@@ -16,8 +16,15 @@ import {
     buildCorrectionString
 } from '../domain/analyses.js';
 import {
+    GURU_COLORS,
+    DEFAULT_GURU_COLOUR,
     getCurrentColorAnalysis,
     getCurrentColorSignature,
+    setColourAnalysis,
+    setColourSignature,
+    colourLabel,
+    emptyColumnIndex,
+    buildColumnIndex,
     getCurrentGuruColIndex,
     getGuruColorInRow
 } from '../domain/guruColor.js';
@@ -54,13 +61,8 @@ export class GuruAnalysisInterface {
         this.currentRowIndex = -1;
         this.currentGuruColor = null;
         this.numDiscrepancies = 0;
-        // Store column indices as attributes for easier access
-        this.redAnalysisColIndex = -1;
-        this.blueAnalysisColIndex = -1;
-        this.greenAnalysisColIndex = -1;
-        this.redSignatureColIndex = -1;
-        this.blueSignatureColIndex = -1;
-        this.greenSignatureColIndex = -1;
+        // Single per-colour column index: { red: { analysis, signature }, ... }
+        this.columnIndex = emptyColumnIndex();
         this.bindEvents();
     }
 
@@ -71,13 +73,7 @@ export class GuruAnalysisInterface {
         this.currentRowIndex = -1;
         this.currentGuruColor = null;
         this.numDiscrepancies = 0;
-        // Store column indices as attributes for easier access
-        this.redAnalysisColIndex = -1;
-        this.blueAnalysisColIndex = -1;
-        this.greenAnalysisColIndex = -1;
-        this.redSignatureColIndex = -1;
-        this.blueSignatureColIndex = -1;
-        this.greenSignatureColIndex = -1;
+        this.columnIndex = emptyColumnIndex();
     }
 
     /**
@@ -97,7 +93,7 @@ export class GuruAnalysisInterface {
 
         if (!currentSignature.trim()) {
             console.log('No guru signature found, defaulting to red');
-            return 'red';
+            return DEFAULT_GURU_COLOUR;
         }
 
         // Find the merged guru sheet
@@ -107,22 +103,17 @@ export class GuruAnalysisInterface {
 
         if (!mergedGuruSheet || !mergedGuruSheet.values || mergedGuruSheet.values.length < 2) {
             console.log('No merged guru sheet found, defaulting to red');
-            return 'red';
+            return DEFAULT_GURU_COLOUR;
         }
 
         const headerRow = mergedGuruSheet.values[0];
-        
-        // Find signature columns
-        const redSignatureColIndex = findColumnIndex(headerRow, ['Red Signature']);
-        const blueSignatureColIndex = findColumnIndex(headerRow, ['Blue Signature']);
-        const greenSignatureColIndex = findColumnIndex(headerRow, ['Green Signature']);
 
-        console.log('Signature column indices:', {
-            red: redSignatureColIndex,
-            blue: blueSignatureColIndex,
-            green: greenSignatureColIndex,
-            currentSignature
-        });
+        // Find signature columns, one per colour
+        const signatureCols = Object.fromEntries(
+            GURU_COLORS.map(colour => [colour, findColumnIndex(headerRow, [`${colourLabel(colour)} Signature`])])
+        );
+
+        console.log('Signature column indices:', { ...signatureCols, currentSignature });
 
         // Start searching from current row index if available, otherwise start from row 1
         const startRowIndex = (this.currentRowIndex !== undefined && this.currentRowIndex >= 0) 
@@ -135,23 +126,13 @@ export class GuruAnalysisInterface {
         for (let i = 0; i < totalRows - 1; i++) {
             const rowIndex = ((startRowIndex - 1 + i) % (totalRows - 1)) + 1; // -1 and +1 to handle header row
             const row = mergedGuruSheet.values[rowIndex];
-            
-            // Check red signature column
-            if (redSignatureColIndex !== -1 && row[redSignatureColIndex] === currentSignature) {
-                console.log(`Found guru signature "${currentSignature}" in Red column at row ${rowIndex}`);
-                return 'red';
-            }
-            
-            // Check blue signature column
-            if (blueSignatureColIndex !== -1 && row[blueSignatureColIndex] === currentSignature) {
-                console.log(`Found guru signature "${currentSignature}" in Blue column at row ${rowIndex}`);
-                return 'blue';
-            }
-            
-            // Check green signature column
-            if (greenSignatureColIndex !== -1 && row[greenSignatureColIndex] === currentSignature) {
-                console.log(`Found guru signature "${currentSignature}" in Green column at row ${rowIndex}`);
-                return 'green';
+
+            for (const colour of GURU_COLORS) {
+                const colIndex = signatureCols[colour];
+                if (colIndex !== -1 && row[colIndex] === currentSignature) {
+                    console.log(`Found guru signature "${currentSignature}" in ${colourLabel(colour)} column at row ${rowIndex}`);
+                    return colour;
+                }
             }
         }
 
@@ -532,13 +513,8 @@ export class GuruAnalysisInterface {
             sheet, sheetIndex, this.currentGuruColor, this.guruSignature
         );
 
-        // Store column indices as class attributes for the write paths
-        this.redAnalysisColIndex = columnIndices.redAnalysis;
-        this.blueAnalysisColIndex = columnIndices.blueAnalysis;
-        this.greenAnalysisColIndex = columnIndices.greenAnalysis;
-        this.redSignatureColIndex = columnIndices.redSignature;
-        this.blueSignatureColIndex = columnIndices.blueSignature;
-        this.greenSignatureColIndex = columnIndices.greenSignature;
+        // Store the resolved column index as a single per-colour structure
+        this.columnIndex = buildColumnIndex(columnIndices);
 
         this.allRows.push(...rows);
         this.numDiscrepancies = numDiscrepancies;
@@ -547,8 +523,8 @@ export class GuruAnalysisInterface {
     // The methods below delegate to js/domain/. They are kept on the class so
     // the rendering and event call sites do not need to change in this phase.
 
-    calculateOutcomeFromAnalyses(redAnalysis, blueAnalysis, greenAnalysis) {
-        return calculateOutcomeFromAnalyses(redAnalysis, blueAnalysis, greenAnalysis);
+    calculateOutcomeFromAnalyses(...guruAnalyses) {
+        return calculateOutcomeFromAnalyses(...guruAnalyses);
     }
 
     getCurrentColorAnalysis(row) {
@@ -938,19 +914,11 @@ export class GuruAnalysisInterface {
                     const skipped = result.skipped && result.skipped.find(s => s.row === row.originalRowIndex + 1);
                     if (skipped) {
                         // This row is already claimed, set the signature to the value from skipped
-                        switch (this.currentGuruColor) {
-                            case 'red': match.redSignature = skipped.currentValue; break;
-                            case 'blue': match.blueSignature = skipped.currentValue; break;
-                            case 'green': match.greenSignature = skipped.currentValue; break;
-                        }
+                        setColourSignature(match, this.currentGuruColor, skipped.currentValue);
                     }
                     else {
                         // Successfully claimed this row, set the signature to user's guru signature
-                        switch (this.currentGuruColor) {
-                            case 'red': match.redSignature = this.guruSignature; break;
-                            case 'blue': match.blueSignature = this.guruSignature; break;
-                            case 'green': match.greenSignature = this.guruSignature; break;
-                        }
+                        setColourSignature(match, this.currentGuruColor, this.guruSignature);
                         actuallyClaimed++;
                     }
                 });
@@ -1122,24 +1090,10 @@ export class GuruAnalysisInterface {
             await this.sheetsAPI.updateSheetData(this.currentData.sheetId, updates);
             
             // Update the specific guru analysis in the local data
-            switch (this.currentGuruColor) {
-                case 'red':
-                    currentRow.redAnalysis = value.toString();
-                    break;
-                case 'blue':
-                    currentRow.blueAnalysis = value.toString();
-                    break;
-                case 'green':
-                    currentRow.greenAnalysis = value.toString();
-                    break;
-            }
+            setColourAnalysis(currentRow, this.currentGuruColor, value.toString());
             
             // Calculate and update the outcome value based on all guru analyses
-            const newOutcome = this.calculateOutcomeFromAnalyses(
-                currentRow.redAnalysis, 
-                currentRow.blueAnalysis, 
-                currentRow.greenAnalysis
-            );
+            const newOutcome = this.calculateOutcomeFromAnalyses(...getGuruAnalysisValues(currentRow));
             currentRow.outcomeValue = newOutcome;
             
             // Update button highlighting immediately based on the new analysis value
@@ -1224,17 +1178,7 @@ export class GuruAnalysisInterface {
             }
 
             // Update local data with the new signature
-            switch (this.currentGuruColor) {
-                case 'red':
-                    currentRow.redSignature = this.guruSignature;
-                    break;
-                case 'blue':
-                    currentRow.blueSignature = this.guruSignature;
-                    break;
-                case 'green':
-                    currentRow.greenSignature = this.guruSignature;
-                    break;
-            }
+            setColourSignature(currentRow, this.currentGuruColor, this.guruSignature);
 
             this.uiController.showStatus('Match claimed successfully!', 'success');
 
@@ -1307,17 +1251,7 @@ export class GuruAnalysisInterface {
             await this.sheetsAPI.clearCell(this.currentData.sheetId, updateObj);
             
             // Update local data to clear the signature
-            switch (this.currentGuruColor) {
-                case 'red':
-                    currentRow.redSignature = '';
-                    break;
-                case 'blue':
-                    currentRow.blueSignature = '';
-                    break;
-                case 'green':
-                    currentRow.greenSignature = '';
-                    break;
-            }
+            setColourSignature(currentRow, this.currentGuruColor, '');
             
             this.uiController.showStatus('Match unclaimed successfully!', 'success');
             
@@ -1386,19 +1320,11 @@ export class GuruAnalysisInterface {
             await this.sheetsAPI.clearCell(this.currentData.sheetId, updateObj);
 
             // Update local data to clear the analysis for the current guru
-            switch (this.currentGuruColor) {
-                case 'red': currentRow.redAnalysis = ''; break;
-                case 'blue': currentRow.blueAnalysis = ''; break;
-                case 'green': currentRow.greenAnalysis = ''; break;
-            }
+            setColourAnalysis(currentRow, this.currentGuruColor, '');
 
             // Recalculate outcome
             const oldOutcome = currentRow.outcomeValue;
-            currentRow.outcomeValue = this.calculateOutcomeFromAnalyses(
-                currentRow.redAnalysis,
-                currentRow.blueAnalysis,
-                currentRow.greenAnalysis
-            );
+            currentRow.outcomeValue = this.calculateOutcomeFromAnalyses(...getGuruAnalysisValues(currentRow));
 
             // Update the number of discrepancies
             if (oldOutcome === 'discrepancy' && currentRow.outcomeValue !== 'discrepancy'){
@@ -1516,14 +1442,11 @@ export class GuruAnalysisInterface {
         const otherAnalyses = [];
         
         // Show analyses from other gurus based on current guru color
-        if (this.currentGuruColor !== 'red' && currentRow.redAnalysis) {
-            otherAnalyses.push({ name: 'Red', value: currentRow.redAnalysis });
-        }
-        if (this.currentGuruColor !== 'blue' && currentRow.blueAnalysis) {
-            otherAnalyses.push({ name: 'Blue', value: currentRow.blueAnalysis });
-        }
-        if (this.currentGuruColor !== 'green' && currentRow.greenAnalysis) {
-            otherAnalyses.push({ name: 'Green', value: currentRow.greenAnalysis });
+        for (const colour of GURU_COLORS) {
+            const analysis = getCurrentColorAnalysis(currentRow, colour);
+            if (this.currentGuruColor !== colour && analysis) {
+                otherAnalyses.push({ name: colourLabel(colour), value: analysis });
+            }
         }
         
         // Build the display HTML with proper structure
@@ -1555,7 +1478,7 @@ export class GuruAnalysisInterface {
         const allAnalyses = [];
         
         // Add current guru's analysis first
-        const currentGuruName = this.currentGuruColor.charAt(0).toUpperCase() + this.currentGuruColor.slice(1);
+        const currentGuruName = colourLabel(this.currentGuruColor);
         allAnalyses.push({ 
             name: currentGuruName, 
             value: currentGuruAnalysis, 
@@ -1565,23 +1488,18 @@ export class GuruAnalysisInterface {
         const showOtherGurus = !this.isMatchAvailableForAnalysis(currentRow);
         
         // Add other guru analyses with their signatures
-        if (this.currentGuruColor !== 'red') {
-            const signature = currentRow.redSignature && currentRow.redSignature.trim() !== '' 
-                ? currentRow.redSignature 
-                : null;
-            allAnalyses.push({ name: 'Red', signature: signature, value: currentRow.redAnalysis, isCurrent: false });
-        }
-        if (this.currentGuruColor !== 'blue') {
-            const signature = currentRow.blueSignature && currentRow.blueSignature.trim() !== '' 
-                ? currentRow.blueSignature 
-                : null;
-            allAnalyses.push({ name: 'Blue', signature: signature, value: currentRow.blueAnalysis, isCurrent: false });
-        }
-        if (this.currentGuruColor !== 'green') {
-            const signature = currentRow.greenSignature && currentRow.greenSignature.trim() !== '' 
-                ? currentRow.greenSignature 
-                : null;
-            allAnalyses.push({ name: 'Green', signature: signature, value: currentRow.greenAnalysis, isCurrent: false });
+        for (const colour of GURU_COLORS) {
+            if (this.currentGuruColor === colour) {
+                continue;
+            }
+            const signatureValue = getCurrentColorSignature(currentRow, colour);
+            const signature = signatureValue && signatureValue.trim() !== '' ? signatureValue : null;
+            allAnalyses.push({
+                name: colourLabel(colour),
+                signature: signature,
+                value: getCurrentColorAnalysis(currentRow, colour),
+                isCurrent: false
+            });
         }
         
         // Build the simple list HTML
@@ -1659,14 +1577,7 @@ export class GuruAnalysisInterface {
      * Returns the column index for the current guru color and type ('analysis' or 'signature')
      */
     getCurrentGuruColIndex(type = 'analysis') {
-        return getCurrentGuruColIndex(this.currentGuruColor, {
-            redAnalysis: this.redAnalysisColIndex,
-            blueAnalysis: this.blueAnalysisColIndex,
-            greenAnalysis: this.greenAnalysisColIndex,
-            redSignature: this.redSignatureColIndex,
-            blueSignature: this.blueSignatureColIndex,
-            greenSignature: this.greenSignatureColIndex
-        }, type);
+        return getCurrentGuruColIndex(this.currentGuruColor, this.columnIndex, type);
     }
 
     /**
@@ -1911,46 +1822,40 @@ export class GuruAnalysisInterface {
             sheet.title === 'Merged Gurus'
         );
 
+        const stats = {};
+        for (const colour of GURU_COLORS) {
+            stats[colour] = { claimed: 0, total: 0 };
+        }
+
         if (!mergedGuruSheet || !mergedGuruSheet.values || mergedGuruSheet.values.length < 2) {
-            return { red: { claimed: 0, total: 0 }, blue: { claimed: 0, total: 0 }, green: { claimed: 0, total: 0 } };
+            return stats;
         }
 
         const headerRow = mergedGuruSheet.values[0];
-        
+
         // Find columns
         const player1ColIndex = findColumnIndex(headerRow, ['Player 1', 'Player1']);
         const player2ColIndex = findColumnIndex(headerRow, ['Player 2', 'Player2']);
-        const redSignatureColIndex = findColumnIndex(headerRow, ['Red Signature']);
-        const blueSignatureColIndex = findColumnIndex(headerRow, ['Blue Signature']);
-        const greenSignatureColIndex = findColumnIndex(headerRow, ['Green Signature']);
-
-        const stats = {
-            red: { claimed: 0, total: 0 },
-            blue: { claimed: 0, total: 0 },
-            green: { claimed: 0, total: 0 }
-        };
+        const signatureCols = Object.fromEntries(
+            GURU_COLORS.map(colour => [colour, findColumnIndex(headerRow, [`${colourLabel(colour)} Signature`])])
+        );
 
         // Count matches for each color
         for (let rowIndex = 1; rowIndex < mergedGuruSheet.values.length; rowIndex++) {
             const row = mergedGuruSheet.values[rowIndex];
             const player1 = row[player1ColIndex] || '';
             const player2 = row[player2ColIndex] || '';
-            
+
             // Only count rows that have player data (actual matches)
             if (player1.trim() || player2.trim()) {
-                stats.red.total++;
-                stats.blue.total++;
-                stats.green.total++;
+                for (const colour of GURU_COLORS) {
+                    stats[colour].total++;
 
-                // Check if each color is claimed
-                if (redSignatureColIndex !== -1 && row[redSignatureColIndex] && row[redSignatureColIndex].trim() !== '') {
-                    stats.red.claimed++;
-                }
-                if (blueSignatureColIndex !== -1 && row[blueSignatureColIndex] && row[blueSignatureColIndex].trim() !== '') {
-                    stats.blue.claimed++;
-                }
-                if (greenSignatureColIndex !== -1 && row[greenSignatureColIndex] && row[greenSignatureColIndex].trim() !== '') {
-                    stats.green.claimed++;
+                    // Check if each color is claimed
+                    const colIndex = signatureCols[colour];
+                    if (colIndex !== -1 && row[colIndex] && row[colIndex].trim() !== '') {
+                        stats[colour].claimed++;
+                    }
                 }
             }
         }
@@ -1971,41 +1876,29 @@ export class GuruAnalysisInterface {
         const stats = this.calculateColorStatistics(sheetData);
         const sheetTitle = sheetData.title || 'Unknown Sheet';
         
+        const colorOptions = GURU_COLORS.map(colour => {
+            const label = colourLabel(colour);
+            const colourStats = stats[colour];
+            return `
+                    <div class="color-option" id="color-${colour}">
+                        <div class="color-circle ${colour}"></div>
+                        <div class="color-info">
+                            <h4>${label} Guru</h4>
+                            <p>${colourStats.claimed} / ${colourStats.total} matches claimed</p>
+                        </div>
+                        <button class="select-color-btn" data-color="${colour}">Select ${label}</button>
+                    </div>`;
+        }).join('\n');
+
         colorSelectionContainer.innerHTML = `
             <div class="color-selection-screen">
                 <h3>Choose Your Guru Color</h3>
                 <h4 class="sheet-title">Pod: ${sheetTitle}</h4>
                 <p>Your signature was not found in any existing analysis. Please select which guru color you want to use for analysis:</p>
-                
-                <div class="color-options">
-                    <div class="color-option" id="color-red">
-                        <div class="color-circle red"></div>
-                        <div class="color-info">
-                            <h4>Red Guru</h4>
-                            <p>${stats.red.claimed} / ${stats.red.total} matches claimed</p>
-                        </div>
-                        <button class="select-color-btn" data-color="red">Select Red</button>
-                    </div>
-                    
-                    <div class="color-option" id="color-blue">
-                        <div class="color-circle blue"></div>
-                        <div class="color-info">
-                            <h4>Blue Guru</h4>
-                            <p>${stats.blue.claimed} / ${stats.blue.total} matches claimed</p>
-                        </div>
-                        <button class="select-color-btn" data-color="blue">Select Blue</button>
-                    </div>
-                    
-                    <div class="color-option" id="color-green">
-                        <div class="color-circle green"></div>
-                        <div class="color-info">
-                            <h4>Green Guru</h4>
-                            <p>${stats.green.claimed} / ${stats.green.total} matches claimed</p>
-                        </div>
-                        <button class="select-color-btn" data-color="green">Select Green</button>
-                    </div>
+
+                <div class="color-options">${colorOptions}
                 </div>
-                
+
                 <p class="color-selection-note">You can start analysing matches by claiming unclaimed matches or work on matches already assigned to your chosen color.</p>
             </div>
         `;

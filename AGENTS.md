@@ -28,6 +28,24 @@ takes the data it needs (row, colour, signature, column indices) as arguments.
 `GuruAnalysisInterface` keeps thin delegating methods so its rendering and event
 call sites are unchanged; new pure logic belongs here, not in the class.
 
+### The colour registry
+
+`js/domain/guruColor.js` is the single source of truth for what a guru colour is.
+`GURU_COLORS` drives the sheet schema, not just the field names:
+
+- `guruSheetName` / `colourFromSheetTitle` derive tab naming and matching.
+- `mergedGuruHeader` / `mergedColumnMapping` / `mergedLastColumn` derive the
+  merged-sheet header and column layout.
+
+`googleSheetsAPI.js` consumes these rather than hard-coding `'Red Gurus'`,
+`'Red Analysis'` or the 3..8 column numbers. Adding a fourth colour is a change
+to `GURU_COLORS` in this module, plus the real spreadsheet gaining that tab and
+its columns; the API module should need no edit. `calculateOutcomeFromAnalyses`
+takes one analysis per colour (via spread) and compares against
+`GURU_COLORS.length`, so it follows too — but note the scoring policy itself
+(majority/tie handling for an even guru count) is deliberately undecided until a
+colour is actually added. Do not add a colour without deciding that policy.
+
 ## Characterization (intentional current quirks)
 
 `tests/unit/characterization.test.js` pins these. Each is labelled CONTRACT
@@ -56,7 +74,7 @@ the-stylus/
 │   ├── config.js               # Google OAuth client ID, scopes, discovery docs, localStorage keys
 │   ├── domain/                 # PURE: no DOM, no gapi, no fetch, no instance state
 │   │   ├── analyses.js         # outcome calc, normalize, labels, css class, correction string
-│   │   ├── guruColor.js        # colour list, colour->field/column resolution
+│   │   ├── guruColor.js        # colour registry: fields, sheet names, merged-column layout
 │   │   ├── inverseCheck.js     # inverse-error detection helpers
 │   │   └── matchRows.js        # row model build + find first incomplete/discrepancy/mirror, deck stats
 │   ├── modules/                # ES6 class-based feature modules

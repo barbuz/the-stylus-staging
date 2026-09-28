@@ -1,3 +1,14 @@
+import {
+    GURU_COLORS,
+    guruSheetName,
+    colourFromSheetTitle,
+    mergedGuruHeader,
+    mergedColumnMapping,
+    mergedLastColumn,
+    GURU_SHEET_ANALYSIS_COLUMN,
+    GURU_SHEET_SIGNATURE_COLUMN
+} from '../domain/guruColor.js';
+
 export class GoogleSheetsAPI {
     constructor(authManager) {
         this.authManager = authManager;
@@ -21,7 +32,7 @@ export class GoogleSheetsAPI {
                 : Promise.resolve({});
             
             // Only process specific sheets needed for the application
-            const requiredSheetNames = ['Deck Notes', 'Red Gurus', 'Blue Gurus', 'Green Gurus'];
+            const requiredSheetNames = ['Deck Notes', ...GURU_COLORS.map(guruSheetName)];
             const sheetsToProcess = metadata.sheets.filter(sheet => 
                 requiredSheetNames.some(requiredName => 
                     sheet.title.toLowerCase().includes(requiredName.toLowerCase())
@@ -127,42 +138,39 @@ export class GoogleSheetsAPI {
     }
 
     async mergeGuruSheets(sheetId, guruSheets) {
-        // Sort sheets to ensure consistent order: Red, Blue, Green
-        const sortedSheets = guruSheets.sort((a, b) => {
-            const order = ['red', 'blue', 'green'];
-            const aIndex = order.findIndex(color => a.title.toLowerCase().includes(color));
-            const bIndex = order.findIndex(color => b.title.toLowerCase().includes(color));
-            return aIndex - bIndex;
-        });
-
-        // Get base data from Red Gurus sheet (columns A:D)
-        const redGuruSheet = sortedSheets.find(sheet => 
-            sheet.title.toLowerCase().includes('red')
+        // Sort sheets into colour order (Red, Blue, Green) so the merge is stable.
+        const sortedSheets = [...guruSheets].sort((a, b) =>
+            GURU_COLORS.indexOf(colourFromSheetTitle(a.title)) -
+            GURU_COLORS.indexOf(colourFromSheetTitle(b.title))
         );
 
-        if (!redGuruSheet) {
+        // Base data (ID, Player 1, Player 2) is shared and lives on the first colour's sheet.
+        const baseGuruSheet = sortedSheets.find(
+            sheet => colourFromSheetTitle(sheet.title) === GURU_COLORS[0]
+        );
+
+        if (!baseGuruSheet) {
             throw new Error('Red Gurus sheet not found');
         }
 
         // Run all queries in parallel for maximum performance
         const allPromises = [
-            // Base data query (A:C from Red Gurus, excluding outcome column D)
+            // Base data query (A:C from the base sheet, excluding outcome column D)
             gapi.client.sheets.spreadsheets.values.get({
                 spreadsheetId: sheetId,
-                range: `'${redGuruSheet.title}'!A1:C1000`,
+                range: `'${baseGuruSheet.title}'!A1:C1000`,
             }),
             // Analysis and signature queries for all guru sheets
             ...sortedSheets.map(async (sheet) => {
-                const color = sheet.title.toLowerCase().includes('red') ? 'red' :
-                             sheet.title.toLowerCase().includes('blue') ? 'blue' : 'green';
-                
+                const colour = colourFromSheetTitle(sheet.title);
+
                 const response = await gapi.client.sheets.spreadsheets.values.get({
                     spreadsheetId: sheetId,
                     range: `'${sheet.title}'!E1:F1000`, // Only columns E and F (analysis and signature)
                 });
 
                 return {
-                    color,
+                    colour,
                     sheetId: sheet.sheetId,
                     values: response.result.values || []
                 };
@@ -172,27 +180,22 @@ export class GoogleSheetsAPI {
         // Wait for all queries to complete
         const [baseResponse, ...guruResults] = await Promise.all(allPromises);
         const baseValues = baseResponse.result.values || [];
-        
-        // Organize guru results by color
+
+        // Organize guru results by colour
         const guruData = {};
         guruResults.forEach(result => {
-            guruData[result.color] = {
+            guruData[result.colour] = {
                 sheetId: result.sheetId,
                 values: result.values
             };
         });
-        
+
         // Prepare merged data structure
         const mergedValues = [];
-        
+
         if (baseValues.length > 0) {
-            // Create header row: ID, Player 1, Player 2, Red Analysis, Red Signature, Blue Analysis, Blue Signature, Green Analysis, Green Signature
-            const headerRow = [
-                ...baseValues[0], // A:C from base (ID, Player 1, Player 2)
-                'Red Analysis', 'Red Signature',
-                'Blue Analysis', 'Blue Signature', 
-                'Green Analysis', 'Green Signature'
-            ];
+            // Base columns (A:C), then each colour's analysis/signature pair in order.
+            const headerRow = [...baseValues[0], ...mergedGuruHeader()];
             mergedValues.push(headerRow);
 
             // Merge data rows
@@ -206,11 +209,11 @@ export class GoogleSheetsAPI {
                 }
 
                 // Add analysis and signature from each guru sheet
-                for (const color of ['red', 'blue', 'green']) {
-                    const colorData = guruData[color];
-                    if (colorData && colorData.values[i]) {
-                        mergedRow.push(colorData.values[i][0] || ''); // Analysis (column E)
-                        mergedRow.push(colorData.values[i][1] || ''); // Signature (column F)
+                for (const colour of GURU_COLORS) {
+                    const colourData = guruData[colour];
+                    if (colourData && colourData.values[i]) {
+                        mergedRow.push(colourData.values[i][0] || ''); // Analysis (column E)
+                        mergedRow.push(colourData.values[i][1] || ''); // Signature (column F)
                     } else {
                         mergedRow.push(''); // Empty analysis
                         mergedRow.push(''); // Empty signature
@@ -225,32 +228,23 @@ export class GoogleSheetsAPI {
 
         return {
             title: 'Merged Gurus',
-            sheetId: redGuruSheet.sheetId, // Use Red Gurus sheet ID as primary
+            sheetId: baseGuruSheet.sheetId, // Use the base (Red) Gurus sheet ID as primary
             values: mergedValues,
-            range: `'${redGuruSheet.title}'!A1:I${mergedValues.length}`,
+            range: `'${baseGuruSheet.title}'!A1:${mergedLastColumn()}${mergedValues.length}`,
             majorDimension: 'ROWS',
             columnMapping: this.getMergedGuruColumnMapping(),
             hidden: hidden,
-            guruSheetIds: {
-                red: sortedSheets.find(s => s.title.toLowerCase().includes('red'))?.sheetId,
-                blue: sortedSheets.find(s => s.title.toLowerCase().includes('blue'))?.sheetId,
-                green: sortedSheets.find(s => s.title.toLowerCase().includes('green'))?.sheetId
-            }
+            guruSheetIds: Object.fromEntries(
+                GURU_COLORS.map(colour => [
+                    colour,
+                    sortedSheets.find(sheet => colourFromSheetTitle(sheet.title) === colour)?.sheetId
+                ])
+            )
         };
     }
 
     getMergedGuruColumnMapping() {
-        return {
-            id: 0,              // Column A
-            player1: 1,         // Column B
-            player2: 2,         // Column C
-            redAnalysis: 3,     // Column D
-            redSignature: 4,    // Column E
-            blueAnalysis: 5,    // Column F
-            blueSignature: 6,   // Column G
-            greenAnalysis: 7,   // Column H
-            greenSignature: 8   // Column I
-        };
+        return mergedColumnMapping();
     }
 
     /**
@@ -266,18 +260,23 @@ export class GoogleSheetsAPI {
         if (update.isMergedGuruUpdate) {
             const columnMapping = this.getMergedGuruColumnMapping();
 
-            if (update.col === columnMapping.redAnalysis + 1 || update.col === columnMapping.redSignature + 1) {
-                targetSheetId = update.guruSheetIds.red;
-                targetCol = update.col === columnMapping.redAnalysis + 1 ? 5 : 6; // E or F
-            } else if (update.col === columnMapping.blueAnalysis + 1 || update.col === columnMapping.blueSignature + 1) {
-                targetSheetId = update.guruSheetIds.blue;
-                targetCol = update.col === columnMapping.blueAnalysis + 1 ? 5 : 6; // E or F
-            } else if (update.col === columnMapping.greenAnalysis + 1 || update.col === columnMapping.greenSignature + 1) {
-                targetSheetId = update.guruSheetIds.green;
-                targetCol = update.col === columnMapping.greenAnalysis + 1 ? 5 : 6; // E or F
-            } else if (update.col <= 3) {
-                // Base columns (A:C) go to Red Gurus sheet
-                targetSheetId = update.guruSheetIds.red;
+            // Each colour's merged analysis/signature pair maps back to columns
+            // E/F on that colour's own sheet.
+            for (const colour of GURU_COLORS) {
+                const analysisCol = columnMapping[`${colour}Analysis`] + 1;
+                const signatureCol = columnMapping[`${colour}Signature`] + 1;
+                if (update.col === analysisCol || update.col === signatureCol) {
+                    targetSheetId = update.guruSheetIds[colour];
+                    targetCol = update.col === analysisCol
+                        ? GURU_SHEET_ANALYSIS_COLUMN
+                        : GURU_SHEET_SIGNATURE_COLUMN;
+                    return { targetSheetId, targetCol };
+                }
+            }
+
+            if (update.col <= 3) {
+                // Base columns (A:C) go to the first colour's sheet.
+                targetSheetId = update.guruSheetIds[GURU_COLORS[0]];
                 targetCol = update.col;
             }
         }
@@ -303,8 +302,8 @@ export class GoogleSheetsAPI {
                 id: 0,             // Column A
                 player1: 1,        // Column B
                 player2: 2,        // Column C
-                guruAnalysis: 4,   // Column E
-                guruSignature: 5   // Column F
+                guruAnalysis: GURU_SHEET_ANALYSIS_COLUMN - 1,   // Column E
+                guruSignature: GURU_SHEET_SIGNATURE_COLUMN - 1  // Column F
             };
         }
     }
@@ -641,7 +640,7 @@ export class GoogleSheetsAPI {
         // Get all sheet metadata
         const metadata = await this.getSheetMetadata(sheetId);
         // Only match exact Guru sheet names (case-insensitive)
-        const guruSheetNames = ['Red Gurus', 'Blue Gurus', 'Green Gurus'];
+        const guruSheetNames = GURU_COLORS.map(guruSheetName);
         const guruSheets = metadata.sheets.filter(sheet =>
             guruSheetNames.some(name => sheet.title.trim().toLowerCase() === name.toLowerCase())
         );

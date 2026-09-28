@@ -5,7 +5,13 @@
  * signature as arguments. No DOM, no gapi, no fetch.
  */
 import { calculateOutcomeFromAnalyses, getGuruAnalysisValues, normalizeAnalysisForComparison } from './analyses.js';
-import { getCurrentColorAnalysis, getCurrentColorSignature } from './guruColor.js';
+import {
+    GURU_COLORS,
+    getCurrentColorAnalysis,
+    getCurrentColorSignature,
+    colourField,
+    colourLabel
+} from './guruColor.js';
 
 /** Substring match of the first matching header alias, or -1. */
 export function findColumnIndex(headerRow, possibleNames) {
@@ -36,14 +42,12 @@ export function buildMatchRows(sheet, sheetIndex, colour, signature) {
 
     const columnIndices = {
         player1: player1ColIndex,
-        player2: player2ColIndex,
-        redAnalysis: findColumnIndex(headerRow, ['Red Analysis']),
-        blueAnalysis: findColumnIndex(headerRow, ['Blue Analysis']),
-        greenAnalysis: findColumnIndex(headerRow, ['Green Analysis']),
-        redSignature: findColumnIndex(headerRow, ['Red Signature']),
-        blueSignature: findColumnIndex(headerRow, ['Blue Signature']),
-        greenSignature: findColumnIndex(headerRow, ['Green Signature'])
+        player2: player2ColIndex
     };
+    for (const colour of GURU_COLORS) {
+        columnIndices[colourField(colour, 'analysis')] = findColumnIndex(headerRow, [`${colourLabel(colour)} Analysis`]);
+        columnIndices[colourField(colour, 'signature')] = findColumnIndex(headerRow, [`${colourLabel(colour)} Signature`]);
+    }
 
     // Throw error if any required column is missing
     if (Object.values(columnIndices).some(index => index === -1)) {
@@ -62,15 +66,20 @@ export function buildMatchRows(sheet, sheetIndex, colour, signature) {
 
         const player1 = row[columnIndices.player1] || '';
         const player2 = row[columnIndices.player2] || '';
-        const redAnalysis = row[columnIndices.redAnalysis].toString().trim() || '';
-        const blueAnalysis = row[columnIndices.blueAnalysis].toString().trim() || '';
-        const greenAnalysis = row[columnIndices.greenAnalysis].toString().trim() || '';
-        const redSignature = row[columnIndices.redSignature].toString().trim() || '';
-        const blueSignature = row[columnIndices.blueSignature].toString().trim() || '';
-        const greenSignature = row[columnIndices.greenSignature].toString().trim() || '';
+        // Pull each guru's analysis and signature through the colour lookup, so
+        // the field names are derived rather than hard-coded per colour.
+        const colourValues = {};
+        for (const colour of GURU_COLORS) {
+            colourValues[colourField(colour, 'analysis')] =
+                row[columnIndices[colourField(colour, 'analysis')]].toString().trim() || '';
+            colourValues[colourField(colour, 'signature')] =
+                row[columnIndices[colourField(colour, 'signature')]].toString().trim() || '';
+        }
 
-        // Calculate outcome based on all guru analyses
-        const outcomeValue = calculateOutcomeFromAnalyses(redAnalysis, blueAnalysis, greenAnalysis);
+        // Calculate outcome based on all guru analyses, in colour order
+        const outcomeValue = calculateOutcomeFromAnalyses(
+            ...GURU_COLORS.map(colour => colourValues[colourField(colour, 'analysis')])
+        );
 
         const newRow = {
             sheetIndex,
@@ -80,12 +89,7 @@ export function buildMatchRows(sheet, sheetIndex, colour, signature) {
             player1: player1.trim(),
             player2: player2.trim(),
             outcomeValue,
-            redAnalysis,
-            blueAnalysis,
-            greenAnalysis,
-            redSignature,
-            blueSignature,
-            greenSignature,
+            ...colourValues,
             originalRowIndex // Use the original row index from unfiltered data
         };
 
@@ -112,7 +116,7 @@ export function rowHasCurrentGuruSignature(row, signature) {
         return false;
     }
 
-    return [row.redSignature, row.blueSignature, row.greenSignature].includes(currentSignature);
+    return GURU_COLORS.some(colour => getCurrentColorSignature(row, colour) === currentSignature);
 }
 
 /** The signature appears in the current colour's column of the row. */

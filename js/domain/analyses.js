@@ -5,29 +5,28 @@
  * it needs as arguments. GuruAnalysisInterface keeps thin delegators so its
  * call sites are unchanged.
  */
+import { GURU_COLORS, getCurrentColorAnalysis } from './guruColor.js';
 
 /**
- * Resolve the match outcome from the three guru analyses.
+ * Resolve the match outcome from the guru analyses, one value per guru colour.
  *
- * Comparison is on raw strings, so '1.0' and '1' are a Discrepancy even though
- * they are the same score. That is the documented contract; see AGENTS.md.
+ * Takes the analyses positionally (a value per entry in GURU_COLORS) so callers
+ * spread a colour-ordered list. Comparison is on raw strings, so '1.0' and '1'
+ * are a Discrepancy even though they are the same score. That is the documented
+ * contract; see AGENTS.md.
  */
-export function calculateOutcomeFromAnalyses(redAnalysis, blueAnalysis, greenAnalysis) {
+export function calculateOutcomeFromAnalyses(...guruAnalyses) {
     // Collect all guru analyses
     const analyses = [];
 
-    if (redAnalysis && redAnalysis.trim() !== '') {
-        analyses.push(redAnalysis.trim());
-    }
-    if (blueAnalysis && blueAnalysis.trim() !== '') {
-        analyses.push(blueAnalysis.trim());
-    }
-    if (greenAnalysis && greenAnalysis.trim() !== '') {
-        analyses.push(greenAnalysis.trim());
+    for (const value of guruAnalyses) {
+        if (value && value.trim() !== '') {
+            analyses.push(value.trim());
+        }
     }
 
     // If any guru's analysis is missing, it's incomplete
-    const expectedAnalyses = 3; // Red, Blue, Green
+    const expectedAnalyses = GURU_COLORS.length;
     if (analyses.length < expectedAnalyses) {
         return 'Incomplete';
     }
@@ -68,7 +67,7 @@ export function getGuruAnalysisValues(row) {
     if (!row) {
         return [];
     }
-    return [row.redAnalysis || '', row.blueAnalysis || '', row.greenAnalysis || ''];
+    return GURU_COLORS.map(colour => getCurrentColorAnalysis(row, colour));
 }
 
 /** Convert an analysis value to a single W/T/L letter. */
@@ -149,12 +148,8 @@ export function buildCorrectionString(row, currentAnalysis) {
         return '';
     }
 
-    // Get all analyses
-    const allAnalyses = [
-        row.redAnalysis,
-        row.blueAnalysis,
-        row.greenAnalysis
-    ].filter(a => a && a.trim() !== ''); // Remove empty analyses
+    // Get all analyses (Red/Blue/Green order), dropping the empty slots
+    const allAnalyses = getGuruAnalysisValues(row).filter(a => a && a.trim() !== '');
 
     // Get current guru analysis value
     const currentValue = parseFloat(currentAnalysis);
