@@ -196,6 +196,24 @@ export function isCurrentMatchAvailableForAnalysis(rows, colour, signature, curr
     return isMatchAvailableForAnalysis(rows[currentRowIndex], colour, signature);
 }
 
+/**
+ * True when the current row is not awaiting work: no valid selection, or the
+ * selected row already has a result (a complete/deleted row or one claimed by
+ * another guru). Drives the "nothing to write" completion message.
+ */
+export function isCurrentRowResolved(rows, colour, signature, currentRowIndex) {
+    const currentRow = rows[currentRowIndex];
+    if (!currentRow) {
+        return true;
+    }
+
+    if (isCurrentMatchAvailableForAnalysis(rows, colour, signature, currentRowIndex)) {
+        return false;
+    }
+
+    return Boolean(hasCurrentColorResult(currentRow, colour));
+}
+
 /** Whether the current colour has scored every row (and there is at least one). */
 export function isAnalysisComplete(rows, colour) {
     for (let i = 0; i < rows.length; i++) {

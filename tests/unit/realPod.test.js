@@ -12,7 +12,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { GoogleSheetsAPI } from '../../js/modules/googleSheetsAPI.js';
-import { GuruAnalysisInterface } from '../../js/modules/guruAnalysisInterface.js';
+import { AnalysisController } from '../../js/ui/analysisController.js';
 import { findColumnIndex, findMirrorMatchIndex } from '../../js/domain/matchRows.js';
 import { calculateOutcomeFromAnalyses } from '../../js/domain/analyses.js';
 import { fakeAuthManager } from '../fixtures/fakeGapi.js';
@@ -119,7 +119,7 @@ function withRealPodGapi() {
 }
 
 function logic() {
-    return Object.create(GuruAnalysisInterface.prototype);
+    return Object.create(AnalysisController.prototype);
 }
 
 test('real pod: base columns come from Red only, analysis from all three', async () => {

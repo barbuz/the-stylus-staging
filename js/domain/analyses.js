@@ -116,6 +116,36 @@ export function getAnalysisLabel(value) {
     return value.toString();
 }
 
+/**
+ * The current outcome cell's text and CSS class, plus the numeric value when
+ * the outcome parses as a number. Used by the analysis view to render the
+ * scoring-value element.
+ */
+export function describeOutcome(outcomeValue) {
+    if (!outcomeValue) {
+        return { text: 'Not set', className: 'scoring-value', analysisValue: null };
+    }
+
+    const outcome = outcomeValue.toLowerCase().trim();
+
+    if (outcome === 'discrepancy') {
+        return { text: 'Discrepancy', className: 'scoring-value discrepancy', analysisValue: null };
+    }
+    if (outcome === 'incomplete') {
+        return { text: 'Incomplete', className: 'scoring-value', analysisValue: null };
+    }
+
+    const numValue = parseFloat(outcomeValue);
+    if (!isNaN(numValue)) {
+        if (numValue === 1.0) return { text: 'Win (1.0)', className: 'scoring-value', analysisValue: numValue };
+        if (numValue === 0.5) return { text: 'Tie (0.5)', className: 'scoring-value', analysisValue: numValue };
+        if (numValue === 0.0) return { text: 'Loss (0.0)', className: 'scoring-value', analysisValue: numValue };
+        return { text: `Custom (${numValue})`, className: 'scoring-value', analysisValue: numValue };
+    }
+
+    return { text: outcomeValue, className: 'scoring-value', analysisValue: null };
+}
+
 /** Human-readable label for an outcome value, including the text states. */
 export function getOutcomeDisplayName(outcomeValue) {
     if (!outcomeValue || outcomeValue.trim() === '') return '';

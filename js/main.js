@@ -2,7 +2,7 @@ import { GoogleSheetsAPI } from './modules/googleSheetsAPI.js';
 import { UIController } from './modules/uiController.js';
 import { AuthManager } from './modules/authManager.js';
 import { GuruSignature } from './modules/guruSignature.js';
-import { GuruAnalysisInterface } from './modules/guruAnalysisInterface.js';
+import { AnalysisController } from './ui/analysisController.js';
 import { RecentPodsManager } from './modules/recentPods.js';
 import { CONFIG, DEPLOYMENTS } from './config.js';
 import {
@@ -383,7 +383,7 @@ class ThreeCardBlindGuruTool {
             
             // Load data into the analysis interface
             if (!this.analysisInterface) {
-                this.analysisInterface = new GuruAnalysisInterface(this.sheetsAPI, this.uiController, this.authManager.guruSignature);
+                this.analysisInterface = new AnalysisController(this.sheetsAPI, this.uiController, this.authManager.guruSignature);
             } else {
                 this.analysisInterface.reset();
                 this.analysisInterface.setGuruSignature(this.authManager.guruSignature);
