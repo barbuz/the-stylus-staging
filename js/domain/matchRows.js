@@ -340,6 +340,26 @@ export function findMirrorMatchIndex(rows, rowIndex) {
 
 // --- Statistics --------------------------------------------------------------
 
+/** The id a row is keyed by in the thread map: its sheet row, else 1-based index. */
+export function getRowThreadId(row, fallbackIndex) {
+    if (row && typeof row.rowIndex === 'number') {
+        return row.rowIndex;
+    }
+    if (row && typeof row.originalRowIndex === 'number') {
+        return row.originalRowIndex;
+    }
+    return fallbackIndex + 1;
+}
+
+/** Whether the thread map has an entry for this row. */
+export function hasDiscordThreadForRow(threadMap, row, fallbackIndex) {
+    if (!threadMap || typeof threadMap.has !== 'function') {
+        return false;
+    }
+    const rowId = getRowThreadId(row, fallbackIndex);
+    return rowId != null && threadMap.has(rowId);
+}
+
 /**
  * Parse every guru sheet in a pod into one row model.
  *

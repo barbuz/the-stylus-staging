@@ -96,7 +96,9 @@ the-stylus/
 │   │   ├── guruColorSelector.js       # Colour dropdown, owns its dismiss listeners
 │   │   ├── matchStatus.js             # Pure match-status descriptors/markup
 │   │   ├── matchTableModal.js         # Match table modal, open/close/destroy
-│   │   └── threadModal.js             # Create-thread modal, open/close/destroy
+│   │   ├── matchTablePresenter.js     # Row/status options for the match table
+│   │   ├── threadModal.js             # Create-thread modal, open/close/destroy
+│   │   └── threadPresenter.js         # Builds the Discord thread text for a row
 │   └── utils/                  # Pure helper functions
 │       ├── constants.js        # STATUS_TYPES, ANALYSIS_VALUES, TIME_CONSTANTS
 │       ├── domUtils.js         # Safe DOM access

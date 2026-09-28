@@ -11,12 +11,10 @@
 import { ScryfallAPI } from '../modules/scryfallAPI.js';
 import { DeckNotesEditor } from '../modules/deckNotesEditor.js';
 import { HubManager } from '../modules/hubManager.js';
-import { DEPLOYMENTS } from '../config.js';
 import {
     calculateOutcomeFromAnalyses,
     getGuruAnalysisValues,
-    getAnalysisLabel,
-    buildCorrectionString
+    getAnalysisLabel
 } from '../domain/analyses.js';
 import {
     getCurrentColorAnalysis,
@@ -26,11 +24,12 @@ import {
     emptyColumnIndex,
     getCurrentGuruColIndex,
     getGuruColorInRow,
-    determineGuruColorFromSheet,
-    deploymentSheetLink
+    determineGuruColorFromSheet
 } from '../domain/guruColor.js';
 import {
     parsePodSheets,
+    getRowThreadId,
+    hasDiscordThreadForRow,
     hasCurrentColorResult,
     rowHasDiscrepancy,
     rowHasMyDiscrepancy,
@@ -46,13 +45,14 @@ import {
 } from '../domain/matchRows.js';
 import { isInverseErrorSuspected, describeInverseResult } from '../domain/inverseCheck.js';
 import { processDeckNotes, calculateColorStatistics } from '../domain/deckNotes.js';
-import { describeMatchStatus, renderMatchStatus } from './matchStatus.js';
 import { AnalysisView } from './analysisView.js';
 import { AnalysisWriter } from './analysisWriter.js';
 import { CardPresenter } from './cardPresenter.js';
 import { GuruColorSelector } from './guruColorSelector.js';
 import { MatchTableModal } from './matchTableModal.js';
+import { MatchTablePresenter } from './matchTablePresenter.js';
 import { ThreadModal } from './threadModal.js';
+import { ThreadPresenter } from './threadPresenter.js';
 
 export class AnalysisController {
     constructor(sheetsAPI, uiController, guruSignature) {
@@ -81,7 +81,9 @@ export class AnalysisController {
         this.cards = new CardPresenter(this.scryfallAPI, this.view);
         this.guruColorSelector = null;
         this.matchTableModal = new MatchTableModal();
+        this.matchTablePresenter = new MatchTablePresenter(this.matchTableModal);
         this.threadModal = new ThreadModal();
+        this.threadPresenter = new ThreadPresenter(this.scryfallAPI, this.threadModal);
 
         this.bindEvents();
     }
@@ -1054,28 +1056,20 @@ export class AnalysisController {
     async showMatchTableModal() {
         const threadMap = await this.getMatchTableThreadMap();
 
-        await this.matchTableModal.open({
+        await this.matchTablePresenter.open({
             rows: this.allRows,
             currentRowIndex: this.currentRowIndex,
-            signatureFor: (row) => getCurrentColorSignature(row, this.currentGuruColor) || '',
-            rowClassFor: (row, idx) => {
-                const signature = getCurrentColorSignature(row, this.currentGuruColor) || '';
-                const highlight = idx === this.currentRowIndex ? 'current-row' : '';
-                const currentGuruRow = signature === this.guruSignature ? 'current-guru-row' : '';
-                return `${highlight} ${currentGuruRow}`;
-            },
-            statusMarkupFor: (row, idx) => {
-                const signature = (getCurrentColorSignature(row, this.currentGuruColor) || '').trim();
-                const status = describeMatchStatus({
-                    signature,
-                    hasResult: this.hasCurrentColorResult(row),
-                    hasDiscrepancy: this.rowHasDiscrepancy(row),
-                    hasThread: this.hasDiscordThreadForRow(threadMap, row, idx),
-                    inverseSuspected: this.isInverseErrorSuspected(idx),
-                    allMatching: this.allGurusHaveMatchingResults(row)
-                });
-                return renderMatchStatus(status);
-            },
+            colour: this.currentGuruColor,
+            signature: this.guruSignature,
+            threadMap,
+            statusFor: (row, idx) => ({
+                signature: (getCurrentColorSignature(row, this.currentGuruColor) || '').trim(),
+                hasResult: this.hasCurrentColorResult(row),
+                hasDiscrepancy: this.rowHasDiscrepancy(row),
+                hasThread: this.hasDiscordThreadForRow(threadMap, row, idx),
+                inverseSuspected: this.isInverseErrorSuspected(idx),
+                allMatching: this.allGurusHaveMatchingResults(row)
+            }),
             onSelect: (idx) => {
                 if (idx >= 0) {
                     this.currentRowIndex = idx;
@@ -1086,7 +1080,7 @@ export class AnalysisController {
     }
 
     closeMatchTableModal() {
-        this.matchTableModal.close();
+        this.matchTablePresenter.close();
     }
 
     async getMatchTableThreadMap() {
@@ -1103,21 +1097,11 @@ export class AnalysisController {
     }
 
     getRowThreadId(row, fallbackIndex) {
-        if (row && typeof row.rowIndex === 'number') {
-            return row.rowIndex;
-        }
-        if (row && typeof row.originalRowIndex === 'number') {
-            return row.originalRowIndex;
-        }
-        return fallbackIndex + 1;
+        return getRowThreadId(row, fallbackIndex);
     }
 
     hasDiscordThreadForRow(threadMap, row, fallbackIndex) {
-        if (!threadMap || typeof threadMap.has !== 'function') {
-            return false;
-        }
-        const rowId = this.getRowThreadId(row, fallbackIndex);
-        return rowId != null && threadMap.has(rowId);
+        return hasDiscordThreadForRow(threadMap, row, fallbackIndex);
     }
 
     hasCurrentColorResult(row) {
@@ -1145,23 +1129,6 @@ export class AnalysisController {
     }
 
     /**
-     * Formats a deck string into card names separated by pipes
-     * @param {string} deckString - The deck string (e.g., "Card1 | Card2 | Card3")
-     * @returns {string} - Card names joined by ' | '
-     */
-    formatDeckForThread(deckString) {
-        if (!deckString || !deckString.trim()) {
-            return '';
-        }
-
-        // Parse the deck string using the same method as ScryfallAPI
-        const cardNames = this.scryfallAPI.parseDeckString(deckString);
-
-        // Join with pipes
-        return cardNames.join(' | ');
-    }
-
-    /**
      * Shows modal with Discord thread text for the current match
      * @param {number} rowIndex - Index of the row to create thread text for
      */
@@ -1172,30 +1139,14 @@ export class AnalysisController {
         }
 
         const currentRow = this.allRows[rowIndex];
-        const podName = this.currentData.metadata?.podName || 'Pod';
-        const matchNumber = rowIndex + 1;
-
-        // Format the thread text
-        const p1Cards = this.formatDeckForThread(currentRow.player1);
-        const p2Cards = this.formatDeckForThread(currentRow.player2);
-
-        // A shared link always points at the canonical production URL; the
-        // recipient's own deployment preference then decides where it opens.
-        const matchLink = deploymentSheetLink(
-            window.location.href,
-            DEPLOYMENTS.production.path,
-            this.currentData.sheetId,
-            this.currentData.metadata?.mainSheetLink
-        );
-
-        // Build correction string (e.g., "W/T->L")
-        const correctionString = buildCorrectionString(currentRow, this.getCurrentColorAnalysis(currentRow));
-        const threadText = `P1 - ${p1Cards}\nP2 - ${p2Cards}\n[See match on The Stylus](${matchLink}) :Stylus:${correctionString}\n`;
-
-        const titleText = `${podName} ${matchNumber}`;
-        const writeupCommand = `/writeup matchid:${podName} ${matchNumber}`;
-
-        this.threadModal.open({ titleText, threadText, writeupCommand });
+        this.threadPresenter.open({
+            row: currentRow,
+            rowIndex,
+            sheetId: this.currentData.sheetId,
+            podName: this.currentData.metadata?.podName || 'Pod',
+            mainSheetLink: this.currentData.metadata?.mainSheetLink,
+            currentAnalysis: this.getCurrentColorAnalysis(currentRow)
+        });
     }
 
     /**
