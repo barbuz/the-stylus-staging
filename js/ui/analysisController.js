@@ -49,6 +49,8 @@ import { isInverseErrorSuspected } from '../domain/inverseCheck.js';
 import { processDeckNotes, calculateColorStatistics } from '../domain/deckNotes.js';
 import { describeMatchStatus, renderMatchStatus } from './matchStatus.js';
 import { AnalysisView } from './analysisView.js';
+import { AnalysisWriter } from './analysisWriter.js';
+import { CardPresenter } from './cardPresenter.js';
 import { GuruColorSelector } from './guruColorSelector.js';
 import { MatchTableModal } from './matchTableModal.js';
 import { ThreadModal } from './threadModal.js';
@@ -76,6 +78,8 @@ export class AnalysisController {
             onUnclaim: () => this.unclaimRow(),
             onClear: () => this.clearCurrentUserAnalysis()
         });
+        this.writer = new AnalysisWriter(sheetsAPI);
+        this.cards = new CardPresenter(this.scryfallAPI, this.view);
         this.guruColorSelector = null;
         this.matchTableModal = new MatchTableModal();
         this.threadModal = new ThreadModal();
@@ -386,8 +390,10 @@ export class AnalysisController {
         this.updateGuruColorDisplay();
 
         // Load card images for both players
-        const cards1Loaded = this.loadPlayerCards('player1', currentRow.player1);
-        const cards2Loaded = this.loadPlayerCards('player2', currentRow.player2);
+        const cards1Loaded = this.cards.loadPlayerCards('player1', currentRow.player1);
+        const cards2Loaded = this.cards.loadPlayerCards('player2', currentRow.player2);
+        this.displayDeckInfo('player1', currentRow.player1);
+        this.displayDeckInfo('player2', currentRow.player2);
 
         // Update current outcome display
         this.view.renderOutcome(currentRow.outcomeValue);
@@ -419,7 +425,7 @@ export class AnalysisController {
         await cards2Loaded;
 
         // Preload card images for adjacent matches in the background
-        this.preloadCardImages();
+        this.cards.preloadRows(this.allRows, this.rowsToPreload());
     }
 
     /** Build the analysis list, fetching its Discord thread link if any. */
@@ -468,26 +474,15 @@ export class AnalysisController {
             return;
         }
 
-        // Prepare batch updates
-        const updates = {
-            updates: rowsToClaim.map(row => {
-                const signatureColIndex = this.getCurrentGuruColIndex('signature');
-                return {
-                    sheetId: row.sheetId,
-                    row: row.originalRowIndex + 1,
-                    col: signatureColIndex + 1,
-                    value: this.guruSignature,
-                    expectedValue: '',
-                    valueType: 'string',
-                    isMergedGuruUpdate: true,
-                    guruSheetIds: this.currentData.sheets.find(s => s.title === 'Merged Gurus')?.guruSheetIds
-                };
-            })
-        };
-
         try {
             this.uiController.showStatus(`Claiming ${rowsToClaim.length} matches for deck...`, 'loading');
-            const result = await this.sheetsAPI.checkedUpdateSheetData(this.currentData.sheetId, updates);
+            const result = await this.writer.claimRows({
+                sheetId: this.currentData.sheetId,
+                rows: rowsToClaim.map(row => row.originalRowIndex),
+                col: this.getCurrentGuruColIndex('signature'),
+                signature: this.guruSignature,
+                guruSheetIds: this.currentData.sheets.find(s => s.title === 'Merged Gurus')?.guruSheetIds
+            });
 
             // Update local data for only those that were actually claimed
             let actuallyClaimed = 0;
@@ -519,73 +514,23 @@ export class AnalysisController {
         }
     }
 
-    /**
-     * Preload card images for adjacent matches and the next empty analysis
-     * This improves user experience by having images ready when user navigates
-     */
-    preloadCardImages() {
-        const decksToPreload = [];
-        const rowsToPreload = new Set();
+    /** Indices worth warming: the next empty, plus the adjacent rows. */
+    rowsToPreload() {
+        const indices = new Set();
 
-        // 1. Preload next empty analysis starting from after current row
         const nextEmptyIndex = this.findFirstEmptyAnalysis(this.currentRowIndex + 1);
         if (nextEmptyIndex != null) {
-            rowsToPreload.add(nextEmptyIndex);
+            indices.add(nextEmptyIndex);
         }
 
-        // 2. Preload next match (currentRowIndex + 1)
-        const nextRowIndex = this.currentRowIndex + 1;
-        if (nextRowIndex >= 0 && nextRowIndex < this.allRows.length) {
-            rowsToPreload.add(nextRowIndex);
-        }
-
-        // 3. Preload previous match (currentRowIndex - 1)
-        const prevRowIndex = this.currentRowIndex - 1;
-        if (prevRowIndex >= 0 && prevRowIndex < this.allRows.length) {
-            rowsToPreload.add(prevRowIndex);
-        }
-
-
-        // Collect all decks from the rows we want to preload
-        rowsToPreload.forEach(rowIndex => {
-            const row = this.allRows[rowIndex];
-            if (row) {
-                if (row.player1 && row.player1.trim()) {
-                    decksToPreload.push(row.player1.trim());
-                }
-                if (row.player2 && row.player2.trim()) {
-                    decksToPreload.push(row.player2.trim());
-                }
+        for (const offset of [1, -1]) {
+            const index = this.currentRowIndex + offset;
+            if (index >= 0 && index < this.allRows.length) {
+                indices.add(index);
             }
-        });
-
-        if (decksToPreload.length > 0) {
-            // Start preloading in the background with slower pace to not interfere
-            this.scryfallAPI.preloadCards(decksToPreload, {
-                delay: 300,  // Slower preloading to be less aggressive
-                silent: true // Don't spam console logs
-            });
-
-            console.log(`🔄 Started preloading cards for ${rowsToPreload.size} matches (rows: ${Array.from(rowsToPreload).map(i => i + 1).join(', ')})`);
         }
-    }
 
-    async loadPlayerCards(playerId, deckString) {
-        const cardNames = this.scryfallAPI.parseDeckString(deckString);
-        const slots = this.view.renderCardLoading(playerId, cardNames);
-
-        // Add deck information if available
-        this.displayDeckInfo(playerId, deckString);
-
-        try {
-            const deckImages = await this.scryfallAPI.getDeckImages(deckString);
-            this.view.renderCards(slots, deckImages, {
-                getCardUrl: (name, exact) => this.scryfallAPI.getCardUrl(name, exact)
-            });
-        } catch (error) {
-            console.error(`Error loading cards for ${playerId}:`, error);
-            this.view.renderCardError(slots);
-        }
+        return indices;
     }
 
     async setAnalysis(value) {
@@ -607,20 +552,13 @@ export class AnalysisController {
                 value: value
             });
 
-            // For merged guru sheet, we need to route to the correct individual sheet
-            const updates = {
-                updates: [{
-                    sheetId: currentRow.sheetId,
-                    row: currentRow.originalRowIndex + 1, // +1 because sheets are 1-indexed
-                    col: analysisColIndex + 1, // +1 because sheets are 1-indexed
-                    value: value.toString(),
-                    valueType: 'number', // Explicitly specify this is a number
-                    isMergedGuruUpdate: true,
-                    guruSheetIds: this.currentData.sheets.find(s => s.title === 'Merged Gurus')?.guruSheetIds
-                }]
-            };
-
-            await this.sheetsAPI.updateSheetData(this.currentData.sheetId, updates);
+            await this.writer.writeAnalysis({
+                sheetId: currentRow.sheetId,
+                row: currentRow.originalRowIndex,
+                col: analysisColIndex,
+                value,
+                guruSheetIds: this.currentData.sheets.find(s => s.title === 'Merged Gurus')?.guruSheetIds
+            });
 
             // Update the specific guru analysis in the local data
             setColourAnalysis(currentRow, this.currentGuruColor, value.toString());
@@ -678,20 +616,13 @@ export class AnalysisController {
             });
 
             // Use checked update to atomically claim the match only if signature is still empty
-            const updates = {
-                updates: [{
-                    sheetId: currentRow.sheetId,
-                    row: currentRow.originalRowIndex + 1, // +1 because sheets are 1-indexed
-                    col: signatureColIndex + 1, // +1 because sheets are 1-indexed
-                    value: this.guruSignature,
-                    expectedValue: '', // Only update if current value is empty
-                    valueType: 'string',
-                    isMergedGuruUpdate: true,
-                    guruSheetIds: this.currentData.sheets.find(s => s.title === 'Merged Gurus')?.guruSheetIds
-                }]
-            };
-
-            const result = await this.sheetsAPI.checkedUpdateSheetData(this.currentData.sheetId, updates);
+            const result = await this.writer.claimRow({
+                sheetId: currentRow.sheetId,
+                row: currentRow.originalRowIndex,
+                col: signatureColIndex,
+                signature: this.guruSignature,
+                guruSheetIds: this.currentData.sheets.find(s => s.title === 'Merged Gurus')?.guruSheetIds
+            });
 
             if (result && result.skippedCells > 0) {
                 // Someone else claimed the match first
@@ -756,15 +687,12 @@ export class AnalysisController {
             });
 
             // Clear the signature using clearCell helper
-            const updateObj = {
+            await this.writer.clearCell({
                 sheetId: currentRow.sheetId,
-                row: currentRow.originalRowIndex + 1, // +1 because sheets are 1-indexed
-                col: signatureColIndex + 1, // +1 because sheets are 1-indexed
-                isMergedGuruUpdate: true,
+                row: currentRow.originalRowIndex,
+                col: signatureColIndex,
                 guruSheetIds: this.currentData.sheets.find(s => s.title === 'Merged Gurus')?.guruSheetIds
-            };
-
-            await this.sheetsAPI.clearCell(this.currentData.sheetId, updateObj);
+            });
 
             // Update local data to clear the signature
             setColourSignature(currentRow, this.currentGuruColor, '');
@@ -816,16 +744,12 @@ export class AnalysisController {
             // Use helper to get analysis column index
             const analysisColIndex = this.getCurrentGuruColIndex('analysis');
 
-            const updateObj = {
+            await this.writer.clearCell({
                 sheetId: currentRow.sheetId,
-                row: currentRow.originalRowIndex + 1,
-                col: analysisColIndex + 1,
-                // value not needed for clearCell; we signal intent via row/col
-                isMergedGuruUpdate: true,
+                row: currentRow.originalRowIndex,
+                col: analysisColIndex,
                 guruSheetIds: this.currentData.sheets.find(s => s.title === 'Merged Gurus')?.guruSheetIds
-            };
-
-            await this.sheetsAPI.clearCell(this.currentData.sheetId, updateObj);
+            });
 
             // Update local data to clear the analysis for the current guru
             setColourAnalysis(currentRow, this.currentGuruColor, '');
@@ -1146,17 +1070,14 @@ export class AnalysisController {
         );
 
         // Checked update so a concurrent edit is not clobbered.
-        const updates = {
-            updates: [{
-                sheetId: deckNotesSheet.sheetId,
-                row: row + 1, // +1 because sheets are 1-indexed
-                col: col + 1, // +1 because sheets are 1-indexed
-                value: newValue,
-                expectedValue: currentValue, // Only update if current value matches old content
-                valueType: 'auto-detect'
-            }]
-        };
-        const result = await this.sheetsAPI.checkedUpdateSheetData(this.currentData.sheetId, updates);
+        const result = await this.writer.saveDeckField({
+            sheetId: this.currentData.sheetId,
+            sheet: deckNotesSheet,
+            row,
+            col,
+            value: newValue,
+            expectedValue: currentValue
+        });
 
         if (result && result.skippedCells == 0) {
             if (type === 'notes') deckInfo.notes = newValue;
@@ -1165,14 +1086,13 @@ export class AnalysisController {
                 deckInfo.goldfishClock = newValue;
                 if (colMap.goldfishSignature > -1) {
                     // Automatically sign this clock with the guru signature
-                    const signatureUpdates = [{
-                        sheetId: deckNotesSheet.sheetId,
-                        row: row + 1,
-                        col: colMap.goldfishSignature + 1,
-                        value: this.guruSignature,
-                        valueType: 'string'
-                    }];
-                    this.sheetsAPI.updateSheetData(this.currentData.sheetId, { updates: signatureUpdates });
+                    this.writer.signGoldfishClock({
+                        sheetId: this.currentData.sheetId,
+                        sheet: deckNotesSheet,
+                        row,
+                        col: colMap.goldfishSignature,
+                        signature: this.guruSignature
+                    });
                     deckInfo.goldfishSignature = this.guruSignature;
                 }
             }
