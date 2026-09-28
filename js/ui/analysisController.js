@@ -24,14 +24,13 @@ import {
     setColourAnalysis,
     setColourSignature,
     emptyColumnIndex,
-    buildColumnIndex,
     getCurrentGuruColIndex,
     getGuruColorInRow,
     determineGuruColorFromSheet,
     deploymentSheetLink
 } from '../domain/guruColor.js';
 import {
-    buildMatchRows,
+    parsePodSheets,
     hasCurrentColorResult,
     rowHasDiscrepancy,
     rowHasMyDiscrepancy,
@@ -45,7 +44,7 @@ import {
     findMirrorMatchIndex,
     getDeckStats
 } from '../domain/matchRows.js';
-import { isInverseErrorSuspected } from '../domain/inverseCheck.js';
+import { isInverseErrorSuspected, describeInverseResult } from '../domain/inverseCheck.js';
 import { processDeckNotes, calculateColorStatistics } from '../domain/deckNotes.js';
 import { describeMatchStatus, renderMatchStatus } from './matchStatus.js';
 import { AnalysisView } from './analysisView.js';
@@ -278,14 +277,7 @@ export class AnalysisController {
         this.deckNotesColumnMap = deckNotesResult.columnMap;
         console.log('Loaded deck notes:', this.deckNotesMap.size, 'entries');
 
-        // Process all sheets and collect rows that need analysis
-        if (sheetData.sheets && Array.isArray(sheetData.sheets)) {
-            sheetData.sheets.forEach((sheet, sheetIndex) => {
-                if (sheet.values && sheet.values.length > 1) {
-                    this.processSheet(sheet, sheetIndex);
-                }
-            });
-        }
+        this.parseSheets(sheetData);
 
         if (this.allRows.length === 0) {
             this.view.showNoDataMessage();
@@ -308,27 +300,16 @@ export class AnalysisController {
         return processDeckNotes(sheetData);
     }
 
-    processSheet(sheet, sheetIndex) {
-        // Handle different sheet types
-        if (sheet.title === 'Merged Gurus') {
-            // For merged guru sheet, use the merged column structure
-            this.processMergedGuruSheet(sheet, sheetIndex);
-        } else {
-            // For deck notes or other sheets, skip processing
-            console.log(`Skipping sheet "${sheet.title}" - not a guru analysis sheet`);
-        }
-    }
-
-    processMergedGuruSheet(sheet, sheetIndex) {
-        const { rows, columnIndices, numDiscrepancies } = buildMatchRows(
-            sheet, sheetIndex, this.currentGuruColor, this.guruSignature
+    /** Build the row model and column index for the selected guru colour. */
+    parseSheets(sheetData) {
+        const { rows, columnIndex, numDiscrepancies } = parsePodSheets(
+            sheetData, this.currentGuruColor, this.guruSignature
         );
-
-        // Store the resolved column index as a single per-colour structure
-        this.columnIndex = buildColumnIndex(columnIndices);
-
-        this.allRows.push(...rows);
+        this.allRows = rows;
         this.numDiscrepancies = numDiscrepancies;
+        if (columnIndex) {
+            this.columnIndex = columnIndex;
+        }
     }
 
     // The methods below delegate to js/domain/. They are kept on the class so
@@ -803,16 +784,7 @@ export class AnalysisController {
             // Rebuild data with fresh information
             this.currentData = freshSheetData;
 
-            this.allRows = [];
-
-            // Process all sheets and collect rows that need analysis
-            if (freshSheetData.sheets && Array.isArray(freshSheetData.sheets)) {
-                freshSheetData.sheets.forEach((sheet, sheetIndex) => {
-                    if (sheet.values && sheet.values.length > 1) {
-                        this.processSheet(sheet, sheetIndex);
-                    }
-                });
-            }
+            this.parseSheets(freshSheetData);
 
             // Find the current row in the fresh data
             let newRowIndex = 0;
@@ -933,45 +905,18 @@ export class AnalysisController {
         return findMirrorMatchIndex(this.allRows, rowIndex);
     }
 
-    /**
-     * Update the display of the inverse match result on the mirror match button
-     */
+    /** Update the inverse display on the mirror-match button. */
     updateInverseResultDisplay() {
         const currentRow = this.allRows[this.currentRowIndex];
-        const currentOutcome = currentRow.outcomeValue;
-
-        // Find the mirror match
         const mirrorIndex = this.findMirrorMatchIndex(this.currentRowIndex);
-        // Get inverse match outcome
         const inverseRow = this.allRows[mirrorIndex];
-        const inverseOutcome = inverseRow?.outcomeValue;
 
-        // Only show if inverse match exists and has a valid result, and I'm not about to solve it
-        if (
-            mirrorIndex >= 0 &&
-            (!inverseOutcome ||
-                inverseOutcome.trim() === '' ||
-                inverseOutcome.toLowerCase() === 'incomplete' ||
-                inverseOutcome.toLowerCase() === 'discrepancy') ||
+        this.view.renderMirrorButton(describeInverseResult(
+            currentRow.outcomeValue,
+            inverseRow?.outcomeValue,
+            mirrorIndex >= 0,
             this.isCurrentMatchAvailableForAnalysis()
-        ) {
-            this.view.renderMirrorButton({ showOutcome: false });
-            return;
-        }
-
-        // Inverted letter: what the P1 deck does going second
-        const inverseLetter = invertOutcomeLetter(inverseOutcome);
-
-        // Check if this is a suspected error
-        // Error condition: at least one is Loss AND neither is Win
-        const currentNumValue = parseFloat(currentOutcome);
-        const inverseNumValue = parseFloat(inverseOutcome);
-        const isSuspectedError =
-            !isNaN(currentNumValue) && !isNaN(inverseNumValue) &&
-            (currentNumValue === 0.0 || inverseNumValue === 0.0) && // At least one is Loss
-            (currentNumValue !== 1.0 && inverseNumValue !== 1.0);   // Neither is Win
-
-        this.view.renderMirrorButton({ showOutcome: true, inverseLetter, isSuspectedError });
+        ));
     }
 
     async skipToMirrorMatch() {
@@ -1259,15 +1204,4 @@ export class AnalysisController {
     closeCreateThreadModal() {
         this.threadModal.close();
     }
-}
-
-/** Inverted W/T/L letter: what the P1 deck does going second. */
-function invertOutcomeLetter(outcome) {
-    const numValue = parseFloat(outcome);
-    if (!isNaN(numValue)) {
-        if (numValue === 0.0) return 'W';
-        if (numValue === 0.5) return 'T';
-        if (numValue === 1.0) return 'L';
-    }
-    return '?';
 }

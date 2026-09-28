@@ -38,6 +38,8 @@ const urlsToCache = [
   `${BASE_PATH}js/modules/userPreferences.js`,
   `${BASE_PATH}js/ui/analysisController.js`,
   `${BASE_PATH}js/ui/analysisView.js`,
+  `${BASE_PATH}js/ui/analysisWriter.js`,
+  `${BASE_PATH}js/ui/cardPresenter.js`,
   `${BASE_PATH}js/ui/guruColorSelector.js`,
   `${BASE_PATH}js/ui/matchStatus.js`,
   `${BASE_PATH}js/ui/matchTableModal.js`,

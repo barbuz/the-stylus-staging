@@ -9,6 +9,7 @@ import {
     GURU_COLORS,
     getCurrentColorAnalysis,
     getCurrentColorSignature,
+    buildColumnIndex,
     colourField,
     colourLabel
 } from './guruColor.js';
@@ -338,6 +339,36 @@ export function findMirrorMatchIndex(rows, rowIndex) {
 }
 
 // --- Statistics --------------------------------------------------------------
+
+/**
+ * Parse every guru sheet in a pod into one row model.
+ *
+ * The merged-guru sheet is the only analysis sheet; other sheets are skipped.
+ * Returns the combined rows, the resolved column index for the current colour,
+ * and the discrepancy count. Extracted from the controller so loading is a pure
+ * data transformation.
+ */
+export function parsePodSheets(sheetData, colour, signature) {
+    const rows = [];
+    let columnIndex = null;
+    let numDiscrepancies = 0;
+
+    if (!sheetData.sheets || !Array.isArray(sheetData.sheets)) {
+        return { rows, columnIndex, numDiscrepancies };
+    }
+
+    sheetData.sheets.forEach((sheet, sheetIndex) => {
+        if (sheet.title !== 'Merged Gurus' || !sheet.values || sheet.values.length <= 1) {
+            return;
+        }
+        const parsed = buildMatchRows(sheet, sheetIndex, colour, signature);
+        rows.push(...parsed.rows);
+        columnIndex = buildColumnIndex(parsed.columnIndices);
+        numDiscrepancies = parsed.numDiscrepancies;
+    });
+
+    return { rows, columnIndex, numDiscrepancies };
+}
 
 /** Match counts for the current row's Player 1 deck. */
 export function getDeckStats(rows, colour, currentRowIndex) {

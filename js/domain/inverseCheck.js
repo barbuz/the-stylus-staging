@@ -70,3 +70,40 @@ export function isInverseErrorSuspected(rows, rowIndex, findMirror) {
 
     return isSuspectedInversePair(currentRow.outcomeValue, inverseRow.outcomeValue);
 }
+
+/**
+ * The Inverse display for the mirror-match button. Hidden when the mirror
+ * exists but has no usable outcome, or when the current row is itself awaiting
+ * work (you are about to decide it). Otherwise it exposes the inverse letter of
+ * the mirror outcome and flags a Loss-beside-non-Win pair as a suspected error.
+ *
+ * Note the mirror-missing case deliberately still renders (a '?' letter): the
+ * original only hid an existing-but-unusable mirror.
+ */
+export function describeInverseResult(currentOutcome, inverseOutcome, mirrorExists, currentAwaitingWork) {
+    const inverseUnusable = !inverseOutcome ||
+        inverseOutcome.trim() === '' ||
+        inverseOutcome.toLowerCase() === 'incomplete' ||
+        inverseOutcome.toLowerCase() === 'discrepancy';
+
+    if ((mirrorExists && inverseUnusable) || currentAwaitingWork) {
+        return { showOutcome: false };
+    }
+
+    return {
+        showOutcome: true,
+        inverseLetter: invertOutcomeLetter(inverseOutcome),
+        isSuspectedError: isSuspectedInversePair(currentOutcome, inverseOutcome)
+    };
+}
+
+/** Inverted W/T/L letter: what the P1 deck does going second. */
+export function invertOutcomeLetter(outcome) {
+    const numValue = parseFloat(outcome);
+    if (!isNaN(numValue)) {
+        if (numValue === 0.0) return 'W';
+        if (numValue === 0.5) return 'T';
+        if (numValue === 1.0) return 'L';
+    }
+    return '?';
+}

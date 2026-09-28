@@ -74,6 +74,7 @@ the-stylus/
 │   ├── config.js               # Google OAuth client ID, scopes, discovery docs, localStorage keys
 │   ├── domain/                 # PURE: no DOM, no gapi, no fetch, no instance state
 │   │   ├── analyses.js         # outcome calc, normalize, labels, css class, correction string
+│   │   ├── deckNotes.js        # deck-notes parsing + per-colour statistics
 │   │   ├── guruColor.js        # colour registry: fields, sheet names, merged-column layout
 │   │   ├── inverseCheck.js     # inverse-error detection helpers
 │   │   └── matchRows.js        # row model build + find first incomplete/discrepancy/mirror, deck stats
@@ -81,13 +82,21 @@ the-stylus/
 │   │   ├── authManager.js
 │   │   ├── deckNotesEditor.js
 │   │   ├── googleSheetsAPI.js
-│   │   ├── guruAnalysisInterface.js   # Largest module; scoring UI + flow
 │   │   ├── guruSignature.js
 │   │   ├── hubManager.js
 │   │   ├── recentPods.js
 │   │   ├── scryfallAPI.js
 │   │   ├── uiController.js            # Centralised event handling / status UI
 │   │   └── userPreferences.js
+│   ├── ui/                     # View / controller split (phase 3 of #18)
+│   │   ├── analysisController.js      # Slim orchestrator: state + service calls + view.render
+│   │   ├── analysisView.js            # All DOM rendering for the scoring screen
+│   │   ├── analysisWriter.js          # All spreadsheet writes for the scoring screen
+│   │   ├── cardPresenter.js           # Scryfall card loading + preloading
+│   │   ├── guruColorSelector.js       # Colour dropdown, owns its dismiss listeners
+│   │   ├── matchStatus.js             # Pure match-status descriptors/markup
+│   │   ├── matchTableModal.js         # Match table modal, open/close/destroy
+│   │   └── threadModal.js             # Create-thread modal, open/close/destroy
 │   └── utils/                  # Pure helper functions
 │       ├── constants.js        # STATUS_TYPES, ANALYSIS_VALUES, TIME_CONSTANTS
 │       ├── domUtils.js         # Safe DOM access
@@ -139,11 +148,11 @@ npm run test:e2e               # Playwright only
 
 **Unit tests** (`tests/unit/`, built-in `node:test`, no dependencies):
 - `js/utils/*` and `js/domain/*` are pure and imported directly.
-- `GuruAnalysisInterface` logic is tested via `Object.create(GuruAnalysisInterface.prototype)`
-  and an explicit fake `this`. The constructor calls `bindEvents()` and needs a
-  DOM, so do not `new` it in unit tests. Since Phase 1 moved the scoring/row logic
-  into `js/domain/`, only the UI-flow methods (e.g. `processDeckNotes`) still need
-  this scaffolding.
+- `AnalysisController` UI-flow methods (e.g. `processDeckNotes`) are tested via
+  `Object.create(AnalysisController.prototype)` and an explicit fake `this`. The
+  constructor calls `bindEvents()` and needs a DOM, so do not `new` it in unit
+  tests. Since Phase 1 and Phase 3 moved the scoring/row logic into
+  `js/domain/`, only a few UI-flow methods still need this scaffolding.
 - `GoogleSheetsAPI` is tested against a fake global `gapi` (`tests/fixtures/fakeGapi.js`)
   that records requests. Tests assert on the requests and the transformations.
   Change the module to read `gapi` lazily; do not capture it at import time.
