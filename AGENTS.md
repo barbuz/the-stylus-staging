@@ -90,6 +90,11 @@ the-stylus/
 │   │   └── userPreferences.js
 │   ├── ui/                     # View / controller split (phase 3 of #18)
 │   │   ├── analysisController.js      # Slim orchestrator: state + service calls + view.render
+│   │   ├── analysisActions.js         # Write/score workflows (set, claim, clear, reload)
+│   │   ├── analysisNavigation.js      # Row movement: next/prev, skips, mirror, next deck
+│   │   ├── analysisSessionLoader.js   # Sheet -> session state: colour, rows, start row
+│   │   ├── analysisRowRenderer.js     # Per-row render pipeline + URL/title sync
+│   │   ├── analysisEventBinder.js     # Scoring/nav button + thread-modal event wiring
 │   │   ├── analysisView.js            # All DOM rendering for the scoring screen
 │   │   ├── analysisWriter.js          # All spreadsheet writes for the scoring screen
 │   │   ├── cardPresenter.js           # Scryfall card loading + preloading
