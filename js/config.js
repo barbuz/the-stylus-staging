@@ -27,5 +27,24 @@ export const CONFIG = {
         LAST_LOGIN: 'last_login',
         RECENT_PODS: 'recent_pods',
         RECENT_HUBS: 'recent_hubs',
+        // Which deployment this browser should open deep links in. Absent or
+        // unknown means "leave me on whichever deployment the link points at".
+        PREFERRED_DEPLOYMENT: 'preferred_deployment',
+    }
+};
+
+// The two GitHub Pages deployments. They share an origin (barbuz.github.io)
+// and differ only by path, which is what lets them share localStorage and the
+// Google appData preferences file.
+export const DEPLOYMENTS = {
+    production: {
+        label: 'Production',
+        appName: 'The Stylus',
+        path: '/the-stylus/'
+    },
+    preview: {
+        label: 'Preview',
+        appName: 'The Stylus - Preview',
+        path: '/the-stylus-staging/'
     }
 };

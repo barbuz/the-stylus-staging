@@ -1,14 +1,20 @@
 // Service Worker for The Stylus PWA
 
 // Version configuration - UPDATE THIS to trigger a service worker update
-const APP_VERSION = 'v20260927';
+const APP_VERSION = 'v20261001';
 const APP_NAME = 'the-stylus';
-const CACHE_NAME = `${APP_NAME}-${APP_VERSION}`;
-
-const SCRYFALL_CACHE_NAME = 'the-stylus-scryfall-permanent';
 
 // Get the base path (works for both root and subdirectory deployments)
 const BASE_PATH = self.location.pathname.replace(/sw\.js$/, '');
+
+// Production and preview share an origin, so the app-shell cache name must be
+// namespaced per deployment: otherwise one deployment's activate step evicts
+// the other's shell once both run the same APP_VERSION. At the origin root
+// (local dev) the deployment id is empty and the name is unchanged.
+const DEPLOYMENT_ID = BASE_PATH.replace(/^\/|\/$/g, '').replace(/\//g, '-');
+const CACHE_NAME = [APP_NAME, DEPLOYMENT_ID, APP_VERSION].filter(Boolean).join('-');
+
+const SCRYFALL_CACHE_NAME = 'the-stylus-scryfall-permanent';
 
 const urlsToCache = [
   `${BASE_PATH}`,

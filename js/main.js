@@ -4,8 +4,15 @@ import { AuthManager } from './modules/authManager.js';
 import { GuruSignature } from './modules/guruSignature.js';
 import { GuruAnalysisInterface } from './modules/guruAnalysisInterface.js';
 import { RecentPodsManager } from './modules/recentPods.js';
-import { CONFIG } from './config.js';
-import { isValidGoogleSheetsUrl, extractSheetId, sanitizeUrlParam } from './utils/urlUtils.js';
+import { CONFIG, DEPLOYMENTS } from './config.js';
+import {
+    isValidGoogleSheetsUrl,
+    extractSheetId,
+    sanitizeUrlParam,
+    deploymentForPath,
+    alternateDeploymentUrl,
+    resolveDeploymentRedirect
+} from './utils/urlUtils.js';
 
 class ThreeCardBlindGuruTool {
     constructor() {
@@ -26,6 +33,13 @@ class ThreeCardBlindGuruTool {
 
     async init() {
         try {
+            // Honour this browser's deployment preference before doing any
+            // authentication work, so a preview tester opening a production
+            // deep link lands in preview (and vice versa).
+            if (this.applyDeploymentPreference()) {
+                return;
+            }
+
             // Show loading while initializing
             this.showLoading('Initializing application...');
             
@@ -86,6 +100,73 @@ class ThreeCardBlindGuruTool {
         }
     }
     
+    currentDeploymentKey() {
+        return deploymentForPath(window.location.pathname, DEPLOYMENTS);
+    }
+
+    /**
+     * Redirect a deep link to this browser's preferred deployment. Returns true
+     * when a redirect was started (the caller must stop initialising).
+     */
+    applyDeploymentPreference() {
+        const preferred = localStorage.getItem(CONFIG.STORAGE_KEYS.PREFERRED_DEPLOYMENT);
+        const target = resolveDeploymentRedirect(
+            window.location.pathname, window.location.search, preferred, DEPLOYMENTS
+        );
+        if (!target) {
+            return false;
+        }
+        console.log(`🔀 Redirecting to preferred deployment: ${target}`);
+        window.location.replace(target);
+        return true;
+    }
+
+    /**
+     * Persist which deployment this browser should open deep links in, so links
+     * shared from either deployment land where the user expects.
+     */
+    setDeploymentPreference(key) {
+        if (!Object.prototype.hasOwnProperty.call(DEPLOYMENTS, key)) {
+            return;
+        }
+        localStorage.setItem(CONFIG.STORAGE_KEYS.PREFERRED_DEPLOYMENT, key);
+    }
+
+    setupDeploymentSwitch() {
+        const container = document.getElementById('deployment-switch');
+        if (!container) {
+            return;
+        }
+
+        const current = this.currentDeploymentKey();
+        const otherKey = Object.keys(DEPLOYMENTS).find(key => key !== current);
+        container.replaceChildren();
+        if (!current || !otherKey) {
+            return;
+        }
+
+        const other = DEPLOYMENTS[otherKey];
+        const note = document.createElement('span');
+        note.className = 'deployment-switch-note';
+        note.textContent = `You are using ${DEPLOYMENTS[current].label}.`;
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'deployment-switch-btn';
+        button.dataset.deployment = otherKey;
+        button.textContent = `Switch to ${other.label}`;
+        button.title = `Open this match in the ${other.label} version`;
+        button.addEventListener('click', () => {
+            this.setDeploymentPreference(otherKey);
+            const url = alternateDeploymentUrl(window.location.pathname, window.location.search, DEPLOYMENTS);
+            if (url) {
+                window.location.href = url;
+            }
+        });
+
+        container.append(note, button);
+    }
+
     setupPreferencesHandlers() {
         // Listen for user login
         window.addEventListener('userLoggedIn', async () => {
@@ -174,6 +255,7 @@ class ThreeCardBlindGuruTool {
         loadBtn.addEventListener('click', () => this.loadSheet());
         refreshBtn.addEventListener('click', () => this.refreshSheet());
         exitAnalysisBtn.addEventListener('click', () => this.uiController.showSheetInputSection());
+        this.setupDeploymentSwitch();
         
         // Allow Enter key to trigger load
         sheetUrlInput.addEventListener('keypress', (e) => {
@@ -360,6 +442,8 @@ class ThreeCardBlindGuruTool {
 
 // Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
+    applyDeploymentBranding();
+
     new ThreeCardBlindGuruTool();
     
     // Display app version
@@ -403,6 +487,25 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
+ * Label the running deployment (production vs preview) and give preview its own
+ * visible name, so testers can always tell which version they are looking at.
+ */
+function applyDeploymentBranding() {
+    const key = deploymentForPath(window.location.pathname, DEPLOYMENTS);
+    if (!key) {
+        return;
+    }
+
+    const deployment = DEPLOYMENTS[key];
+
+    document.title = deployment.appName;
+    const heading = document.querySelector('.header-title h1');
+    if (heading) {
+        heading.textContent = deployment.appName;
+    }
+}
+
+/**
  * Display the app version from the service worker
  */
 async function displayAppVersion() {
@@ -422,7 +525,11 @@ async function displayAppVersion() {
         
         if (match && match[1]) {
             const version = match[1];
-            versionElement.textContent = `Version: ${version}`;
+            const key = deploymentForPath(window.location.pathname, DEPLOYMENTS);
+            const deployment = key ? DEPLOYMENTS[key] : null;
+            versionElement.textContent = deployment
+                ? `${deployment.appName} — Version: ${version}`
+                : `Version: ${version}`;
             console.log('📦 App version:', version);
         } else {
             versionElement.textContent = 'Version: unknown';

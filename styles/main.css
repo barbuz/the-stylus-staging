@@ -2540,3 +2540,33 @@ section h2, .login-section h2 {
     font-size: 0.8rem;
 }
 
+.deployment-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.deployment-switch:empty {
+    display: none;
+}
+
+.deployment-switch-note {
+    color: #888;
+    font-size: 0.8rem;
+}
+
+.deployment-switch-btn {
+    background: none;
+    border: 1px solid #3498db;
+    color: #3498db;
+    border-radius: 4px;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.deployment-switch-btn:hover {
+    background: #3498db;
+    color: #fff;
+}
+

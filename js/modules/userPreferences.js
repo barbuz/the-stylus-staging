@@ -380,7 +380,11 @@ export class UserPreferences {
             return null;
         }
 
+        // Start from the last appData snapshot so keys this build does not know
+        // about (e.g. written by a newer preview build) survive a round trip
+        // through this localStorage fallback instead of being dropped.
         const preferences = {
+            ...(this.cache || {}),
             guruSignature: guruSignature || '',
             recentPods: recentPodsStr ? JSON.parse(recentPodsStr) : [],
             recentHubs: recentHubsStr ? JSON.parse(recentHubsStr) : [],

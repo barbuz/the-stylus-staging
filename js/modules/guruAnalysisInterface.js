@@ -5,6 +5,7 @@
 import { ScryfallAPI } from './scryfallAPI.js';
 import { DeckNotesEditor } from './deckNotesEditor.js';
 import { HubManager } from './hubManager.js';
+import { DEPLOYMENTS } from '../config.js';
 import {
     calculateOutcomeFromAnalyses,
     normalizeAnalysisForComparison,
@@ -2379,6 +2380,10 @@ export class GuruAnalysisInterface {
         // Generate link to this match (without guru color parameter)
         const url = new URL(window.location.href);
         url.searchParams.delete('guru'); // Remove guru color from URL
+        // Shared links are always canonical production URLs. The recipient's
+        // own deployment preference decides where the link actually opens, so a
+        // link copied from preview does not force preview on everyone.
+        url.pathname = DEPLOYMENTS.production.path;
         const trueURL = this.currentData.metadata?.mainSheetLink || 'Fail'; 
         const trueID = trueURL.match(/[-\w]{25,}/); // Get 25 digit ID from sheet link 
         if(trueID) url.searchParams.set('pod',trueID); // If sheet has mainSheetLink metadata, link to that sheet instead

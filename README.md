@@ -74,3 +74,22 @@ The app version is managed in `sw.js` at the top of the file. When making change
 2. This changes the service worker file, causing the browser to detect a new version
 3. The version is fetched and parsed by `main.js` and displayed in the app footer
 4. Service worker will activate on page reload with updated cache
+
+### Production and preview versions
+
+There are two live versions of the app, on the same GitHub Pages origin:
+
+| Version | URL |
+| --- | --- |
+| Production | https://barbuz.github.io/the-stylus/ |
+| Preview | https://barbuz.github.io/the-stylus-staging/ |
+
+New work is tested in **Preview** first and promoted to Production once testers
+are happy. Both versions share the same login, guru signature and recent pods,
+so you can switch between them without signing in again.
+
+The footer shows which version you are on and offers a **Switch** button. That
+button also records your choice for this browser, so links you open afterwards
+(the pod links posted to Discord) take you to the same version. The choice is
+per browser and is not synced to your Google account; clearing site data resets
+it to Production.
