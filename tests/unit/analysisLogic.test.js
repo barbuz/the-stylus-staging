@@ -52,18 +52,18 @@ import {
 } from '../../js/domain/matchRows.js';
 import { isInverseErrorSuspected, isOutcomeValueValidForInverse } from '../../js/domain/inverseCheck.js';
 
-import { GuruAnalysisInterface } from '../../js/modules/guruAnalysisInterface.js';
+import { AnalysisController } from '../../js/ui/analysisController.js';
 import { makeMergedGuruSheet, makeSheetData } from '../fixtures/sheetData.js';
 
 /**
  * These tests exercise the pure domain layer directly. Only processDeckNotes is
- * still reached through GuruAnalysisInterface, because it was not part of the
+ * still reached through AnalysisController, because it was not part of the
  * Phase 1 extraction; that scaffolding borrows the prototype rather than
  * constructing an instance, since the constructor calls bindEvents() and needs
  * a DOM.
  */
 function logic() {
-    return Object.create(GuruAnalysisInterface.prototype);
+    return Object.create(AnalysisController.prototype);
 }
 
 // --- Scoring: calculateOutcomeFromAnalyses -----------------------------------
@@ -542,39 +542,9 @@ test('getDeckStats is safe with no selection', () => {
 
 // --- Discrepancy display -----------------------------------------------------
 //
-// buildDiscrepancyDisplay is a rendering method, but it borrows only pure
-// helpers (domain colour access + formatAnalysisValue/getAnalysisClass), so it
-// runs against the prototype without a DOM. Phase 2 replaced its per-colour
-// branches with a GURU_COLORS loop; these pin the resulting order and content.
-
-test('buildDiscrepancyDisplay lists the other gurus\' scores in colour order', () => {
-    const instance = Object.assign(logic(), { currentGuruColor: 'blue' });
-    const row = { redAnalysis: '1', blueAnalysis: '0.5', greenAnalysis: '0' };
-
-    const html = instance.buildDiscrepancyDisplay(row);
-
-    // Blue is the current guru, so it is excluded; Red comes before Green.
-    assert.ok(!html.includes('>Blue<'), 'current guru must not appear');
-    assert.ok(html.indexOf('>Red<') < html.indexOf('>Green<'), 'Red must precede Green');
-    assert.ok(html.includes('Win (1.0)'));
-    assert.ok(html.includes('Loss (0.0)'));
-});
-
-test('buildDiscrepancyDisplay hides gurus who have not scored', () => {
-    const instance = Object.assign(logic(), { currentGuruColor: 'red' });
-    const row = { redAnalysis: '1', blueAnalysis: '', greenAnalysis: '' };
-
-    const html = instance.buildDiscrepancyDisplay(row);
-
-    // No other guru has a reading, so no analysis block is emitted at all.
-    assert.ok(!html.includes('other-analyses'));
-    assert.ok(html.includes('discrepancy-header'));
-});
-
-test('buildDiscrepancyDisplay is empty-safe', () => {
-    const instance = Object.assign(logic(), { currentGuruColor: 'red' });
-    assert.ok(instance.buildDiscrepancyDisplay({}).includes('Discrepancy'));
-});
+// buildDiscrepancyDisplay was confirmed unused (no callers) and removed in
+// phase 3. The discrepancy *data* is still exercised by rowHasDiscrepancy /
+// rowHasMyDiscrepancy above.
 
 // --- Colour registry: sheet naming and merged layout -------------------------
 //

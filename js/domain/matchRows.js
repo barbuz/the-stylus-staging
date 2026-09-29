@@ -9,6 +9,7 @@ import {
     GURU_COLORS,
     getCurrentColorAnalysis,
     getCurrentColorSignature,
+    buildColumnIndex,
     colourField,
     colourLabel
 } from './guruColor.js';
@@ -196,6 +197,24 @@ export function isCurrentMatchAvailableForAnalysis(rows, colour, signature, curr
     return isMatchAvailableForAnalysis(rows[currentRowIndex], colour, signature);
 }
 
+/**
+ * True when the current row is not awaiting work: no valid selection, or the
+ * selected row already has a result (a complete/deleted row or one claimed by
+ * another guru). Drives the "nothing to write" completion message.
+ */
+export function isCurrentRowResolved(rows, colour, signature, currentRowIndex) {
+    const currentRow = rows[currentRowIndex];
+    if (!currentRow) {
+        return true;
+    }
+
+    if (isCurrentMatchAvailableForAnalysis(rows, colour, signature, currentRowIndex)) {
+        return false;
+    }
+
+    return Boolean(hasCurrentColorResult(currentRow, colour));
+}
+
 /** Whether the current colour has scored every row (and there is at least one). */
 export function isAnalysisComplete(rows, colour) {
     for (let i = 0; i < rows.length; i++) {
@@ -320,6 +339,56 @@ export function findMirrorMatchIndex(rows, rowIndex) {
 }
 
 // --- Statistics --------------------------------------------------------------
+
+/** The id a row is keyed by in the thread map: its sheet row, else 1-based index. */
+export function getRowThreadId(row, fallbackIndex) {
+    if (row && typeof row.rowIndex === 'number') {
+        return row.rowIndex;
+    }
+    if (row && typeof row.originalRowIndex === 'number') {
+        return row.originalRowIndex;
+    }
+    return fallbackIndex + 1;
+}
+
+/** Whether the thread map has an entry for this row. */
+export function hasDiscordThreadForRow(threadMap, row, fallbackIndex) {
+    if (!threadMap || typeof threadMap.has !== 'function') {
+        return false;
+    }
+    const rowId = getRowThreadId(row, fallbackIndex);
+    return rowId != null && threadMap.has(rowId);
+}
+
+/**
+ * Parse every guru sheet in a pod into one row model.
+ *
+ * The merged-guru sheet is the only analysis sheet; other sheets are skipped.
+ * Returns the combined rows, the resolved column index for the current colour,
+ * and the discrepancy count. Extracted from the controller so loading is a pure
+ * data transformation.
+ */
+export function parsePodSheets(sheetData, colour, signature) {
+    const rows = [];
+    let columnIndex = null;
+    let numDiscrepancies = 0;
+
+    if (!sheetData.sheets || !Array.isArray(sheetData.sheets)) {
+        return { rows, columnIndex, numDiscrepancies };
+    }
+
+    sheetData.sheets.forEach((sheet, sheetIndex) => {
+        if (sheet.title !== 'Merged Gurus' || !sheet.values || sheet.values.length <= 1) {
+            return;
+        }
+        const parsed = buildMatchRows(sheet, sheetIndex, colour, signature);
+        rows.push(...parsed.rows);
+        columnIndex = buildColumnIndex(parsed.columnIndices);
+        numDiscrepancies = parsed.numDiscrepancies;
+    });
+
+    return { rows, columnIndex, numDiscrepancies };
+}
 
 /** Match counts for the current row's Player 1 deck. */
 export function getDeckStats(rows, colour, currentRowIndex) {

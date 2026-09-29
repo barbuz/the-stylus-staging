@@ -1,7 +1,7 @@
 // Service Worker for The Stylus PWA
 
 // Version configuration - UPDATE THIS to trigger a service worker update
-const APP_VERSION = 'v20261001';
+const APP_VERSION = 'v20260929';
 const APP_NAME = 'the-stylus';
 
 // Get the base path (works for both root and subdirectory deployments)
@@ -23,19 +23,34 @@ const urlsToCache = [
   `${BASE_PATH}js/main.js`,
   `${BASE_PATH}js/config.js`,
   `${BASE_PATH}js/domain/analyses.js`,
+  `${BASE_PATH}js/domain/deckNotes.js`,
   `${BASE_PATH}js/domain/guruColor.js`,
   `${BASE_PATH}js/domain/inverseCheck.js`,
   `${BASE_PATH}js/domain/matchRows.js`,
   `${BASE_PATH}js/modules/authManager.js`,
   `${BASE_PATH}js/modules/deckNotesEditor.js`,
   `${BASE_PATH}js/modules/googleSheetsAPI.js`,
-  `${BASE_PATH}js/modules/guruAnalysisInterface.js`,
   `${BASE_PATH}js/modules/guruSignature.js`,
   `${BASE_PATH}js/modules/hubManager.js`,
   `${BASE_PATH}js/modules/recentPods.js`,
   `${BASE_PATH}js/modules/scryfallAPI.js`,
   `${BASE_PATH}js/modules/uiController.js`,
   `${BASE_PATH}js/modules/userPreferences.js`,
+  `${BASE_PATH}js/ui/analysisController.js`,
+  `${BASE_PATH}js/ui/analysisActions.js`,
+  `${BASE_PATH}js/ui/analysisNavigation.js`,
+  `${BASE_PATH}js/ui/analysisSessionLoader.js`,
+  `${BASE_PATH}js/ui/analysisRowRenderer.js`,
+  `${BASE_PATH}js/ui/analysisEventBinder.js`,
+  `${BASE_PATH}js/ui/analysisView.js`,
+  `${BASE_PATH}js/ui/analysisWriter.js`,
+  `${BASE_PATH}js/ui/cardPresenter.js`,
+  `${BASE_PATH}js/ui/guruColorSelector.js`,
+  `${BASE_PATH}js/ui/matchStatus.js`,
+  `${BASE_PATH}js/ui/matchTableModal.js`,
+  `${BASE_PATH}js/ui/matchTablePresenter.js`,
+  `${BASE_PATH}js/ui/threadModal.js`,
+  `${BASE_PATH}js/ui/threadPresenter.js`,
   `${BASE_PATH}js/utils/constants.js`,
   `${BASE_PATH}js/utils/domUtils.js`,
   `${BASE_PATH}js/utils/podUtils.js`,

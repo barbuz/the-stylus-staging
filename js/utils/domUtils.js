@@ -66,3 +66,18 @@ export function addEventListenerSafe(elementId, event, handler, required = false
         element.addEventListener(event, handler);
     }
 }
+
+/**
+ * Escape a value for safe interpolation into HTML markup.
+ * @param {*} value
+ * @returns {string}
+ */
+export function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[char]);
+}

@@ -144,6 +144,75 @@ export function isGuruSheetTitle(title) {
     return colourFromSheetTitle(title) !== null;
 }
 
+/**
+ * Determine which colour column the current signature is claimed under in the
+ * merged guru sheet. Searches from `startRowIndex` (0-based row position, or a
+ * negative value to start at the top), wrapping around. Returns the base colour
+ * when no signature is set or no merged sheet is present. Throws when the
+ * signature appears in no column, so the caller can offer colour selection.
+ */
+export function determineGuruColorFromSheet(sheetData, signature, startRowIndex = -1) {
+    const currentSignature = signature || '';
+
+    if (!currentSignature.trim()) {
+        return DEFAULT_GURU_COLOUR;
+    }
+
+    const mergedGuruSheet = sheetData.sheets?.find(sheet => sheet.title === 'Merged Gurus');
+    if (!mergedGuruSheet || !mergedGuruSheet.values || mergedGuruSheet.values.length < 2) {
+        return DEFAULT_GURU_COLOUR;
+    }
+
+    const headerRow = mergedGuruSheet.values[0];
+    const signatureCols = Object.fromEntries(
+        GURU_COLORS.map(colour => [colour, headerRow.findIndex(header =>
+            header && header.toLowerCase().includes(`${colourLabel(colour)} Signature`.toLowerCase())
+        )])
+    );
+
+    const start = startRowIndex >= 0 ? startRowIndex + 1 : 1;
+    const totalRows = mergedGuruSheet.values.length;
+
+    for (let i = 0; i < totalRows - 1; i++) {
+        const rowIndex = ((start - 1 + i) % (totalRows - 1)) + 1;
+        const row = mergedGuruSheet.values[rowIndex];
+
+        for (const colour of GURU_COLORS) {
+            const colIndex = signatureCols[colour];
+            if (colIndex !== -1 && row[colIndex] === currentSignature) {
+                return colour;
+            }
+        }
+    }
+
+    throw new Error(`Guru signature "${currentSignature}" not found in any analysis column. Please check that you have matches assigned to analyse.`);
+}
+
+/** The merged guru sheet in a sheet-data payload, or undefined. */
+export function getMergedGuruSheet(sheetData) {
+    return sheetData?.sheets?.find(sheet => sheet.title === 'Merged Gurus');
+}
+
+/** The Google Sheets edit URL for a spreadsheet id. */
+export function guruSheetLink(sheetId) {
+    return `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+}
+
+/**
+ * The URL a shared match link should point at: the production deployment with
+ * the match's pod id (and no guru colour). When the sheet declares a
+ * `mainSheetLink`, its spreadsheet id replaces the current pod. Returns '' for
+ * a non-absolute or unparseable input, matching the original modal's fallback.
+ */
+export function deploymentSheetLink(currentHref, basePath, podId, mainSheetLink) {
+    const url = new URL(currentHref);
+    url.searchParams.delete('guru');
+    url.pathname = basePath;
+    const mainId = mainSheetLink ? String(mainSheetLink).match(/[-\w]{25,}/) : null;
+    url.searchParams.set('pod', mainId ? mainId[0] : podId);
+    return url.toString();
+}
+
 /** The analysis/signature header pair for one colour, e.g. ['Red Analysis', 'Red Signature']. */
 export function mergedColourHeaders(colour) {
     return [`${colourLabel(colour)} Analysis`, `${colourLabel(colour)} Signature`];
