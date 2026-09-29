@@ -127,6 +127,31 @@ test.describe('The Stylus (no Google, no network)', () => {
         await expect(page.locator('#sheet-input-section')).toBeVisible();
     });
 
+    test('exiting analysis clears the deep-link parameters and reloading stays on the input', async ({ page }) => {
+        await bootApp(page);
+        await signIn(page);
+        await loadPod(page);
+
+        // Scoring a row writes pod / guru / match into the URL.
+        await expect
+            .poll(() => new URL(page.url()).searchParams.get('pod'))
+            .toBeTruthy();
+
+        await page.locator('#exit-analysis-btn').click();
+
+        const params = new URL(page.url()).searchParams;
+        expect(params.get('pod')).toBeNull();
+        expect(params.get('guru')).toBeNull();
+        expect(params.get('match')).toBeNull();
+
+        // On reload the stored session is restored; with no deep-link params the
+        // app must land on the pod input rather than reopening analysis mode.
+        await page.reload();
+
+        await expect(page.locator('#sheet-input-section')).toBeVisible();
+        await expect(page.locator('#sheet-editor')).toBeHidden();
+    });
+
     test('the app boots without unexpected console errors', async ({ page }) => {
         const errors = [];
         page.on('pageerror', error => errors.push(error.message));

@@ -3,12 +3,14 @@
  * Handles guru username storage and validation
  */
 import { CONFIG } from '../config.js';
+import { APP_EVENTS } from '../app/events.js';
 
 
 export class GuruSignature {
-    constructor(authManager) {
+    constructor(authManager, events = null) {
         this.storageKey = CONFIG.STORAGE_KEYS.GURU_SIGNATURE;
         this.authManager = authManager;
+        this.events = events;
         this.callbacks = {
             onSignatureSet: [],
             onSignatureChanged: []
@@ -53,7 +55,7 @@ export class GuruSignature {
         }
 
         // Listen for requests to change guru signature
-        window.addEventListener('requestGuruSignatureChange', () => {
+        this.events?.on(APP_EVENTS.REQUEST_GURU_SIGNATURE_CHANGE, () => {
             this.changeSignature();
         });
     }

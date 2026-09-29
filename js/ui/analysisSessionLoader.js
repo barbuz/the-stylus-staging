@@ -18,7 +18,8 @@ export class AnalysisSessionLoader {
 
     async loadData(sheetData, guruColor = null, rowNumber = 0) {
         const host = this.host;
-        host.currentData = sheetData;
+        const state = host.state;
+        state.setSheetData(sheetData);
 
         if (sheetData.sheets.some(sheet => sheet.title === 'Merged Gurus' && sheet.hidden)) {
             const notesData = sheetData.sheets.find(sheet => sheet.title === 'Deck Notes');
@@ -31,19 +32,19 @@ export class AnalysisSessionLoader {
         }
 
         if (sheetData.metadata?.guruHubLink && sheetData.metadata?.podName) {
-            if (!host.hub) {
-                host.hub = new HubManager(sheetData.metadata.guruHubLink, sheetData.metadata.podName);
+            if (!state.hub) {
+                state.setHub(new HubManager(sheetData.metadata.guruHubLink, sheetData.metadata.podName));
             }
-            host.hub.loadThreads();
+            state.hub.loadThreads();
         }
 
         if (rowNumber !== null && rowNumber > 0) {
-            host.currentRowIndex = rowNumber - 1;
+            state.setRowIndex(rowNumber - 1);
         }
 
         if (guruColor === null) {
             try {
-                host.currentGuruColor = determineGuruColorFromSheet(sheetData, host.guruSignature, host.currentRowIndex);
+                state.setGuruColor(determineGuruColorFromSheet(sheetData, state.signature, state.rowIndex));
             } catch (error) {
                 if (error.message.includes('not found in any analysis column')) {
                     host.showGuruColorSelection(sheetData);
@@ -54,31 +55,28 @@ export class AnalysisSessionLoader {
                 return false;
             }
         } else {
-            host.currentGuruColor = guruColor.toLowerCase();
+            state.setGuruColor(guruColor.toLowerCase());
         }
 
         const deckNotesResult = processDeckNotes(sheetData);
-        host.deckNotesMap = deckNotesResult.deckNotesMap;
-        host.deckNotesColumnMap = deckNotesResult.columnMap;
+        state.setDeckNotes(deckNotesResult.deckNotesMap, deckNotesResult.columnMap);
 
         const { rows, columnIndex, numDiscrepancies } = parsePodSheets(
-            sheetData, host.currentGuruColor, host.guruSignature
+            sheetData, state.guruColor, state.signature
         );
-        host.allRows = rows;
-        host.numDiscrepancies = numDiscrepancies;
-        if (columnIndex) {
-            host.columnIndex = columnIndex;
-        }
+        state.setRows(rows);
+        state.setNumDiscrepancies(numDiscrepancies);
+        state.setColumnIndex(columnIndex);
 
-        if (host.allRows.length === 0) {
+        if (state.rows.length === 0) {
             host.view.showNoDataMessage();
-        } else if (host.currentRowIndex == null || host.currentRowIndex < 0 || host.currentRowIndex >= host.allRows.length) {
+        } else if (state.rowIndex == null || state.rowIndex < 0 || state.rowIndex >= state.rows.length) {
             const firstEmpty = host.findFirstEmptyAnalysis();
             if (firstEmpty == null) {
-                host.currentRowIndex = 0;
+                state.setRowIndex(0);
                 host.showCompletionMessage();
             } else {
-                host.currentRowIndex = firstEmpty;
+                state.setRowIndex(firstEmpty);
             }
         }
         return true;

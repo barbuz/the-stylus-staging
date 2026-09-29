@@ -5,6 +5,7 @@ import { GuruSignature } from './modules/guruSignature.js';
 import { AnalysisController } from './ui/analysisController.js';
 import { RecentPodsManager } from './modules/recentPods.js';
 import { CONFIG, DEPLOYMENTS } from './config.js';
+import { EventBus, APP_EVENTS } from './app/events.js';
 import {
     isValidGoogleSheetsUrl,
     extractSheetId,
@@ -16,8 +17,11 @@ import {
 
 class ThreeCardBlindGuruTool {
     constructor() {
-        this.authManager = new AuthManager();
-        this.guruSignature = new GuruSignature(this.authManager);
+        // One local bus for the login / logout / signature flow, replacing the
+        // window CustomEvents and the boolean guard flags (phase 4 of #18).
+        this.events = new EventBus();
+        this.authManager = new AuthManager(this.events);
+        this.guruSignature = new GuruSignature(this.authManager, this.events);
         this.sheetsAPI = new GoogleSheetsAPI(this.authManager);
         this.uiController = new UIController();
         this.analysisInterface = null; // Initialized after auth
@@ -25,10 +29,38 @@ class ThreeCardBlindGuruTool {
 
         this.currentSheetData = null;
         this.currentSheetId = null;
-        this.handlersSetup = false; // Track if handlers have been set up
-        this.authSectionRendered = false; // Track if auth section has been rendered
-        
+        this._domBound = false;
+        this._signatureHandlersBound = false;
+
+        this.setupEventSubscriptions();
         this.init();
+    }
+
+    /**
+     * Subscribe to the app events. Registration happens exactly once per page
+     * load; the handlers themselves are written to be safe to re-run.
+     */
+    setupEventSubscriptions() {
+        this.events.on(APP_EVENTS.USER_LOGGED_IN, () => this.onUserLoggedIn());
+        this.events.on(APP_EVENTS.USER_LOGGED_OUT, () => this.clearLocalPreferences());
+    }
+
+    /**
+     * Bring the authenticated session to life: render the signed-in chrome,
+     * wire handlers once, and pull the persisted signature / recent pods in.
+     */
+    async onUserLoggedIn() {
+        this.authManager.renderAuthSection();
+        this.authManager.showAppContent();
+
+        this.setupGuruSignatureHandlers();
+        this.bindEvents();
+
+        if (this.authManager.userPreferences && this.authManager.userPreferences.isInitialized) {
+            this.guruSignature.initSignature(await this.authManager.userPreferences.getGuruSignature());
+            // setUserPreferences already loads and renders recent pods/hubs
+            this.recentPodsManager.setUserPreferences(this.authManager.userPreferences);
+        }
     }
 
     async init() {
@@ -42,40 +74,18 @@ class ThreeCardBlindGuruTool {
 
             // Show loading while initializing
             this.showLoading('Initializing application...');
-            
-            // Set up event listeners first, before any authentication
-            this.setupPreferencesHandlers();
-            
+
             // Check authentication status
             const isAuthenticated = await this.authManager.checkAuthStatus();
-            
+
             // Hide loading after checking authentication
             this.hideLoading();
-            
-            if (isAuthenticated) {
-                this.authManager.renderAuthSection();
-                this.authManager.showAppContent();
-                this.authSectionRendered = true; // Mark as rendered
-                
-                // Only set up handlers once
-                if (!this.handlersSetup) {
-                    this.setupGuruSignatureHandlers();
-                    this.bindEvents();
-                    this.handlersSetup = true;
-                }
 
-                // Try to initialize the guru signature from persisted preferences so it's
-                // available immediately after login (avoids race where loadSheet blocks)
-                try {
-                    if (this.authManager.userPreferences) {
-                        const persistedSig = await this.authManager.userPreferences.getGuruSignature();
-                        if (persistedSig && persistedSig.trim() !== '') {
-                            await this.guruSignature.initSignature(persistedSig);
-                        }
-                    }
-                } catch (err) {
-                    console.warn('Could not initialize guru signature from preferences:', err);
-                }
+            if (isAuthenticated) {
+                // Bring the session up directly; on a restored session the login
+                // event also fires on a short delay, and onUserLoggedIn is safe
+                // to run more than once.
+                await this.onUserLoggedIn();
 
                 // Check if we should go directly to analysis mode based on URL parameters
                 const hasUrlParameters = await this.checkForDirectAnalysisMode();
@@ -167,41 +177,6 @@ class ThreeCardBlindGuruTool {
         container.append(note, button);
     }
 
-    setupPreferencesHandlers() {
-        // Listen for user login
-        window.addEventListener('userLoggedIn', async () => {
-            console.log('User logged in');
-            
-            // Only render auth section if it hasn't been rendered yet during initialization
-            // This prevents duplicate rendering when user is already authenticated
-            if (!this.authSectionRendered) {
-                this.authManager.renderAuthSection();
-                this.authManager.showAppContent();
-                this.authSectionRendered = true;
-            }
-            
-            // Only set up handlers once
-            if (!this.handlersSetup) {
-                this.setupGuruSignatureHandlers();
-                this.bindEvents();
-                this.handlersSetup = true;
-            }
-            
-            // Initialize user preferences and connect to recent pods manager
-            if (this.authManager.userPreferences && this.authManager.userPreferences.isInitialized) {
-                this.guruSignature.initSignature(await this.authManager.userPreferences.getGuruSignature());
-                // setUserPreferences already loads and renders recent pods/hubs
-                this.recentPodsManager.setUserPreferences(this.authManager.userPreferences);
-            }
-        });
-        // Clear preferences on logout
-        window.addEventListener('userLoggedOut', () => {
-            this.clearLocalPreferences();
-            this.handlersSetup = false; // Reset handlers flag so they can be set up again on next login
-            this.authSectionRendered = false; // Reset auth section flag
-        });
-    }
-
     /**
      * Show simple loading indicator under header
      */
@@ -233,6 +208,11 @@ class ThreeCardBlindGuruTool {
     }
 
     setupGuruSignatureHandlers() {
+        if (this._signatureHandlersBound) {
+            return;
+        }
+        this._signatureHandlersBound = true;
+
         // Listen for signature events
         this.guruSignature.onSignatureSet((signature) => {
             console.log('Guru signature set:', signature);
@@ -247,6 +227,11 @@ class ThreeCardBlindGuruTool {
     }
 
     bindEvents() {
+        if (this._domBound) {
+            return;
+        }
+        this._domBound = true;
+
         const loadBtn = document.getElementById('load-sheet-btn');
         const refreshBtn = document.getElementById('refresh-btn');
         const exitAnalysisBtn = document.getElementById('exit-analysis-btn');
@@ -256,20 +241,12 @@ class ThreeCardBlindGuruTool {
         refreshBtn.addEventListener('click', () => this.refreshSheet());
         exitAnalysisBtn.addEventListener('click', () => this.uiController.showSheetInputSection());
         this.setupDeploymentSwitch();
-        
+
         // Allow Enter key to trigger load
         sheetUrlInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
                 this.loadSheet();
             }
-        });
-
-        // Listen for user logout to optionally handle recent pods
-        window.addEventListener('userLoggedOut', () => {
-            // Note: We keep recent pods even after logout so they're available when user logs back in
-            // If you want to clear them on logout, uncomment the next line:
-            // this.recentPodsManager.clearRecentPods();
-            console.log('📋 User logged out - keeping recent pods for next session');
         });
     }
 

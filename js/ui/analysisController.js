@@ -1,19 +1,20 @@
 /**
  * Analysis controller.
  *
- * Owns the analysis session state and orchestrates the services and views for
- * the single-row scoring screen. It contains no DOM construction: rendering is
- * delegated to AnalysisView, modals to MatchTableModal / ThreadModal, the
- * colour dropdown to GuruColorSelector, and pure logic to js/domain/.
+ * Owns the analysis session state (on `this.state`, see js/app/appState.js) and
+ * orchestrates the services and views for the single-row scoring screen. It
+ * contains no DOM construction: rendering is delegated to AnalysisView, modals
+ * to MatchTableModal / ThreadModal, the colour dropdown to GuruColorSelector,
+ * and pure logic to js/domain/.
  *
- * Extracted from the former guruAnalysisInterface.js god class (phase 3 of #18).
+ * Extracted from the former guruAnalysisInterface.js god class (phase 3 of #18);
+ * its loose fields were consolidated into AppState in phase 4.
  */
 import { ScryfallAPI } from '../modules/scryfallAPI.js';
 import { DeckNotesEditor } from '../modules/deckNotesEditor.js';
 import {
     getCurrentColorAnalysis,
     getCurrentColorSignature,
-    emptyColumnIndex,
     getCurrentGuruColIndex,
     getGuruColorInRow,
     determineGuruColorFromSheet
@@ -47,23 +48,16 @@ import { AnalysisNavigation } from './analysisNavigation.js';
 import { AnalysisSessionLoader } from './analysisSessionLoader.js';
 import { AnalysisRowRenderer } from './analysisRowRenderer.js';
 import { AnalysisEventBinder } from './analysisEventBinder.js';
+import { AppState } from '../app/appState.js';
 
 export class AnalysisController {
     constructor(sheetsAPI, uiController, guruSignature) {
         this.sheetsAPI = sheetsAPI;
         this.uiController = uiController;
-        this.guruSignature = guruSignature;
-        this.hub = null;
+        // All session state lives on one object (phase 4 of #18).
+        this.state = new AppState();
+        this.state.setSignature(guruSignature);
         this.scryfallAPI = new ScryfallAPI();
-        this.currentData = null;
-        this.allRows = [];
-        this.currentRowIndex = -1;
-        this.currentGuruColor = null;
-        this.numDiscrepancies = 0;
-        this.deckNotesMap = new Map();
-        this.deckNotesColumnMap = {};
-        // Single per-colour column index: { red: { analysis, signature }, ... }
-        this.columnIndex = emptyColumnIndex();
 
         this.view = new AnalysisView({
             onClaim: () => this.claimRow(),
@@ -88,15 +82,7 @@ export class AnalysisController {
     }
 
     reset() {
-        this.hub = null;
-        this.currentData = null;
-        this.allRows = [];
-        this.currentRowIndex = -1;
-        this.currentGuruColor = null;
-        this.numDiscrepancies = 0;
-        this.deckNotesMap = new Map();
-        this.deckNotesColumnMap = {};
-        this.columnIndex = emptyColumnIndex();
+        this.state.reset();
     }
 
     destroy() {
@@ -111,14 +97,18 @@ export class AnalysisController {
      * @param {string} signature - The new guru signature
      */
     setGuruSignature(signature) {
-        if (this.guruSignature !== signature) {
-            this.guruSignature = signature;
+        if (this.state.signature !== signature) {
+            this.state.setSignature(signature);
             console.log(`Guru signature updated to: ${signature}`);
         }
     }
 
+    get guruSignature() {
+        return this.state.signature;
+    }
+
     determineGuruColorFromSheet(sheetData) {
-        return determineGuruColorFromSheet(sheetData, this.guruSignature, this.currentRowIndex);
+        return determineGuruColorFromSheet(sheetData, this.state.signature, this.state.rowIndex);
     }
 
     bindEvents() {
@@ -126,13 +116,13 @@ export class AnalysisController {
     }
 
     async changeGuruColor(newColor) {
-        if (newColor === this.currentGuruColor) {
+        if (newColor === this.state.guruColor) {
             return;
         }
 
         try {
-            const oldColor = this.currentGuruColor;
-            this.currentGuruColor = newColor;
+            const oldColor = this.state.guruColor;
+            this.state.setGuruColor(newColor);
 
             this.updateGuruColorDisplay();
             await this.showCurrentRow();
@@ -142,7 +132,7 @@ export class AnalysisController {
             console.error('Error changing guru color:', error);
             this.uiController.showStatus(`Error switching guru color: ${error.message}`, 'error');
 
-            this.currentGuruColor = oldColor;
+            this.state.setGuruColor(oldColor);
             this.updateGuruColorDisplay();
         }
     }
@@ -169,44 +159,44 @@ export class AnalysisController {
     /** Build the row model and column index for the selected guru colour. */
     parseSheets(sheetData) {
         const { rows, columnIndex, numDiscrepancies } = parsePodSheets(
-            sheetData, this.currentGuruColor, this.guruSignature
+            sheetData, this.state.guruColor, this.state.signature
         );
-        this.allRows = rows;
-        this.numDiscrepancies = numDiscrepancies;
-        if (columnIndex) {
-            this.columnIndex = columnIndex;
-        }
+        this.state.setRows(rows);
+        this.state.setNumDiscrepancies(numDiscrepancies);
+        this.state.setColumnIndex(columnIndex);
     }
 
     // The methods below delegate to js/domain/. They are kept on the class so
     // the rendering and event call sites do not need to change in this phase.
 
     getCurrentColorAnalysis(row) {
-        return getCurrentColorAnalysis(row, this.currentGuruColor);
+        return getCurrentColorAnalysis(row, this.state.guruColor);
     }
 
     getCurrentColorSignature(row) {
-        return getCurrentColorSignature(row, this.currentGuruColor);
+        return getCurrentColorSignature(row, this.state.guruColor);
     }
 
     isCurrentMatchAvailableForAnalysis() {
-        return isCurrentMatchAvailableForAnalysis(this.allRows, this.currentGuruColor, this.guruSignature, this.currentRowIndex);
+        return isCurrentMatchAvailableForAnalysis(
+            this.state.rows, this.state.guruColor, this.state.signature, this.state.rowIndex
+        );
     }
 
     isMatchAvailableForAnalysis(row) {
-        return isMatchAvailableForAnalysis(row, this.currentGuruColor, this.guruSignature);
+        return isMatchAvailableForAnalysis(row, this.state.guruColor, this.state.signature);
     }
 
     isAnalysisComplete() {
-        return isAnalysisComplete(this.allRows, this.currentGuruColor);
+        return isAnalysisComplete(this.state.rows, this.state.guruColor);
     }
 
     findFirstEmptyAnalysis(startFromIndex = 0) {
-        return findFirstEmptyAnalysis(this.allRows, this.currentGuruColor, this.guruSignature, startFromIndex);
+        return findFirstEmptyAnalysis(this.state.rows, this.state.guruColor, this.state.signature, startFromIndex);
     }
 
     findFirstDiscrepancy(startFromIndex = 0) {
-        return findFirstDiscrepancy(this.allRows, this.currentGuruColor, this.guruSignature, startFromIndex);
+        return findFirstDiscrepancy(this.state.rows, this.state.guruColor, this.state.signature, startFromIndex);
     }
 
     async showCurrentRow() {
@@ -253,19 +243,24 @@ export class AnalysisController {
         return this.actions.clearCurrentUserAnalysis();
     }
 
-    async reloadAllDataInBackground() {
-        return this.actions.reloadAllDataInBackground();
+    /**
+     * Re-fetch the pod and rebuild the row model, staying on the current match
+     * unless `preservePosition` is false. The single reload implementation; the
+     * former background refresh is a thin wrapper over it.
+     */
+    async reload({ preservePosition = true } = {}) {
+        return this.actions.reload({ preservePosition });
     }
 
     getDeckStats() {
-        return getDeckStats(this.allRows, this.currentGuruColor, this.currentRowIndex);
+        return getDeckStats(this.state.rows, this.state.guruColor, this.state.rowIndex);
     }
 
     /**
      * Returns the column index for the current guru color and type ('analysis' or 'signature')
      */
     getCurrentGuruColIndex(type = 'analysis') {
-        return getCurrentGuruColIndex(this.currentGuruColor, this.columnIndex, type);
+        return getCurrentGuruColIndex(this.state.guruColor, this.state.columnIndex, type);
     }
 
     /**
@@ -273,7 +268,7 @@ export class AnalysisController {
      * if that row does not have the current guru's signature.
      */
     getGuruColorInRow(row) {
-        return getGuruColorInRow(row, this.guruSignature);
+        return getGuruColorInRow(row, this.state.signature);
     }
 
     async nextRow() {
@@ -306,14 +301,14 @@ export class AnalysisController {
      * @returns {number} - Index of the mirror match, or -1 if not found
      */
     findMirrorMatchIndex(rowIndex) {
-        return findMirrorMatchIndex(this.allRows, rowIndex);
+        return findMirrorMatchIndex(this.state.rows, rowIndex);
     }
 
     /** Update the inverse display on the mirror-match button. */
     updateInverseResultDisplay() {
-        const currentRow = this.allRows[this.currentRowIndex];
-        const mirrorIndex = this.findMirrorMatchIndex(this.currentRowIndex);
-        const inverseRow = this.allRows[mirrorIndex];
+        const currentRow = this.state.rows[this.state.rowIndex];
+        const mirrorIndex = this.findMirrorMatchIndex(this.state.rowIndex);
+        const inverseRow = this.state.rows[mirrorIndex];
 
         this.view.renderMirrorButton(describeInverseResult(
             currentRow.outcomeValue,
@@ -336,16 +331,16 @@ export class AnalysisController {
                 uiController: this.uiController,
                 scryfallAPI: this.scryfallAPI,
                 sheetsAPI: this.sheetsAPI,
-                spreadsheetID: this.currentData.sheetId,
+                spreadsheetID: this.state.sheetId,
             });
         } else {
             // Update references in case they changed
             this.deckNotesEditor.uiController = this.uiController;
             this.deckNotesEditor.scryfallAPI = this.scryfallAPI;
             this.deckNotesEditor.sheetsAPI = this.sheetsAPI;
-            this.deckNotesEditor.spreadsheetID = this.currentData.sheetId;
+            this.deckNotesEditor.spreadsheetID = this.state.sheetId;
         }
-        this.deckNotesEditor.show(notesData, this.currentData.title);
+        this.deckNotesEditor.show(notesData, this.state.sheetData.title);
     }
 
     calculateColorStatistics(sheetData) {
@@ -364,7 +359,7 @@ export class AnalysisController {
         console.log(`User selected guru color: ${color}`);
 
         // Set the guru color
-        this.currentGuruColor = color;
+        this.state.setGuruColor(color);
 
         // Remove the color selection container
         this.view.hideColorSelection();
@@ -378,13 +373,13 @@ export class AnalysisController {
     }
 
     getTotalRows() {
-        return this.allRows.length;
+        return this.state.totalRows;
     }
 
     getCurrentProgress() {
         return {
-            current: this.currentRowIndex + 1,
-            total: this.allRows.length
+            current: this.state.rowIndex + 1,
+            total: this.state.totalRows
         };
     }
 
@@ -401,13 +396,13 @@ export class AnalysisController {
         const threadMap = await this.getMatchTableThreadMap();
 
         await this.matchTablePresenter.open({
-            rows: this.allRows,
-            currentRowIndex: this.currentRowIndex,
-            colour: this.currentGuruColor,
-            signature: this.guruSignature,
+            rows: this.state.rows,
+            currentRowIndex: this.state.rowIndex,
+            colour: this.state.guruColor,
+            signature: this.state.signature,
             threadMap,
             statusFor: (row, idx) => ({
-                signature: (getCurrentColorSignature(row, this.currentGuruColor) || '').trim(),
+                signature: (getCurrentColorSignature(row, this.state.guruColor) || '').trim(),
                 hasResult: this.hasCurrentColorResult(row),
                 hasDiscrepancy: this.rowHasDiscrepancy(row),
                 hasThread: this.hasDiscordThreadForRow(threadMap, row, idx),
@@ -416,7 +411,7 @@ export class AnalysisController {
             }),
             onSelect: (idx) => {
                 if (idx >= 0) {
-                    this.currentRowIndex = idx;
+                    this.state.setRowIndex(idx);
                     this.showCurrentRow();
                 }
             }
@@ -428,15 +423,15 @@ export class AnalysisController {
     }
 
     async getMatchTableThreadMap() {
-        if (!this.hub) {
+        if (!this.state.hub) {
             return null;
         }
 
         try {
-            return await this.hub.getThreads();
+            return await this.state.hub.getThreads();
         } catch (error) {
             console.warn('Failed to load thread data for match table:', error);
-            return this.hub.threadsCache || null;
+            return this.state.hub.threadsCache || null;
         }
     }
 
@@ -449,7 +444,7 @@ export class AnalysisController {
     }
 
     hasCurrentColorResult(row) {
-        return hasCurrentColorResult(row, this.currentGuruColor);
+        return hasCurrentColorResult(row, this.state.guruColor);
     }
 
     rowHasDiscrepancy(row) {
@@ -461,7 +456,7 @@ export class AnalysisController {
     }
 
     isInverseErrorSuspected(rowIndex) {
-        return isInverseErrorSuspected(this.allRows, rowIndex, (index) => this.findMirrorMatchIndex(index));
+        return isInverseErrorSuspected(this.state.rows, rowIndex, (index) => this.findMirrorMatchIndex(index));
     }
 
     /**
@@ -469,18 +464,18 @@ export class AnalysisController {
      * @param {number} rowIndex - Index of the row to create thread text for
      */
     showCreateThreadModal(rowIndex) {
-        if (rowIndex < 0 || rowIndex >= this.allRows.length) {
+        if (rowIndex < 0 || rowIndex >= this.state.rows.length) {
             console.warn('Invalid row index for thread creation');
             return;
         }
 
-        const currentRow = this.allRows[rowIndex];
+        const currentRow = this.state.rows[rowIndex];
         this.threadPresenter.open({
             row: currentRow,
             rowIndex,
-            sheetId: this.currentData.sheetId,
-            podName: this.currentData.metadata?.podName || 'Pod',
-            mainSheetLink: this.currentData.metadata?.mainSheetLink,
+            sheetId: this.state.sheetId,
+            podName: this.state.sheetData.metadata?.podName || 'Pod',
+            mainSheetLink: this.state.sheetData.metadata?.mainSheetLink,
             currentAnalysis: this.getCurrentColorAnalysis(currentRow)
         });
     }

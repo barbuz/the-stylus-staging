@@ -53,6 +53,7 @@ import {
 import { isInverseErrorSuspected, isOutcomeValueValidForInverse } from '../../js/domain/inverseCheck.js';
 
 import { AnalysisController } from '../../js/ui/analysisController.js';
+import { AppState } from '../../js/app/appState.js';
 import { makeMergedGuruSheet, makeSheetData } from '../fixtures/sheetData.js';
 
 /**
@@ -503,25 +504,34 @@ test('hasDiscordThreadForRow copes with a missing thread map', () => {
 
 // --- Colour detection from sheet ---------------------------------------------
 
+/** A fake controller carrying just the session state the method reads. */
+function controllerWithSignature(signature) {
+    const instance = logic();
+    instance.state = new AppState();
+    instance.state.setSignature(signature);
+    instance.state.setRowIndex(-1);
+    return instance;
+}
+
 test('determineGuruColorFromSheet finds the colour a signature is claimed under', () => {
     const sheetData = makeSheetData({ guruRows: [
         ['1', 'Deck A', 'Deck B', '1', 'bob', '1', 'alice', '1', 'carol']
     ]});
-    const instance = Object.assign(logic(), { guruSignature: 'alice', currentRowIndex: -1 });
-    assert.equal(instance.determineGuruColorFromSheet(sheetData), 'blue');
+    assert.equal(controllerWithSignature('alice').determineGuruColorFromSheet(sheetData), 'blue');
 });
 
 test('determineGuruColorFromSheet defaults to red without a signature', () => {
-    const instance = Object.assign(logic(), { guruSignature: '', currentRowIndex: -1 });
-    assert.equal(instance.determineGuruColorFromSheet(makeSheetData({ guruRows: [] })), 'red');
+    assert.equal(controllerWithSignature('').determineGuruColorFromSheet(makeSheetData({ guruRows: [] })), 'red');
 });
 
 test('determineGuruColorFromSheet throws when the signature is nowhere', () => {
     const sheetData = makeSheetData({ guruRows: [
         ['1', 'Deck A', 'Deck B', '1', 'bob', '1', 'bob', '1', 'bob']
     ]});
-    const instance = Object.assign(logic(), { guruSignature: 'nobody', currentRowIndex: -1 });
-    assert.throws(() => instance.determineGuruColorFromSheet(sheetData), /not found in any analysis column/);
+    assert.throws(
+        () => controllerWithSignature('nobody').determineGuruColorFromSheet(sheetData),
+        /not found in any analysis column/
+    );
 });
 
 // --- Statistics --------------------------------------------------------------
