@@ -81,6 +81,11 @@ test.describe('The Stylus (no Google, no network)', () => {
 
         await expect(page.locator('#status-message')).toContainText('Analysis saved: Win');
         await expect.poll(() => page.evaluate(() => window.__stylus.getCell('Red Gurus', 2, 5))).toBe('1');
+
+        // The batchUpdate must name the spreadsheet file, not the tab, or the
+        // real API rejects the write. The stub ignores the id, so assert here.
+        const [batch] = await page.evaluate(() => window.__stylus.getBatchUpdates());
+        expect(batch.spreadsheetId).toBe(POD_ID);
     });
 
     test('navigation moves between matches and reflects claim state', async ({ page }) => {
