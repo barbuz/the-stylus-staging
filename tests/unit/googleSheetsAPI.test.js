@@ -417,6 +417,26 @@ test('updateSheetData routes merged-sheet columns to the right guru sheet', asyn
     }
 });
 
+test('updateSheetData honours a tab id of 0 (first sheet) without dropping it', async () => {
+    const { fake, restore } = withFakeGapi({ sheets: [{ title: 'Red Gurus', sheetId: 0 }] });
+    try {
+        const api = new GoogleSheetsAPI(fakeAuthManager());
+        await api.updateSheetData(SHEET_ID, {
+            updates: [{
+                sheetId: 0, row: 3, col: 4, value: '1', valueType: 'number',
+                isMergedGuruUpdate: true, guruSheetIds: { red: 0, blue: 1, green: 2 }
+            }]
+        });
+
+        const [call] = fake.callsTo('spreadsheets.batchUpdate');
+        assert.equal(call.params.spreadsheetId, SHEET_ID);
+        // Google numbers the first tab 0; a falsy check would lose it.
+        assert.equal(call.params.resource.requests[0].updateCells.start.sheetId, 0);
+    } finally {
+        restore();
+    }
+});
+
 test('updateSheetData wraps API failures with a readable message', async () => {
     const api = new GoogleSheetsAPI(fakeAuthManager());
     globalThis.gapi = {
