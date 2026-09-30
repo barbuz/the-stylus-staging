@@ -71,7 +71,5 @@ export class EventBus {
 export const APP_EVENTS = {
     USER_LOGGED_IN: 'userLoggedIn',
     USER_LOGGED_OUT: 'userLoggedOut',
-    GURU_SIGNATURE_LOADED: 'guruSignatureLoaded',
-    GURU_SIGNATURE_CHANGED: 'guruSignatureChanged',
     REQUEST_GURU_SIGNATURE_CHANGE: 'requestGuruSignatureChange'
 };

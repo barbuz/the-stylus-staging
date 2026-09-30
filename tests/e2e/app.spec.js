@@ -27,10 +27,12 @@ async function bootApp(page, { signature = 'alice', preferences } = {}) {
 }
 
 /** Sign in and wait for the pod URL input to be available. */
-async function signIn(page) {
+async function signIn(page, { waitForPodInput = true } = {}) {
     await page.getByRole('button', { name: /sign in with google/i }).click();
     await expect(page.locator('#app-content')).toBeVisible();
-    await expect(page.locator('#sheet-url')).toBeVisible();
+    if (waitForPodInput) {
+        await expect(page.locator('#sheet-url')).toBeVisible();
+    }
 }
 
 async function loadPod(page, url = POD_URL) {
@@ -281,6 +283,65 @@ test.describe('The Stylus (no Google, no network)', () => {
         await selection.locator('#color-green .select-color-btn').click();
         await expect(selection).toBeHidden();
         await expect(page.locator('#current-analysis-value')).toBeVisible();
+    });
+});
+
+// --- Signature ownership (phase 5 of #18) ------------------------------------
+//
+// The signature is a single immutable session value. There is no live getter
+// into an open pod, so a change is an explicit restart: it must persist once,
+// update the header, and be the value the *next* pod load resolves against.
+
+test.describe('Signature ownership', () => {
+    test('an unset signature shows the identification section instead of the pod input', async ({ page }) => {
+        await bootApp(page, { preferences: { guruSignature: '', recentPods: [], recentHubs: [] } });
+        await signIn(page, { waitForPodInput: false });
+
+        // With no signature, the app asks for one and hides the pod input.
+        await expect(page.locator('#guru-signature-section')).toBeVisible();
+        await expect(page.locator('#sheet-input-section')).toBeHidden();
+
+        // Setting one reveals the pod input and hides the section again.
+        await page.locator('#guru-signature').fill('alice');
+        await page.locator('#set-signature-btn').click();
+
+        await expect(page.locator('#sheet-input-section')).toBeVisible();
+        await expect(page.locator('#guru-signature-section')).toBeHidden();
+    });
+
+    test('the change affordance is hidden while a pod is open', async ({ page }) => {
+        await bootApp(page);
+        await signIn(page);
+        await loadPod(page);
+
+        // The signature is session identity, not live per-row state: the change
+        // affordance lives in the header, which the scoring screen hides. A guru
+        // must therefore leave the pod before changing it.
+        await expect(page.locator('#guru-signature-display')).toBeHidden();
+    });
+
+    test('changing the signature persists once and the next load uses it', async ({ page }) => {
+        await bootApp(page);
+        await signIn(page);
+        await expect(page.locator('#guru-signature-display')).toHaveText('alice');
+
+        // Change it through the header affordance, before any pod is open.
+        await page.locator('#guru-signature-display').click();
+        await expect(page.locator('#guru-signature-section')).toBeVisible();
+        await page.locator('#guru-signature').fill('bob');
+        await page.locator('#set-signature-btn').click();
+
+        // Persisted through the single owner; the header and section reflect it.
+        await expect.poll(() => page.evaluate(() =>
+            window.__stylus.getPreferences().guruSignature
+        )).toBe('bob');
+        await expect(page.locator('#guru-signature-display')).toHaveText('bob');
+        await expect(page.locator('#guru-signature-section')).toBeHidden();
+
+        // The next load resolves against the new signature: bob's first match is
+        // his own and unscored.
+        await loadPod(page);
+        await expect(page.locator('#current-row-info')).toHaveText('Match 1 of 4');
     });
 });
 

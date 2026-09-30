@@ -93,16 +93,9 @@ export class AnalysisController {
     }
 
     /**
-     * Updates the guru signature used for filtering and claiming matches
-     * @param {string} signature - The new guru signature
+     * The guru signature this session was opened with. A snapshot taken at load;
+     * it does not change while a pod is open (phase 5 of #18).
      */
-    setGuruSignature(signature) {
-        if (this.state.signature !== signature) {
-            this.state.setSignature(signature);
-            console.log(`Guru signature updated to: ${signature}`);
-        }
-    }
-
     get guruSignature() {
         return this.state.signature;
     }

@@ -11,22 +11,30 @@ export class GuruSignature {
         this.storageKey = CONFIG.STORAGE_KEYS.GURU_SIGNATURE;
         this.authManager = authManager;
         this.events = events;
+        // The one place the current value lives. Persistence is delegated to
+        // UserPreferences; nothing else keeps a copy (phase 5 of #18).
+        this.userPreferences = authManager?.userPreferences || null;
         this.callbacks = {
-            onSignatureSet: [],
-            onSignatureChanged: []
+            onSignatureSet: []
         };
         this.signature = null; // In-memory signature for this session
         this.initialized = false;
         this.bindEvents();
     }
 
-    async initSignature(signature) {
+    /** Load the persisted signature into memory and update the UI. */
+    async initSignature() {
+        const signature = this.userPreferences
+            ? await this.userPreferences.getGuruSignature()
+            : localStorage.getItem(this.storageKey) || '';
+
         if (signature) {
             this.signature = signature;
-            this.displaySignature(this.signature);
+            this.displaySignature(signature);
             this.hideSignatureSection();
             this.showSheetInputSection();
-            this.notifyCallbacks('onSignatureSet', this.signature);
+            this.authManager?.renderAuthSection();
+            this.notifyCallbacks('onSignatureSet', signature);
         } else {
             this.showSignatureSection();
         }
@@ -78,36 +86,30 @@ export class GuruSignature {
         await this.saveSignature(finalSignature);
         this.signature = finalSignature;
 
-        // Update auth manager header display
-        if (this.authManager) {
-            this.authManager.updateGuruSignature(finalSignature);
-        }
-
         this.displaySignature(finalSignature);
         this.hideSignatureSection();
         this.showSheetInputSection();
+        this.authManager?.renderAuthSection();
         this.notifyCallbacks('onSignatureSet', finalSignature);
     }
 
     changeSignature() {
         const signatureInput = document.getElementById('guru-signature');
         const currentSignature = this.getSignature();
-        
+
         signatureInput.value = currentSignature;
         this.showSignatureSection();
         signatureInput.focus();
         signatureInput.select();
     }
 
+    /** Persist through the single owner (UserPreferences), with a localStorage fallback. */
     async saveSignature(signature) {
-        // Use authManager to save signature (which will handle Drive vs localStorage)
-        if (this.authManager) {
-            await this.authManager.saveGuruSignature(signature);
+        if (this.userPreferences) {
+            await this.userPreferences.setGuruSignature(signature);
         } else {
-            // Fall back to localStorage if authManager not available
             localStorage.setItem(this.storageKey, signature);
         }
-        // Always update in-memory value
         this.signature = signature;
     }
 
@@ -188,25 +190,13 @@ export class GuruSignature {
         }, 5000);
     }
 
-    clearSignature() {
-        localStorage.removeItem(this.storageKey);
-        this.signature = null;
-        this.showSignatureSection();
-        document.getElementById('guru-signature').value = '';
-        this.notifyCallbacks('onSignatureChanged', null);
-    }
-
     hasSignature() {
         return !!this.signature;
     }
 
-    // Event system for other modules to listen to signature changes
+    /** Notify listeners that a signature is now set (main.js wires the status line). */
     onSignatureSet(callback) {
         this.callbacks.onSignatureSet.push(callback);
-    }
-
-    onSignatureChanged(callback) {
-        this.callbacks.onSignatureChanged.push(callback);
     }
 
     notifyCallbacks(event, signature) {
@@ -217,27 +207,5 @@ export class GuruSignature {
                 console.error('Error in guru signature callback:', error);
             }
         });
-    }
-
-    // Get signature with metadata for audit trail
-    getSignatureWithMetadata() {
-        const signature = this.getSignature();
-        if (!signature) return null;
-
-        return {
-            signature,
-            timestamp: new Date().toISOString(),
-            userAgent: navigator.userAgent,
-            sessionId: this.getSessionId()
-        };
-    }
-
-    getSessionId() {
-        let sessionId = sessionStorage.getItem('3cb-session-id');
-        if (!sessionId) {
-            sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-            sessionStorage.setItem('3cb-session-id', sessionId);
-        }
-        return sessionId;
     }
 }
