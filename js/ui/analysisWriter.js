@@ -8,6 +8,11 @@
  *
  * Merged-guru writes are routed to the individual colour sheet by the API
  * module via `guruSheetIds`, so this class never needs the colour column map.
+ *
+ * `spreadsheetId` is the spreadsheet file id (the batchUpdate target);
+ * `sheetId` is the numeric tab id inside it. They are distinct and both
+ * required: passing the tab id where the file id belongs makes the real API
+ * reject the write.
  */
 export class AnalysisWriter {
     constructor(sheetsAPI) {
@@ -15,7 +20,7 @@ export class AnalysisWriter {
     }
 
     /** Write one guru's Win/Tie/Loss to a merged-guru row. */
-    async writeAnalysis({ sheetId, row, col, value, guruSheetIds }) {
+    async writeAnalysis({ spreadsheetId, sheetId, row, col, value, guruSheetIds }) {
         const updates = {
             updates: [{
                 sheetId,
@@ -27,11 +32,11 @@ export class AnalysisWriter {
                 guruSheetIds
             }]
         };
-        await this.sheetsAPI.updateSheetData(sheetId, updates);
+        await this.sheetsAPI.updateSheetData(spreadsheetId, updates);
     }
 
     /** Atomically claim a row only if its signature cell is still empty. */
-    async claimRow({ sheetId, row, col, signature, guruSheetIds }) {
+    async claimRow({ spreadsheetId, sheetId, row, col, signature, guruSheetIds }) {
         const updates = {
             updates: [{
                 sheetId,
@@ -44,11 +49,11 @@ export class AnalysisWriter {
                 guruSheetIds
             }]
         };
-        return this.sheetsAPI.checkedUpdateSheetData(sheetId, updates);
+        return this.sheetsAPI.checkedUpdateSheetData(spreadsheetId, updates);
     }
 
     /** Claim every listed row, reporting which were already taken. */
-    async claimRows({ sheetId, rows, col, signature, guruSheetIds }) {
+    async claimRows({ spreadsheetId, sheetId, rows, col, signature, guruSheetIds }) {
         const updates = {
             updates: rows.map(row => ({
                 sheetId,
@@ -61,11 +66,11 @@ export class AnalysisWriter {
                 guruSheetIds
             }))
         };
-        return this.sheetsAPI.checkedUpdateSheetData(sheetId, updates);
+        return this.sheetsAPI.checkedUpdateSheetData(spreadsheetId, updates);
     }
 
-    async clearCell({ sheetId, row, col, guruSheetIds }) {
-        return this.sheetsAPI.clearCell(sheetId, {
+    async clearCell({ spreadsheetId, sheetId, row, col, guruSheetIds }) {
+        return this.sheetsAPI.clearCell(spreadsheetId, {
             sheetId,
             row: row + 1,
             col: col + 1,
@@ -75,7 +80,7 @@ export class AnalysisWriter {
     }
 
     /** Checked update of a Deck Notes field (notes / additional notes / clock). */
-    async saveDeckField({ sheetId, sheet, row, col, value, expectedValue }) {
+    async saveDeckField({ spreadsheetId, sheet, row, col, value, expectedValue }) {
         const updates = {
             updates: [{
                 sheetId: sheet.sheetId,
@@ -86,12 +91,12 @@ export class AnalysisWriter {
                 valueType: 'auto-detect'
             }]
         };
-        return this.sheetsAPI.checkedUpdateSheetData(sheetId, updates);
+        return this.sheetsAPI.checkedUpdateSheetData(spreadsheetId, updates);
     }
 
     /** Sign the goldfish clock with the guru signature. */
-    async signGoldfishClock({ sheetId, sheet, row, col, signature }) {
-        await this.sheetsAPI.updateSheetData(sheetId, {
+    async signGoldfishClock({ spreadsheetId, sheet, row, col, signature }) {
+        await this.sheetsAPI.updateSheetData(spreadsheetId, {
             updates: [{
                 sheetId: sheet.sheetId,
                 row: row + 1,
