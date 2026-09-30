@@ -48,6 +48,7 @@ export class AnalysisActions {
             const analysisColIndex = host.getCurrentGuruColIndex('analysis');
 
             await host.writer.writeAnalysis({
+                spreadsheetId: state.sheetId,
                 sheetId: currentRow.sheetId,
                 row: currentRow.originalRowIndex,
                 col: analysisColIndex,
@@ -87,6 +88,7 @@ export class AnalysisActions {
             host.uiController.showStatus('Claiming match...', 'loading');
 
             const result = await host.writer.claimRow({
+                spreadsheetId: state.sheetId,
                 sheetId: currentRow.sheetId,
                 row: currentRow.originalRowIndex,
                 col: host.getCurrentGuruColIndex('signature'),
@@ -134,6 +136,7 @@ export class AnalysisActions {
             host.uiController.showStatus('Unclaiming match...', 'loading');
 
             await host.writer.clearCell({
+                spreadsheetId: state.sheetId,
                 sheetId: currentRow.sheetId,
                 row: currentRow.originalRowIndex,
                 col: host.getCurrentGuruColIndex('signature'),
@@ -174,6 +177,7 @@ export class AnalysisActions {
             host.uiController.showStatus('Clearing your analysis...', 'loading');
 
             await host.writer.clearCell({
+                spreadsheetId: state.sheetId,
                 sheetId: currentRow.sheetId,
                 row: currentRow.originalRowIndex,
                 col: host.getCurrentGuruColIndex('analysis'),
@@ -222,7 +226,8 @@ export class AnalysisActions {
         try {
             host.uiController.showStatus(`Claiming ${rowsToClaim.length} matches for deck...`, 'loading');
             const result = await host.writer.claimRows({
-                sheetId: state.sheetId,
+                spreadsheetId: state.sheetId,
+                sheetId: currentRow.sheetId,
                 rows: rowsToClaim.map(row => row.originalRowIndex),
                 col: host.getCurrentGuruColIndex('signature'),
                 signature: state.signature,
@@ -289,7 +294,7 @@ export class AnalysisActions {
         );
 
         const result = await host.writer.saveDeckField({
-            sheetId: state.sheetId,
+            spreadsheetId: state.sheetId,
             sheet: deckNotesSheet,
             row,
             col,
@@ -304,7 +309,7 @@ export class AnalysisActions {
                 deckInfo.goldfishClock = newValue;
                 if (colMap.goldfishSignature > -1) {
                     host.writer.signGoldfishClock({
-                        sheetId: state.sheetId,
+                        spreadsheetId: state.sheetId,
                         sheet: deckNotesSheet,
                         row,
                         col: colMap.goldfishSignature,

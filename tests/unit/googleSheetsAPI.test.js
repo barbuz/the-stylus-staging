@@ -67,6 +67,65 @@ test('resolveTargetForMergedUpdate leaves non-merged updates untouched', () => {
     assert.deepEqual(api.resolveTargetForMergedUpdate(update), { targetSheetId: 99, targetCol: 6 });
 });
 
+test('updateSheetData sends the spreadsheet id, not the target tab id', async () => {
+    const { fake, restore } = withFakeGapi({ sheets: [{ title: 'Red Gurus', sheetId: 111 }] });
+    try {
+        const api = new GoogleSheetsAPI(fakeAuthManager());
+        await api.updateSheetData(SHEET_ID, {
+            updates: [{
+                sheetId: 111, row: 2, col: 5, value: '1', valueType: 'number',
+                isMergedGuruUpdate: true, guruSheetIds: { red: 111 }
+            }]
+        });
+
+        const [call] = fake.callsTo('spreadsheets.batchUpdate');
+        assert.equal(call.params.spreadsheetId, SHEET_ID);
+        // Merged col 5 is Red Signature, which lands in column F (index 5).
+        assert.deepEqual(call.params.resource.requests[0].updateCells.start, { sheetId: 111, rowIndex: 1, columnIndex: 5 });
+    } finally {
+        restore();
+    }
+});
+
+test('checkedUpdateSheetData sends the spreadsheet id, not the target tab id', async () => {
+    const { fake, restore } = withFakeGapi({
+        sheets: [{ title: 'Red Gurus', sheetId: 111 }],
+        valueRanges: [[['']]]
+    });
+    try {
+        const api = new GoogleSheetsAPI(fakeAuthManager());
+        await api.checkedUpdateSheetData(SHEET_ID, {
+            updates: [{
+                sheetId: 111, row: 2, col: 5, value: 'alice', expectedValue: '',
+                valueType: 'string', isMergedGuruUpdate: true, guruSheetIds: { red: 111 }
+            }]
+        });
+
+        const [call] = fake.callsTo('spreadsheets.batchUpdate');
+        assert.equal(call.params.spreadsheetId, SHEET_ID);
+        assert.deepEqual(call.params.resource.requests[0].updateCells.start, { sheetId: 111, rowIndex: 1, columnIndex: 5 });
+    } finally {
+        restore();
+    }
+});
+
+test('clearCell sends the spreadsheet id, not the target tab id', async () => {
+    const { fake, restore } = withFakeGapi({ sheets: [{ title: 'Red Gurus', sheetId: 111 }] });
+    try {
+        const api = new GoogleSheetsAPI(fakeAuthManager());
+        await api.clearCell(SHEET_ID, {
+            sheetId: 111, row: 4, col: 5, isMergedGuruUpdate: true, guruSheetIds: { red: 111 }
+        });
+
+        const [call] = fake.callsTo('values.clear');
+        assert.equal(call.params.spreadsheetId, SHEET_ID);
+        // Merged col 5 is Red Signature, which clears column F.
+        assert.equal(call.params.range, "'Red Gurus'!F4");
+    } finally {
+        restore();
+    }
+});
+
 // --- Authentication guard ----------------------------------------------------
 
 test('API methods refuse to run when not logged in', async () => {
@@ -353,6 +412,26 @@ test('updateSheetData routes merged-sheet columns to the right guru sheet', asyn
         const request = fake.callsTo('spreadsheets.batchUpdate')[0].params.resource.requests[0];
         // Merged column F (Blue Analysis) becomes column E on the Blue sheet.
         assert.deepEqual(request.updateCells.start, { sheetId: 22, rowIndex: 1, columnIndex: 4 });
+    } finally {
+        restore();
+    }
+});
+
+test('updateSheetData honours a tab id of 0 (first sheet) without dropping it', async () => {
+    const { fake, restore } = withFakeGapi({ sheets: [{ title: 'Red Gurus', sheetId: 0 }] });
+    try {
+        const api = new GoogleSheetsAPI(fakeAuthManager());
+        await api.updateSheetData(SHEET_ID, {
+            updates: [{
+                sheetId: 0, row: 3, col: 4, value: '1', valueType: 'number',
+                isMergedGuruUpdate: true, guruSheetIds: { red: 0, blue: 1, green: 2 }
+            }]
+        });
+
+        const [call] = fake.callsTo('spreadsheets.batchUpdate');
+        assert.equal(call.params.spreadsheetId, SHEET_ID);
+        // Google numbers the first tab 0; a falsy check would lose it.
+        assert.equal(call.params.resource.requests[0].updateCells.start.sheetId, 0);
     } finally {
         restore();
     }
