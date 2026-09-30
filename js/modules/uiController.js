@@ -1,12 +1,13 @@
-import { CONFIG } from '../config.js';
-
 export class UIController {
-    constructor() {
+    constructor(guruSignature = null) {
         this.statusMessage = document.getElementById('status-message');
         this.sheetEditor = document.getElementById('sheet-editor');
         this.loadBtn = document.getElementById('load-sheet-btn');
         this.saveBtn = document.getElementById('save-btn');
         this.refreshBtn = document.getElementById('refresh-btn');
+        // The single owner of the signature, injected by main.js. Used only to
+        // decide whether the signature section should stay hidden.
+        this.guruSignature = guruSignature;
 
         // --- Pointer type detection ---
         this._pointerType = null;
@@ -122,13 +123,13 @@ export class UIController {
         // Remove body class for mobile scrolling support
         document.body.classList.remove('fullscreen-mode');
         
-        // Only show guru signature section if no signature is set
-        // Check if guru signature exists in localStorage using the CONFIG storage key
-        const guruSignature = localStorage.getItem(CONFIG.STORAGE_KEYS.GURU_SIGNATURE);
+        // Only show the guru signature section when no signature is set. Ask the
+        // single owner rather than reading localStorage behind its back.
+        const hasSignature = this.guruSignature?.hasSignature() ?? false;
         const guruSignatureSection = document.getElementById('guru-signature-section');
         
         if (guruSignatureSection) {
-            if (guruSignature) {
+            if (hasSignature) {
                 // User has a signature, keep the section hidden
                 guruSignatureSection.style.display = 'none';
                 console.log('🔒 Guru signature exists, keeping section hidden');

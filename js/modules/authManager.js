@@ -3,17 +3,24 @@ import { UserPreferences } from './userPreferences.js';
 import { APP_EVENTS } from '../app/events.js';
 
 export class AuthManager {
-    constructor(events) {
+    constructor(events, guruSignature = null) {
         // Optional event bus. When present the login / signature flow is routed
         // through it instead of `window` CustomEvents (phase 4 of #18).
         this.events = events || null;
+        // The single owner of the current signature (phase 5 of #18). AuthManager
+        // deliberately keeps no copy: it delegates reads/writes here.
+        this.guruSignature = guruSignature;
         this.user = null;
         this.isAuthenticated = false;
-        this.guruSignature = '';
         this.tokenClient = null;
         this.initialized = false;
         this.userPreferences = new UserPreferences();
         this.reauthTimer = null;
+    }
+
+    /** The current guru signature, or '' when none is set. */
+    getGuruSignature() {
+        return this.guruSignature?.getSignature() || '';
     }
 
     async initialize() {
@@ -142,36 +149,10 @@ export class AuthManager {
         try {
             // Initialize user preferences with appData storage
             await this.userPreferences.initialize(this.user);
-            
-            // Load guru signature from appData
-            const guruSignature = await this.userPreferences.getGuruSignature();
-            if (guruSignature) {
-                this.guruSignature = guruSignature;
-                this.renderAuthSection();
 
-                // Notify other components that a signature was loaded
-                this.events?.emit(APP_EVENTS.GURU_SIGNATURE_LOADED, { signature: guruSignature });
-            }
-            
             console.log('✅ User preferences initialized from Google appData');
         } catch (error) {
             console.error('Error initializing user preferences:', error);
-        }
-    }
-
-
-    async saveGuruSignature(signature) {
-        this.guruSignature = signature;
-
-        // Save to localStorage first
-        localStorage.setItem(CONFIG.STORAGE_KEYS.GURU_SIGNATURE, signature);
-        try {
-            // Save to Google appData if user preferences are initialized
-            if (this.userPreferences.isInitialized) {
-                await this.userPreferences.setGuruSignature(signature);
-            }
-        } catch (error) {
-            console.error('Error saving guru signature:', error);            
         }
     }
 
@@ -446,8 +427,7 @@ export class AuthManager {
             
             this.isAuthenticated = false;
             this.user = null;
-            this.guruSignature = '';
-            
+
             // Clear all stored authentication data
             this.clearStoredAuth();
             
@@ -484,15 +464,16 @@ export class AuthManager {
 
     renderAuthSection() {
         const authSection = document.getElementById('auth-section');
-        console.log('AuthManager: Rendering auth section with guruSignature:', this.guruSignature);
+        const signature = this.getGuruSignature();
+        console.log('AuthManager: Rendering auth section with guruSignature:', signature);
         
         if (this.isAuthenticated && this.user) {
             authSection.innerHTML = `
                 <div class="user-info">
-                    ${this.guruSignature ? `
+                    ${signature ? `
                         <div class="guru-signature-display">
                             <span class="guru-label">Guru:</span>
-                            <span class="guru-signature-name" id="guru-signature-display">${this.guruSignature}</span>
+                            <span class="guru-signature-name" id="guru-signature-display">${signature}</span>
                         </div>
                     ` : ''}
                 </div>
@@ -504,7 +485,7 @@ export class AuthManager {
             });
             
             // Add click handler for guru signature to change it
-            if (this.guruSignature) {
+            if (signature) {
                 const guruSignatureDisplay = document.getElementById('guru-signature-display');
                 if (guruSignatureDisplay) {
                     guruSignatureDisplay.addEventListener('click', () => {
@@ -516,19 +497,6 @@ export class AuthManager {
             }
         } else {
             authSection.innerHTML = '';
-        }
-    }
-
-    /**
-     * Update the guru signature display in the auth section
-     * @param {string} signature - New guru signature
-     */
-    updateGuruSignature(signature) {
-        console.log('AuthManager: Updating guru signature to:', signature);
-        this.saveGuruSignature(signature);
-        // Only re-render if user is authenticated
-        if (this.user) {
-            this.renderAuthSection(); // Re-render to show the signature
         }
     }
 

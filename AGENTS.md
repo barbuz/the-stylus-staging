@@ -71,6 +71,34 @@ onto one object.
   is guarded by `_domBound` / `_signatureHandlersBound` so it is idempotent
   without the old reset-on-logout flags.
 
+### The guru signature (phase 5 of #18)
+
+The guru signature is session identity, not reactive state. It is set once,
+persisted, and only changes in exceptional circumstances, so it is modelled as a
+mostly immutable value rather than a live field.
+
+- `GuruSignature` (`js/modules/guruSignature.js`) is the **single owner** of the
+  current value. It keeps `this.signature` in memory and delegates persistence to
+  `UserPreferences` (Google appData, with a `localStorage` fallback when
+  preferences are unavailable). Nothing else stores a copy.
+- `AuthManager` deliberately holds **no** signature string. `this.guruSignature`
+  is the injected owner object, and `getGuruSignature()` reads through it, so
+  there is no stale duplicate to keep in sync. `main.js` wires the owner in after
+  constructing both.
+- `initSignature()` takes no argument: the owner loads the persisted value
+  itself. `main.js:onUserLoggedIn` calls it after `UserPreferences` initialises.
+- `AnalysisController` receives a **snapshot string** at construction
+  (`main.js` passes `guruSignature.getSignature()`), stored in
+  `AppState.signature`. There is no `setGuruSignature`; a pod that is open cannot
+  have its signature changed underneath it.
+- Changing the signature is therefore an explicit restart. The change affordance
+  is the header's `#guru-signature-display`, and the header is hidden while a pod
+  is open (`#sheet-editor` fullscreen). To change it a guru leaves the pod first;
+  the next `loadSheet` resolves the colour and rows against the new value.
+- `APP_EVENTS` only needs `USER_LOGGED_IN`, `USER_LOGGED_OUT` and
+  `REQUEST_GURU_SIGNATURE_CHANGE`. The old `GURU_SIGNATURE_LOADED` /
+  `GURU_SIGNATURE_CHANGED` events were removed with the duality they carried.
+
 ## Characterization (intentional current quirks)
 
 `tests/unit/characterization.test.js` pins these. Each is labelled CONTRACT
@@ -289,6 +317,22 @@ When you add, remove, or rename a file under `js/`, `styles/`, `images/`, or `fa
 ### Bumping the version
 
 `APP_VERSION` at the top of `sw.js` (format `vYYYYMMDD`) drives service worker updates. Bump it for any user-visible change so installed clients pick it up. `main.js` parses this value for the footer.
+
+### Work happens in staging first, always
+
+`barbuz/the-stylus-staging` is the working repository; `barbuz/the-stylus` is
+production. **Do all work here first, get it tested, and only then merge to the
+production repo.** This is the standing procedure for every change, not a
+per-task choice:
+
+1. Branch, implement and test in `the-stylus-staging`.
+2. Merge to the staging `main` and let it deploy to the preview site.
+3. Once the change has been verified on the preview, replay the same commits on
+   the production repo (`barbuz/the-stylus`) and merge to its `main` to deploy.
+
+Do not open PRs against or push to the production repo until the staging copy has
+been tested. The two repositories are independent copies (see below), so a change
+merged in staging does not appear in production by itself.
 
 ### Production and preview deployments
 

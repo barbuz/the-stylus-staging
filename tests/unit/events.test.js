@@ -88,9 +88,8 @@ test('on rejects a non-function handler', () => {
     assert.throws(() => bus.on('ping', 'not a function'), TypeError);
 });
 
-test('APP_EVENTS carries the login and signature flow names', () => {
+test('APP_EVENTS carries the login and signature-change flow names', () => {
     assert.equal(APP_EVENTS.USER_LOGGED_IN, 'userLoggedIn');
     assert.equal(APP_EVENTS.USER_LOGGED_OUT, 'userLoggedOut');
-    assert.equal(APP_EVENTS.GURU_SIGNATURE_LOADED, 'guruSignatureLoaded');
     assert.equal(APP_EVENTS.REQUEST_GURU_SIGNATURE_CHANGE, 'requestGuruSignatureChange');
 });

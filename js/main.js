@@ -22,8 +22,11 @@ class ThreeCardBlindGuruTool {
         this.events = new EventBus();
         this.authManager = new AuthManager(this.events);
         this.guruSignature = new GuruSignature(this.authManager, this.events);
+        // Hand the owner to the components that need it, so nothing else keeps
+        // a copy of the signature (phase 5 of #18).
+        this.authManager.guruSignature = this.guruSignature;
         this.sheetsAPI = new GoogleSheetsAPI(this.authManager);
-        this.uiController = new UIController();
+        this.uiController = new UIController(this.guruSignature);
         this.analysisInterface = null; // Initialized after auth
         this.recentPodsManager = new RecentPodsManager();
 
@@ -57,7 +60,8 @@ class ThreeCardBlindGuruTool {
         this.bindEvents();
 
         if (this.authManager.userPreferences && this.authManager.userPreferences.isInitialized) {
-            this.guruSignature.initSignature(await this.authManager.userPreferences.getGuruSignature());
+            // The single owner loads the persisted signature and updates the UI.
+            await this.guruSignature.initSignature();
             // setUserPreferences already loads and renders recent pods/hubs
             this.recentPodsManager.setUserPreferences(this.authManager.userPreferences);
         }
@@ -213,17 +217,29 @@ class ThreeCardBlindGuruTool {
         }
         this._signatureHandlersBound = true;
 
-        // Listen for signature events
+        // Listen for the signature being set (initial load or an explicit change).
         this.guruSignature.onSignatureSet((signature) => {
             console.log('Guru signature set:', signature);
             this.uiController.showStatus(`Welcome, ${signature}! Ready to edit pod sheets.`, 'success');
+            // A change while a pod is open must not leave a stale snapshot behind.
+            this.refreshSignatureForOpenPod();
         });
-        this.guruSignature.onSignatureChanged((signature) => {
-            console.log('Guru signature changed:', signature);
-            if (!signature) {
-                this.uiController.showStatus('Please set your Guru Signature to continue.', 'info');
-            }
-        });
+    }
+
+    /**
+     * If a pod is open, adopt the (now changed) signature: close the pod and
+     * return home so the next load resolves the colour and rows against the new
+     * value. The signature is session identity, not live per-row state.
+     */
+    refreshSignatureForOpenPod() {
+        if (!this.currentSpreadsheetId) {
+            return;
+        }
+        this.analysisInterface?.destroy();
+        this.analysisInterface = null;
+        this.currentSheetData = null;
+        this.currentSpreadsheetId = null;
+        this.uiController.showSheetInputSection();
     }
 
     bindEvents() {
@@ -360,10 +376,13 @@ class ThreeCardBlindGuruTool {
             
             // Load data into the analysis interface
             if (!this.analysisInterface) {
-                this.analysisInterface = new AnalysisController(this.sheetsAPI, this.uiController, this.authManager.guruSignature);
+                // The signature is a snapshot taken at load: it cannot change
+                // while a pod is open (phase 5 of #18).
+                this.analysisInterface = new AnalysisController(
+                    this.sheetsAPI, this.uiController, this.guruSignature.getSignature()
+                );
             } else {
                 this.analysisInterface.reset();
-                this.analysisInterface.setGuruSignature(this.authManager.guruSignature);
             }
             const isLoaded = await this.analysisInterface.loadData(sheetData, guruColor, rowNumber);
             this.uiController.showSheetEditor(sheetData.title || 'Untitled Pod');
