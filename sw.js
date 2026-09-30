@@ -29,6 +29,7 @@ const urlsToCache = [
   `${BASE_PATH}js/domain/guruColor.js`,
   `${BASE_PATH}js/domain/inverseCheck.js`,
   `${BASE_PATH}js/domain/matchRows.js`,
+  `${BASE_PATH}js/domain/recentEntries.js`,
   `${BASE_PATH}js/modules/authManager.js`,
   `${BASE_PATH}js/modules/deckNotesEditor.js`,
   `${BASE_PATH}js/modules/googleSheetsAPI.js`,

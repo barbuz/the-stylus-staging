@@ -1,6 +1,7 @@
 import { CONFIG } from '../config.js';
 import { getElement } from '../utils/domUtils.js';
 import { HubManager } from './hubManager.js';
+import { getRecordSpreadsheetId, normaliseRecords } from '../domain/recentEntries.js';
 
 export class RecentPodsManager {
     constructor() {
@@ -13,7 +14,7 @@ export class RecentPodsManager {
         this.userPreferences = null; // Will be set when auth manager is available
         this.isInitialized = false;
         this.expandedHubs = new Set(); // Track which hubs are expanded
-        this.hubManagers = new Map(); // Cache HubManager instances by sheetId
+        this.hubManagers = new Map(); // Cache HubManager instances by spreadsheetId
     }
 
     /**
@@ -49,8 +50,8 @@ export class RecentPodsManager {
                 console.log('📥 Loaded recent pods from localStorage:', pods.length, 'pods');
             }
             
-            this.recentPods = pods;
-            return pods;
+            this.recentPods = normaliseRecords(pods);
+            return this.recentPods;
         } catch (error) {
             console.error('Error loading recent pods:', error);
             this.recentPods = [];
@@ -100,27 +101,27 @@ export class RecentPodsManager {
 
     /**
      * Add a pod to recent list
-     * @param {string} sheetId - Google Sheets ID
+     * @param {string} spreadsheetId - Google Sheets file ID
      * @param {string} title - Pod title/name
      * @param {string} url - Full Google Sheets URL
      */
-    async addRecentPod(sheetId, title, url) {
-        if (!sheetId || !title || !url) {
+    async addRecentPod(spreadsheetId, title, url) {
+        if (!spreadsheetId || !title || !url) {
             console.warn('Invalid pod data provided to addRecentPod');
             return;
         }
 
         // Check if pod already exists to preserve original dateAdded
-        const existingPod = this.recentPods.find(pod => pod.sheetId === sheetId);
+        const existingPod = this.recentPods.find(pod => getRecordSpreadsheetId(pod) === spreadsheetId);
         const originalDateAdded = existingPod ? existingPod.dateAdded : Date.now();
 
         // Remove existing entry if it exists
-        this.recentPods = this.recentPods.filter(pod => pod.sheetId !== sheetId);
+        this.recentPods = this.recentPods.filter(pod => getRecordSpreadsheetId(pod) !== spreadsheetId);
 
         // Add to beginning of list with current timestamp for lastAccessed
         const now = Date.now();
         this.recentPods.unshift({
-            sheetId,
+            spreadsheetId,
             title: title.trim(),
             url,
             lastAccessed: now,
@@ -135,13 +136,13 @@ export class RecentPodsManager {
 
     /**
      * Remove a pod from recent list
-     * @param {string} sheetId - Google Sheets ID to remove
+     * @param {string} spreadsheetId - Google Sheets file ID to remove
      */
-    async removeRecentPod(sheetId) {
-        this.recentPods = this.recentPods.filter(pod => pod.sheetId !== sheetId);
+    async removeRecentPod(spreadsheetId) {
+        this.recentPods = this.recentPods.filter(pod => getRecordSpreadsheetId(pod) !== spreadsheetId);
         await this.saveRecentPods();
         this.renderRecentPods();
-        console.log(`🗑️ Removed pod from recent list: ${sheetId}`);
+        console.log(`🗑️ Removed pod from recent list: ${spreadsheetId}`);
     }
 
     /**
@@ -179,8 +180,8 @@ export class RecentPodsManager {
                 console.log('📥 Loaded recent hubs from localStorage:', hubs.length, 'hubs');
             }
             
-            this.recentHubs = hubs;
-            return hubs;
+            this.recentHubs = normaliseRecords(hubs);
+            return this.recentHubs;
         } catch (error) {
             console.error('Error loading recent hubs:', error);
             this.recentHubs = [];
@@ -238,23 +239,23 @@ export class RecentPodsManager {
         try {
             // Create a HubManager instance to get hub details
             const hubManager = new HubManager(hubLink);
-            const hubSheetId = hubManager.hubSheetId;
+            const hubSpreadsheetId = hubManager.hubSpreadsheetId;
             const hubUrl = hubManager.getHubUrl();
 
             // Check if hub already exists to preserve original dateAdded
-            const existingHub = this.recentHubs.find(hub => hub.sheetId === hubSheetId);
+            const existingHub = this.recentHubs.find(hub => getRecordSpreadsheetId(hub) === hubSpreadsheetId);
             const originalDateAdded = existingHub ? existingHub.dateAdded : Date.now();
 
             // Get the hub title
             const title = await hubManager.getHubTitle();
 
             // Remove existing entry if it exists
-            this.recentHubs = this.recentHubs.filter(hub => hub.sheetId !== hubSheetId);
+            this.recentHubs = this.recentHubs.filter(hub => getRecordSpreadsheetId(hub) !== hubSpreadsheetId);
 
             // Add to beginning of list with current timestamp for lastAccessed
             const now = Date.now();
             this.recentHubs.unshift({
-                sheetId: hubSheetId,
+                spreadsheetId: hubSpreadsheetId,
                 title: title.trim(),
                 url: hubUrl,
                 lastAccessed: now,
@@ -263,7 +264,7 @@ export class RecentPodsManager {
 
             // Clear all expanded hubs and set only this hub as expanded
             this.expandedHubs.clear();
-            this.expandedHubs.add(hubSheetId);
+            this.expandedHubs.add(hubSpreadsheetId);
 
             await this.saveRecentHubs();
             this.renderRecentPods(); // Re-render to update UI
@@ -277,13 +278,13 @@ export class RecentPodsManager {
 
     /**
      * Remove a hub from recent list
-     * @param {string} sheetId - Google Sheets ID to remove
+     * @param {string} spreadsheetId - Google Sheets file ID to remove
      */
-    async removeRecentHub(sheetId) {
-        this.recentHubs = this.recentHubs.filter(hub => hub.sheetId !== sheetId);
+    async removeRecentHub(spreadsheetId) {
+        this.recentHubs = this.recentHubs.filter(hub => getRecordSpreadsheetId(hub) !== spreadsheetId);
         await this.saveRecentHubs();
         this.renderRecentPods();
-        console.log(`🗑️ Removed hub from recent list: ${sheetId}`);
+        console.log(`🗑️ Removed hub from recent list: ${spreadsheetId}`);
     }
 
     /**
@@ -341,12 +342,12 @@ export class RecentPodsManager {
         let hasExpandedHub = false;
         
         this.recentHubs.forEach((hub, index) => {
-            if (this.expandedHubs.has(hub.sheetId)) {
+            if (this.expandedHubs.has(getRecordSpreadsheetId(hub))) {
                 hasExpandedHub = true;
-                const hubElement = recentPodsList.querySelector(`[data-hub-id="${hub.sheetId}"]`);
+                const hubElement = recentPodsList.querySelector(`[data-hub-id="${getRecordSpreadsheetId(hub)}"]`);
                 if (hubElement) {
                     // Clear the expanded state temporarily so toggleHubPods will expand it
-                    this.expandedHubs.delete(hub.sheetId);
+                    this.expandedHubs.delete(getRecordSpreadsheetId(hub));
                     expandPromises.push(this.toggleHubPods(hub, hubElement));
                 }
             }
@@ -355,7 +356,7 @@ export class RecentPodsManager {
         // If no hubs were previously expanded, expand the first hub
         if (!hasExpandedHub && this.recentHubs.length > 0) {
             const firstHub = this.recentHubs[0];
-            const firstHubElement = recentPodsList.querySelector(`[data-hub-id="${firstHub.sheetId}"]`);
+            const firstHubElement = recentPodsList.querySelector(`[data-hub-id="${getRecordSpreadsheetId(firstHub)}"]`);
             if (firstHubElement) {
                 expandPromises.push(this.toggleHubPods(firstHub, firstHubElement));
             }
@@ -377,7 +378,7 @@ export class RecentPodsManager {
     createHubElement(hub) {
         const hubElement = document.createElement('div');
         hubElement.className = 'recent-pod-item recent-hub-item';
-        hubElement.dataset.hubId = hub.sheetId; // Add identifier for tracking
+        hubElement.dataset.hubId = getRecordSpreadsheetId(hub); // Add identifier for tracking
         
         // Format date added time
         const dateAddedDate = new Date(hub.dateAdded);
@@ -429,7 +430,7 @@ export class RecentPodsManager {
         const removeBtn = hubElement.querySelector('.recent-pod-remove');
         removeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.removeRecentHub(hub.sheetId);
+            this.removeRecentHub(getRecordSpreadsheetId(hub));
         });
 
         return hubElement;
@@ -478,7 +479,7 @@ export class RecentPodsManager {
         const removeBtn = podElement.querySelector('.recent-pod-remove');
         removeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.removeRecentPod(pod.sheetId);
+            this.removeRecentPod(getRecordSpreadsheetId(pod));
         });
 
         return podElement;
@@ -490,13 +491,13 @@ export class RecentPodsManager {
      * @param {HTMLElement} hubElement - The hub DOM element
      */
     async toggleHubPods(hub, hubElement) {
-        const hubSheetId = hub.sheetId;
+        const hubSpreadsheetId = getRecordSpreadsheetId(hub);
         const expandIcon = hubElement.querySelector('.hub-expand-icon');
         
         // Check if this hub is already expanded
-        if (this.expandedHubs.has(hubSheetId)) {
+        if (this.expandedHubs.has(hubSpreadsheetId)) {
             // Collapse: remove the pods list
-            this.expandedHubs.delete(hubSheetId);
+            this.expandedHubs.delete(hubSpreadsheetId);
             const podsList = hubElement.nextElementSibling;
             if (podsList && podsList.classList.contains('hub-pods-list')) {
                 podsList.remove();
@@ -513,17 +514,17 @@ export class RecentPodsManager {
             if (expandIcon) expandIcon.textContent = '⏳';
             
             // Get or create HubManager for this hub
-            let hubManager = this.hubManagers.get(hubSheetId);
+            let hubManager = this.hubManagers.get(hubSpreadsheetId);
             if (!hubManager) {
                 hubManager = new HubManager(hub.url);
-                this.hubManagers.set(hubSheetId, hubManager);
+                this.hubManagers.set(hubSpreadsheetId, hubManager);
             }
             
             // Load pods from the hub
             const pods = await hubManager.getPods();
             
             // Mark as expanded
-            this.expandedHubs.add(hubSheetId);
+            this.expandedHubs.add(hubSpreadsheetId);
             hubElement.classList.add('expanded');
             hubElement.classList.remove('loading');
             if (expandIcon) expandIcon.textContent = '▼';
@@ -559,7 +560,7 @@ export class RecentPodsManager {
      * @param {HTMLElement} hubElement - The hub DOM element
      */
     async refreshHub(hub, hubElement) {
-        const hubSheetId = hub.sheetId;
+        const hubSpreadsheetId = getRecordSpreadsheetId(hub);
         
         try {
             console.log(`🔄 Refreshing hub data: ${hub.title}`);
@@ -571,10 +572,10 @@ export class RecentPodsManager {
             refreshBtn.disabled = true;
             
             // Get or create HubManager for this hub
-            let hubManager = this.hubManagers.get(hubSheetId);
+            let hubManager = this.hubManagers.get(hubSpreadsheetId);
             if (!hubManager) {
                 hubManager = new HubManager(hub.url);
-                this.hubManagers.set(hubSheetId, hubManager);
+                this.hubManagers.set(hubSpreadsheetId, hubManager);
             }
             
             // Force reload by calling loadPods() directly
@@ -583,14 +584,14 @@ export class RecentPodsManager {
             console.log(`✅ Hub data refreshed: ${hub.title}`);
             
             // If the hub is currently expanded, refresh the pods list
-            if (this.expandedHubs.has(hubSheetId)) {
+            if (this.expandedHubs.has(hubSpreadsheetId)) {
                 const podsList = hubElement.nextElementSibling;
                 if (podsList && podsList.classList.contains('hub-pods-list')) {
                     podsList.remove();
                 }
                 
                 // Remove from expanded set temporarily so toggleHubPods will expand it
-                this.expandedHubs.delete(hubSheetId);
+                this.expandedHubs.delete(hubSpreadsheetId);
                 // Update the expand icon since we're collapsing
                 const expandIcon = hubElement.querySelector('.hub-expand-icon');
                 if (expandIcon) expandIcon.textContent = '▶';
@@ -725,7 +726,7 @@ export class RecentPodsManager {
             console.log(`🔄 Loading recent pod: ${pod.title}`);
             
             // Add to recent pods to update lastAccessed timestamp
-            this.addRecentPod(pod.sheetId, pod.title, pod.url);
+            this.addRecentPod(getRecordSpreadsheetId(pod), pod.title, pod.url);
             
             // Set the URL in the input field
             const urlInput = getElement('sheet-url');

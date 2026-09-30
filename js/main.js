@@ -28,7 +28,7 @@ class ThreeCardBlindGuruTool {
         this.recentPodsManager = new RecentPodsManager();
 
         this.currentSheetData = null;
-        this.currentSheetId = null;
+        this.currentSpreadsheetId = null;
         this._domBound = false;
         this._signatureHandlersBound = false;
 
@@ -316,7 +316,7 @@ class ThreeCardBlindGuruTool {
         window.history.replaceState({}, '', newUrl);
     }
 
-    async loadSheet(sheetId = null, guruColor = null, rowNumber = null) {
+    async loadSheet(spreadsheetId = null, guruColor = null, rowNumber = null) {
         // Check if guru signature is set before loading sheet
         if (!this.guruSignature.hasSignature()) {
             console.warn('Guru signature not set, cannot load sheet');
@@ -325,11 +325,11 @@ class ThreeCardBlindGuruTool {
             return;
         }
 
-        let targetSheetId = sheetId;
+        let targetSpreadsheetId = spreadsheetId;
         let sheetUrl = '';
         
-        // If no sheetId provided, get it from the URL input
-        if (!targetSheetId) {
+        // If no spreadsheetId provided, get it from the URL input
+        if (!targetSpreadsheetId) {
             const url = document.getElementById('sheet-url').value.trim();
             
             if (!url) {
@@ -342,21 +342,21 @@ class ThreeCardBlindGuruTool {
                 return;
             }
             
-            targetSheetId = extractSheetId(url);
+            targetSpreadsheetId = extractSheetId(url);
             sheetUrl = url;
         } else {
-            // Construct URL from sheet ID for recent pods functionality
-            sheetUrl = `https://docs.google.com/spreadsheets/d/${targetSheetId}`;
+            // Construct URL from the spreadsheet ID for recent pods functionality
+            sheetUrl = `https://docs.google.com/spreadsheets/d/${targetSpreadsheetId}`;
         }
 
         try {
             this.uiController.showStatus('Loading pod...', 'loading');
             this.uiController.setLoadingState(true);
 
-            const sheetData = await this.sheetsAPI.getSheetData(targetSheetId);
+            const sheetData = await this.sheetsAPI.getSheetData(targetSpreadsheetId);
             
             this.currentSheetData = sheetData;
-            this.currentSheetId = targetSheetId;
+            this.currentSpreadsheetId = targetSpreadsheetId;
             
             // Load data into the analysis interface
             if (!this.analysisInterface) {
@@ -366,7 +366,7 @@ class ThreeCardBlindGuruTool {
                 this.analysisInterface.setGuruSignature(this.authManager.guruSignature);
             }
             const isLoaded = await this.analysisInterface.loadData(sheetData, guruColor, rowNumber);
-            this.uiController.showSheetEditor(sheetData.title || 'Untitled Pod', targetSheetId);
+            this.uiController.showSheetEditor(sheetData.title || 'Untitled Pod');
             if (isLoaded) {
                 await this.analysisInterface.showCurrentRow();
             }
@@ -378,7 +378,7 @@ class ThreeCardBlindGuruTool {
             }
 
             console.log('Adding recent pod:', sheetData.title || 'Untitled Pod');
-            this.recentPodsManager.addRecentPod(targetSheetId, sheetData.title || 'Untitled Pod', sheetUrl);
+            this.recentPodsManager.addRecentPod(targetSpreadsheetId, sheetData.title || 'Untitled Pod', sheetUrl);
 
             this.uiController.showStatus(`Loaded pod - ${sheetData.title || 'Untitled Pod'}`, 'success');
 
@@ -391,7 +391,7 @@ class ThreeCardBlindGuruTool {
     }
 
     async refreshSheet() {
-        if (!this.currentSheetId) {
+        if (!this.currentSpreadsheetId) {
             this.uiController.showStatus('No pod loaded', 'error');
             return;
         }
@@ -399,7 +399,7 @@ class ThreeCardBlindGuruTool {
         try {
             this.uiController.showStatus('Refreshing pod...', 'loading');
             
-            const sheetData = await this.sheetsAPI.getSheetData(this.currentSheetId);
+            const sheetData = await this.sheetsAPI.getSheetData(this.currentSpreadsheetId);
             this.currentSheetData = sheetData;
             
             // Reload data into the analysis interface

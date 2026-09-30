@@ -157,6 +157,7 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
             },
             getRequests: () => state.requests.slice(),
             getBatchUpdates: () => state.batchUpdates.slice(),
+            getPreferences: () => state.preferences,
             reset() { state.requests = []; state.batchUpdates = []; }
         };
 
@@ -174,7 +175,19 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
                         get: () => Promise.resolve({ body: JSON.stringify(state.preferences || {}) })
                     }
                 },
-                request: () => ok({ id: 'PREF_FILE_ID' })
+                request: (params) => {
+                    // The app saves preferences with a PATCH whose body is the
+                    // JSON document; record it so tests can assert on the
+                    // persisted shape.
+                    if (params && params.method === 'PATCH' && typeof params.body === 'string') {
+                        try {
+                            state.preferences = JSON.parse(params.body);
+                        } catch (e) {
+                            // Ignore malformed bodies; the app never sends one.
+                        }
+                    }
+                    return ok({ id: 'PREF_FILE_ID' });
+                }
             }
         };
 
