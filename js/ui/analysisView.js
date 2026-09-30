@@ -87,12 +87,12 @@ export class AnalysisView {
      * Render the sheet header (title, pod name, sheet link).
      *
      * @param {object} info
-     * @param {string} info.sheetId
+     * @param {string} info.spreadsheetId
      * @param {string} info.title
      * @param {string} [info.podName]
      * @param {number} info.matchNumber 1-based match number for the pod title
      */
-    renderSheetInfo({ sheetId, title, podName, matchNumber }) {
+    renderSheetInfo({ spreadsheetId, title, podName, matchNumber }) {
         const sheetInfoSection = getElement('sheet-info');
         if (!sheetInfoSection) {
             return;
@@ -101,7 +101,7 @@ export class AnalysisView {
         const sheetLink = document.createElement('a');
         sheetLink.setAttribute('id', 'google-sheet-link');
         sheetLink.target = '_blank';
-        sheetLink.href = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+        sheetLink.href = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
         sheetLink.title = 'Open pod in Google Sheets';
 
         const heading = document.createElement('h2');

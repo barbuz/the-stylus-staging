@@ -61,7 +61,7 @@ export function makeSheetData({ guruRows = [], deckNotesRows = [], metadata = {}
     if (deckNotesRows.length) {
         sheets.unshift(makeDeckNotesSheet(deckNotesRows));
     }
-    return { sheetId: 'TEST_SHEET_ID', title, sheets, metadata };
+    return { spreadsheetId: 'TEST_SHEET_ID', title, sheets, metadata };
 }
 
 /**

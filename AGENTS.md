@@ -52,13 +52,13 @@ Phase 4 of #18 moved the analysis session's mutable state off the controller and
 onto one object.
 
 - `AppState` is the single source of truth for the open pod: `sheetData`
-  (and its derived `sheetId`), `rows`, `rowIndex`, `guruColor`, `signature`,
-  `numDiscrepancies`, the deck-notes map/column map, the resolved per-colour
-  `columnIndex` and the `hub`. Mutate it only through its setters; `reset()`
-  clears the per-pod fields but deliberately keeps `signature`, which belongs to
-  the session rather than the pod. `currentRowKey()` / `findRowIndexByKey()`
-  give a stable row identity (sheet id + original row index) so a reload does
-  not depend on the player names.
+  (and its derived `spreadsheetId`), `rows`, `rowIndex`, `guruColor`,
+  `signature`, `numDiscrepancies`, the deck-notes map/column map, the resolved
+  per-colour `columnIndex` and the `hub`. Mutate it only through its setters;
+  `reset()` clears the per-pod fields but deliberately keeps `signature`, which
+  belongs to the session rather than the pod. `currentRowKey()` /
+  `findRowIndexByKey()` give a stable row identity (tab id + original row index)
+  so a reload does not depend on the player names.
 - `AnalysisController.state` is that object; the views (`analysisView`,
   `analysisRowRenderer`, ...) and the extracted services (`analysisActions`,
   `analysisNavigation`, `analysisSessionLoader`) read it via `host.state`.
@@ -372,6 +372,7 @@ only flips between exactly two.
 - **DOM access:** use helpers from `js/utils/domUtils.js` (`getElement`, `waitForElement`, `addEventListenerSafe`) rather than direct `document.getElementById`, so missing elements degrade gracefully.
 - **Event handling:** register UI events in `uiController.js` / the owning module's setup method rather than inline `onclick` handlers.
 - **Config:** `js/config.js` holds the public OAuth client ID and storage keys. Do not move secrets here; `public/js/config.local.js` is gitignored for local overrides.
+- **Sheet ids:** `spreadsheetId` is the spreadsheet file id (the `batchUpdate` / `values.get` target); `sheetId` is the numeric tab id inside it (Google's own `updateCells.start.sheetId`). Never use `sheetId` for the file — passing the tab id where the file id belongs makes the real API 404, and the e2e stub does not catch it. The persisted recent-pods/hubs records keep their historical `sheetId` field (localStorage and Drive appData are shared with production), so treat those as the exception.
 - **No new dependencies:** the project deliberately loads everything from CDNs and ships no bundler. Confirm with the user before adding a package. Playwright is the one agreed exception, and it is dev-only: it must never be imported by app code or added to `sw.js`/`index.html`.
 - **Commits:** short imperative subjects, often `<Area>: <change>` (e.g. `Fix next button not going to current guru's matches first`).
 

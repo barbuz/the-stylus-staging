@@ -10,7 +10,7 @@ test('a fresh state has no pod loaded', () => {
     const state = new AppState();
 
     assert.equal(state.sheetData, null);
-    assert.equal(state.sheetId, null);
+    assert.equal(state.spreadsheetId, null);
     assert.deepEqual(state.rows, []);
     assert.equal(state.rowIndex, -1);
     assert.equal(state.guruColor, null);
@@ -36,7 +36,7 @@ test('the column index starts unresolved for every colour', () => {
 test('setters update the matching fields', () => {
     const state = new AppState();
 
-    state.setSheetData({ sheetId: 'ABC', title: 'Pod' });
+    state.setSheetData({ spreadsheetId: 'ABC', title: 'Pod' });
     state.setRows([{ sheetId: 'ABC', originalRowIndex: 3 }]);
     state.setRowIndex(0);
     state.setGuruColor('blue');
@@ -44,7 +44,7 @@ test('setters update the matching fields', () => {
     state.setNumDiscrepancies(2);
     state.setHub({ marker: true });
 
-    assert.equal(state.sheetId, 'ABC');
+    assert.equal(state.spreadsheetId, 'ABC');
     assert.equal(state.totalRows, 1);
     assert.equal(state.guruColor, 'blue');
     assert.equal(state.signature, 'alice');
@@ -69,7 +69,7 @@ test('setColumnIndex stores a resolved index but ignores a null parse', () => {
 test('reset clears per-pod state but keeps the guru signature', () => {
     const state = new AppState();
     state.setSignature('alice');
-    state.setSheetData({ sheetId: 'ABC' });
+    state.setSheetData({ spreadsheetId: 'ABC' });
     state.setRows([{ sheetId: 'ABC' }]);
     state.setRowIndex(0);
     state.setGuruColor('red');
