@@ -1,8 +1,12 @@
 import { CONFIG } from '../config.js';
 import { UserPreferences } from './userPreferences.js';
+import { APP_EVENTS } from '../app/events.js';
 
 export class AuthManager {
-    constructor() {
+    constructor(events) {
+        // Optional event bus. When present the login / signature flow is routed
+        // through it instead of `window` CustomEvents (phase 4 of #18).
+        this.events = events || null;
         this.user = null;
         this.isAuthenticated = false;
         this.guruSignature = '';
@@ -114,8 +118,8 @@ export class AuthManager {
             this.renderAuthSection();
             this.showAppContent();
             
-            // Dispatch login event
-            window.dispatchEvent(new CustomEvent('userLoggedIn'));
+            // Notify the app that the user logged in
+            this.events?.emit(APP_EVENTS.USER_LOGGED_IN);
 
             console.log('✅ User successfully authenticated');
             
@@ -145,10 +149,8 @@ export class AuthManager {
                 this.guruSignature = guruSignature;
                 this.renderAuthSection();
 
-                // Dispatch event to notify other components
-                window.dispatchEvent(new CustomEvent('guruSignatureLoaded', {
-                    detail: { signature: guruSignature }
-                }));
+                // Notify other components that a signature was loaded
+                this.events?.emit(APP_EVENTS.GURU_SIGNATURE_LOADED, { signature: guruSignature });
             }
             
             console.log('✅ User preferences initialized from Google appData');
@@ -361,9 +363,9 @@ export class AuthManager {
                     // Render auth section to show guru signature
                     this.renderAuthSection();
                     
-                    // Dispatch login event for restored session
+                    // Notify the app of the restored session
                     setTimeout(() => {
-                        window.dispatchEvent(new CustomEvent('userLoggedIn'));
+                        this.events?.emit(APP_EVENTS.USER_LOGGED_IN);
                     }, 100);
                     
                     return true;
@@ -434,8 +436,8 @@ export class AuthManager {
 
     async logout() {
         try {
-            // Trigger custom event before logout
-            window.dispatchEvent(new CustomEvent('userLoggedOut'));
+            // Notify the app before logging out
+            this.events?.emit(APP_EVENTS.USER_LOGGED_OUT);
             
             // Revoke the token if we have one
             if (this.user && this.user.accessToken) {
@@ -534,8 +536,8 @@ export class AuthManager {
      * Prompt user to change guru signature
      */
     promptGuruSignatureChange() {
-        // Dispatch event for guru signature module to handle
-        window.dispatchEvent(new CustomEvent('requestGuruSignatureChange'));
+        // Ask the guru signature module to open its editor
+        this.events?.emit(APP_EVENTS.REQUEST_GURU_SIGNATURE_CHANGE);
     }
 
     showLoginScreen() {

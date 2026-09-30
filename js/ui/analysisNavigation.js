@@ -15,26 +15,29 @@ export class AnalysisNavigation {
 
     async nextRow() {
         const host = this.host;
-        if (host.currentRowIndex < host.allRows.length - 1) {
-            host.currentRowIndex++;
+        const { state } = host;
+        if (state.rowIndex < state.rows.length - 1) {
+            state.setRowIndex(state.rowIndex + 1);
             await host.showCurrentRow();
         }
     }
 
     async previousRow() {
         const host = this.host;
-        if (host.currentRowIndex > 0) {
-            host.currentRowIndex--;
+        const { state } = host;
+        if (state.rowIndex > 0) {
+            state.setRowIndex(state.rowIndex - 1);
             await host.showCurrentRow();
         }
     }
 
     async skipToNextIncomplete() {
         const host = this.host;
-        const nextIncompleteIndex = host.findFirstEmptyAnalysis(host.currentRowIndex + 1);
+        const { state } = host;
+        const nextIncompleteIndex = host.findFirstEmptyAnalysis(state.rowIndex + 1);
 
-        if (nextIncompleteIndex != null && nextIncompleteIndex != host.currentRowIndex) {
-            host.currentRowIndex = nextIncompleteIndex;
+        if (nextIncompleteIndex != null && nextIncompleteIndex != state.rowIndex) {
+            state.setRowIndex(nextIncompleteIndex);
             await host.showCurrentRow();
         } else {
             host.showCompletionMessage();
@@ -43,17 +46,18 @@ export class AnalysisNavigation {
 
     async skipToNextDiscrepancy() {
         const host = this.host;
-        const targetIndex = host.findFirstDiscrepancy(host.currentRowIndex + 1);
+        const { state } = host;
+        const targetIndex = host.findFirstDiscrepancy(state.rowIndex + 1);
         if (targetIndex >= 0) {
-            host.currentRowIndex = targetIndex;
+            state.setRowIndex(targetIndex);
         }
 
         // A discrepancy may belong to a different guru's colour; follow it.
-        const targetRow = host.allRows[host.currentRowIndex];
+        const targetRow = state.rows[state.rowIndex];
         if (host.rowHasDiscrepancy(targetRow)) {
             const color = host.getGuruColorInRow(targetRow);
             if (color) {
-                host.currentGuruColor = color;
+                state.setGuruColor(color);
             }
         }
         await host.showCurrentRow();
@@ -61,9 +65,10 @@ export class AnalysisNavigation {
 
     async skipToNextDeck() {
         const host = this.host;
-        const nextDeckIndex = findNextDeck(host.allRows, host.currentGuruColor, host.currentRowIndex);
-        if (nextDeckIndex !== host.currentRowIndex) {
-            host.currentRowIndex = nextDeckIndex;
+        const { state } = host;
+        const nextDeckIndex = findNextDeck(state.rows, state.guruColor, state.rowIndex);
+        if (nextDeckIndex !== state.rowIndex) {
+            state.setRowIndex(nextDeckIndex);
             await host.showCurrentRow();
         } else {
             host.uiController.showStatus('No other unclaimed decks found', 'info');
@@ -72,10 +77,11 @@ export class AnalysisNavigation {
 
     async skipToMirrorMatch() {
         const host = this.host;
-        const mirrorIndex = findMirrorMatchIndex(host.allRows, host.currentRowIndex);
+        const { state } = host;
+        const mirrorIndex = findMirrorMatchIndex(state.rows, state.rowIndex);
 
         if (mirrorIndex !== -1) {
-            host.currentRowIndex = mirrorIndex;
+            state.setRowIndex(mirrorIndex);
             await host.showCurrentRow();
         } else {
             host.uiController.showStatus('No mirror match found for this game.', 'info');

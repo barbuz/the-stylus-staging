@@ -46,6 +46,31 @@ takes one analysis per colour (via spread) and compares against
 (majority/tie handling for an even guru count) is deliberately undecided until a
 colour is actually added. Do not add a colour without deciding that policy.
 
+## App Shell (`js/app/`)
+
+Phase 4 of #18 moved the analysis session's mutable state off the controller and
+onto one object.
+
+- `AppState` is the single source of truth for the open pod: `sheetData`
+  (and its derived `sheetId`), `rows`, `rowIndex`, `guruColor`, `signature`,
+  `numDiscrepancies`, the deck-notes map/column map, the resolved per-colour
+  `columnIndex` and the `hub`. Mutate it only through its setters; `reset()`
+  clears the per-pod fields but deliberately keeps `signature`, which belongs to
+  the session rather than the pod. `currentRowKey()` / `findRowIndexByKey()`
+  give a stable row identity (sheet id + original row index) so a reload does
+  not depend on the player names.
+- `AnalysisController.state` is that object; the views (`analysisView`,
+  `analysisRowRenderer`, ...) and the extracted services (`analysisActions`,
+  `analysisNavigation`, `analysisSessionLoader`) read it via `host.state`.
+- `reload({ preservePosition })` in `analysisActions.js` is the only reload
+  path. A failed refresh is non-fatal by design: the screen keeps its data.
+- `EventBus` / `APP_EVENTS` replace the `window` CustomEvents that used to carry
+  the login / logout / signature flow. `main.js` subscribes in
+  `setupEventSubscriptions()`; `AuthManager` and `GuruSignature` emit and
+  subscribe through the bus they are handed. Handler registration in `main.js`
+  is guarded by `_domBound` / `_signatureHandlersBound` so it is idempotent
+  without the old reset-on-logout flags.
+
 ## Characterization (intentional current quirks)
 
 `tests/unit/characterization.test.js` pins these. Each is labelled CONTRACT
@@ -72,6 +97,9 @@ the-stylus/
 ├── js/
 │   ├── main.js                 # Entry point: ThreeCardBlindGuruTool bootstrap + init flow
 │   ├── config.js               # Google OAuth client ID, scopes, discovery docs, localStorage keys
+│   ├── app/                    # App-shell plumbing (no DOM)
+│   │   ├── appState.js         # Analysis session state: one object, explicit mutators + reset()
+│   │   └── events.js           # Local pub/sub + APP_EVENTS (login / logout / signature)
 │   ├── domain/                 # PURE: no DOM, no gapi, no fetch, no instance state
 │   │   ├── analyses.js         # outcome calc, normalize, labels, css class, correction string
 │   │   ├── deckNotes.js        # deck-notes parsing + per-colour statistics
@@ -88,7 +116,7 @@ the-stylus/
 │   │   ├── scryfallAPI.js
 │   │   ├── uiController.js            # Centralised event handling / status UI
 │   │   └── userPreferences.js
-│   ├── ui/                     # View / controller split (phase 3 of #18)
+│   ├── ui/                     # View / controller split (phase 3 of #18); state lives in js/app/
 │   │   ├── analysisController.js      # Slim orchestrator: state + service calls + view.render
 │   │   ├── analysisActions.js         # Write/score workflows (set, claim, clear, reload)
 │   │   ├── analysisNavigation.js      # Row movement: next/prev, skips, mirror, next deck

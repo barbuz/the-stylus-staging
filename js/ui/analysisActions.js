@@ -27,15 +27,20 @@ export class AnalysisActions {
         this.host = host;
     }
 
+    get state() {
+        return this.host.state;
+    }
+
     get mergedGuruSheetIds() {
-        return this.host.currentData.sheets.find(s => s.title === 'Merged Gurus')?.guruSheetIds;
+        return this.state.sheetData.sheets.find(s => s.title === 'Merged Gurus')?.guruSheetIds;
     }
 
     async setAnalysis(value) {
         const host = this.host;
-        if (host.currentRowIndex >= host.allRows.length) return;
+        const state = this.state;
+        if (state.rowIndex >= state.rows.length) return;
 
-        const currentRow = host.allRows[host.currentRowIndex];
+        const currentRow = state.currentRow;
 
         try {
             host.uiController.showStatus('Saving guru analysis...', 'loading');
@@ -50,7 +55,7 @@ export class AnalysisActions {
                 guruSheetIds: this.mergedGuruSheetIds
             });
 
-            setColourAnalysis(currentRow, host.currentGuruColor, value.toString());
+            setColourAnalysis(currentRow, state.guruColor, value.toString());
             currentRow.outcomeValue = calculateOutcomeFromAnalyses(...getGuruAnalysisValues(currentRow));
 
             host.view.highlightAnalysisButton(value);
@@ -63,7 +68,7 @@ export class AnalysisActions {
                 return;
             }
 
-            host.reloadAllDataInBackground();
+            host.reload();
         } catch (error) {
             console.error('Error saving analysis:', error);
             host.uiController.showStatus(`Error saving analysis: ${error.message}`, 'error');
@@ -72,9 +77,10 @@ export class AnalysisActions {
 
     async claimRow() {
         const host = this.host;
-        if (host.currentRowIndex >= host.allRows.length) return;
+        const state = this.state;
+        if (state.rowIndex >= state.rows.length) return;
 
-        const currentRow = host.allRows[host.currentRowIndex];
+        const currentRow = state.currentRow;
         const claimButton = host.view.beginSpinner('claim-button', 'Claiming...');
 
         try {
@@ -84,17 +90,17 @@ export class AnalysisActions {
                 sheetId: currentRow.sheetId,
                 row: currentRow.originalRowIndex,
                 col: host.getCurrentGuruColIndex('signature'),
-                signature: host.guruSignature,
+                signature: state.signature,
                 guruSheetIds: this.mergedGuruSheetIds
             });
 
             if (result && result.skippedCells > 0) {
                 host.uiController.showStatus('Match was already claimed by someone else', 'info');
-                await host.reloadAllDataInBackground();
+                await host.reload();
                 return;
             }
 
-            setColourSignature(currentRow, host.currentGuruColor, host.guruSignature);
+            setColourSignature(currentRow, state.guruColor, state.signature);
             host.uiController.showStatus('Match claimed successfully!', 'success');
             await host.showCurrentRow();
         } catch (error) {
@@ -106,16 +112,17 @@ export class AnalysisActions {
 
     async unclaimRow() {
         const host = this.host;
-        if (host.currentRowIndex >= host.allRows.length) return;
+        const state = this.state;
+        if (state.rowIndex >= state.rows.length) return;
 
-        const currentRow = host.allRows[host.currentRowIndex];
+        const currentRow = state.currentRow;
 
-        if (getCurrentColorSignature(currentRow, host.currentGuruColor) !== host.guruSignature) {
+        if (getCurrentColorSignature(currentRow, state.guruColor) !== state.signature) {
             host.uiController.showStatus('You can only unclaim matches that you have claimed.', 'error');
             return;
         }
 
-        const currentAnalysis = getCurrentColorAnalysis(currentRow, host.currentGuruColor);
+        const currentAnalysis = getCurrentColorAnalysis(currentRow, state.guruColor);
         if (currentAnalysis && currentAnalysis.trim() !== '') {
             host.uiController.showStatus('Cannot unclaim a match that has already been scored.', 'error');
             return;
@@ -133,7 +140,7 @@ export class AnalysisActions {
                 guruSheetIds: this.mergedGuruSheetIds
             });
 
-            setColourSignature(currentRow, host.currentGuruColor, '');
+            setColourSignature(currentRow, state.guruColor, '');
             host.uiController.showStatus('Match unclaimed successfully!', 'success');
             await host.showCurrentRow();
         } catch (error) {
@@ -145,16 +152,17 @@ export class AnalysisActions {
 
     async clearCurrentUserAnalysis() {
         const host = this.host;
-        if (host.currentRowIndex >= host.allRows.length) return;
+        const state = this.state;
+        if (state.rowIndex >= state.rows.length) return;
 
-        const currentRow = host.allRows[host.currentRowIndex];
+        const currentRow = state.currentRow;
 
-        if (getCurrentColorSignature(currentRow, host.currentGuruColor) !== host.guruSignature) {
+        if (getCurrentColorSignature(currentRow, state.guruColor) !== state.signature) {
             host.uiController.showStatus('You can only clear results for matches you own.', 'error');
             return;
         }
 
-        const currentAnalysis = getCurrentColorAnalysis(currentRow, host.currentGuruColor);
+        const currentAnalysis = getCurrentColorAnalysis(currentRow, state.guruColor);
         if (!currentAnalysis || currentAnalysis.trim() === '') {
             host.uiController.showStatus('No analysis to clear for this match.', 'info');
             return;
@@ -172,18 +180,18 @@ export class AnalysisActions {
                 guruSheetIds: this.mergedGuruSheetIds
             });
 
-            setColourAnalysis(currentRow, host.currentGuruColor, '');
+            setColourAnalysis(currentRow, state.guruColor, '');
 
             const oldOutcome = currentRow.outcomeValue;
             currentRow.outcomeValue = calculateOutcomeFromAnalyses(...getGuruAnalysisValues(currentRow));
 
             if (oldOutcome === 'discrepancy' && currentRow.outcomeValue !== 'discrepancy') {
-                host.numDiscrepancies--;
+                state.setNumDiscrepancies(state.numDiscrepancies - 1);
             } else if (oldOutcome !== 'discrepancy' && currentRow.outcomeValue === 'discrepancy') {
-                host.numDiscrepancies++;
+                state.setNumDiscrepancies(state.numDiscrepancies + 1);
             }
 
-            host.reloadAllDataInBackground();
+            host.reload();
             host.uiController.showStatus('Your analysis was cleared.', 'success');
 
             if (clearButton) clearButton.style.display = 'none';
@@ -198,13 +206,14 @@ export class AnalysisActions {
 
     async claimDeckRows() {
         const host = this.host;
-        if (host.currentRowIndex >= host.allRows.length) return;
+        const state = this.state;
+        if (state.rowIndex >= state.rows.length) return;
 
-        const currentRow = host.allRows[host.currentRowIndex];
+        const currentRow = state.currentRow;
         const player1Deck = currentRow.player1;
         if (!player1Deck) return;
 
-        const rowsToClaim = host.allRows.filter(row => row.player1 === player1Deck);
+        const rowsToClaim = state.rows.filter(row => row.player1 === player1Deck);
         if (rowsToClaim.length === 0) {
             host.uiController.showStatus(`No matches found for deck "${player1Deck}".`, 'error');
             return;
@@ -213,23 +222,23 @@ export class AnalysisActions {
         try {
             host.uiController.showStatus(`Claiming ${rowsToClaim.length} matches for deck...`, 'loading');
             const result = await host.writer.claimRows({
-                sheetId: host.currentData.sheetId,
+                sheetId: state.sheetId,
                 rows: rowsToClaim.map(row => row.originalRowIndex),
                 col: host.getCurrentGuruColIndex('signature'),
-                signature: host.guruSignature,
+                signature: state.signature,
                 guruSheetIds: this.mergedGuruSheetIds
             });
 
             let actuallyClaimed = 0;
             if (result && result.updatedCells) {
                 rowsToClaim.forEach((row) => {
-                    const match = host.allRows.find(r => r.originalRowIndex === row.originalRowIndex && r.sheetId === row.sheetId);
+                    const match = state.rows.find(r => r.originalRowIndex === row.originalRowIndex && r.sheetId === row.sheetId);
                     if (!match) return;
                     const skipped = result.skipped && result.skipped.find(s => s.row === row.originalRowIndex + 1);
                     if (skipped) {
-                        setColourSignature(match, host.currentGuruColor, skipped.currentValue);
+                        setColourSignature(match, state.guruColor, skipped.currentValue);
                     } else {
-                        setColourSignature(match, host.currentGuruColor, host.guruSignature);
+                        setColourSignature(match, state.guruColor, state.signature);
                         actuallyClaimed++;
                     }
                 });
@@ -243,35 +252,24 @@ export class AnalysisActions {
         }
     }
 
-    async reloadAllDataInBackground() {
+    /**
+     * Re-fetch the pod and rebuild the row model. When `preservePosition` is
+     * true, stay on the same match by its stable key (sheet id + original row
+     * index) rather than a fuzzy four-field match. A failed refresh is
+     * non-fatal: the screen keeps showing the data it already has.
+     */
+    async reload({ preservePosition = true } = {}) {
         const host = this.host;
+        const state = this.state;
         try {
-            const freshSheetData = await host.sheetsAPI.getSheetData(host.currentData.sheetId);
+            const key = preservePosition ? state.currentRowKey() : null;
+            const freshSheetData = await host.sheetsAPI.getSheetData(state.sheetId);
 
-            const currentRow = host.allRows[host.currentRowIndex];
-            const currentRowIdentifier = {
-                sheetId: currentRow.sheetId,
-                originalRowIndex: currentRow.originalRowIndex,
-                player1: currentRow.player1,
-                player2: currentRow.player2
-            };
-
-            host.currentData = freshSheetData;
+            state.setSheetData(freshSheetData);
             host.parseSheets(freshSheetData);
 
-            let newRowIndex = 0;
-            for (let i = 0; i < host.allRows.length; i++) {
-                const row = host.allRows[i];
-                if (row.sheetId === currentRowIdentifier.sheetId &&
-                    row.originalRowIndex === currentRowIdentifier.originalRowIndex &&
-                    row.player1 === currentRowIdentifier.player1 &&
-                    row.player2 === currentRowIdentifier.player2) {
-                    newRowIndex = i;
-                    break;
-                }
-            }
-
-            host.currentRowIndex = newRowIndex;
+            const newRowIndex = state.findRowIndexByKey(key);
+            state.setRowIndex(newRowIndex >= 0 ? newRowIndex : 0);
             await host.showCurrentRow();
         } catch (error) {
             console.warn('Background data refresh failed:', error);
@@ -280,17 +278,18 @@ export class AnalysisActions {
 
     async saveDeckInfoField(deckString, type, currentValue, newValue, span) {
         const host = this.host;
+        const state = this.state;
         host.uiController.showStatus(`Saving ${type} changes...`, 'loading');
-        const deckInfo = host.deckNotesMap.get(deckString) || {};
+        const deckInfo = state.deckNotesMap.get(deckString) || {};
         const row = deckInfo.row;
-        const colMap = host.deckNotesColumnMap;
+        const colMap = state.deckNotesColumnMap;
         const col = colMap[type];
-        const deckNotesSheet = host.currentData.sheets.find(sheet =>
+        const deckNotesSheet = state.sheetData.sheets.find(sheet =>
             sheet.title && sheet.title.toLowerCase().includes('deck notes')
         );
 
         const result = await host.writer.saveDeckField({
-            sheetId: host.currentData.sheetId,
+            sheetId: state.sheetId,
             sheet: deckNotesSheet,
             row,
             col,
@@ -305,16 +304,16 @@ export class AnalysisActions {
                 deckInfo.goldfishClock = newValue;
                 if (colMap.goldfishSignature > -1) {
                     host.writer.signGoldfishClock({
-                        sheetId: host.currentData.sheetId,
+                        sheetId: state.sheetId,
                         sheet: deckNotesSheet,
                         row,
                         col: colMap.goldfishSignature,
-                        signature: host.guruSignature
+                        signature: state.signature
                     });
-                    deckInfo.goldfishSignature = host.guruSignature;
+                    deckInfo.goldfishSignature = state.signature;
                 }
             }
-            host.deckNotesMap.set(deckString, { ...deckInfo });
+            state.deckNotesMap.set(deckString, { ...deckInfo });
             host.view.updateDeckInfoValue(span, newValue);
             host.uiController.showStatus(`${type.charAt(0).toUpperCase() + type.slice(1)} saved successfully!`, 'success');
         } else {

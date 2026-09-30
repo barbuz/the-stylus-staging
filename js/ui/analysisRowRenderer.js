@@ -13,56 +13,57 @@ export class AnalysisRowRenderer {
 
     /** Sync the browser URL and document title with the current session state. */
     updateURL() {
-        const host = this.host;
-        if (!host.currentData?.sheetId) return;
+        const { state } = this.host;
+        if (!state.sheetId) return;
 
         const newUrl = new URL(window.location);
         newUrl.search = '';
-        newUrl.searchParams.set('pod', host.currentData.sheetId);
+        newUrl.searchParams.set('pod', state.sheetId);
 
-        if (host.currentRowIndex !== undefined && host.allRows?.length > 0) {
-            newUrl.searchParams.set('match', (host.currentRowIndex + 1).toString());
+        if (state.rowIndex !== undefined && state.rows.length > 0) {
+            newUrl.searchParams.set('match', (state.rowIndex + 1).toString());
         }
-        if (host.currentGuruColor) {
-            newUrl.searchParams.set('guru', host.currentGuruColor);
+        if (state.guruColor) {
+            newUrl.searchParams.set('guru', state.guruColor);
         }
 
         window.history.replaceState({
-            podId: host.currentData.sheetId,
-            guruColor: host.currentGuruColor,
-            rowIndex: host.currentRowIndex
+            podId: state.sheetId,
+            guruColor: state.guruColor,
+            rowIndex: state.rowIndex
         }, '', newUrl);
 
-        const podName = host.currentData?.metadata?.podName || host.currentData?.title || 'Unknown Pod';
-        const matchId = host.currentRowIndex === null ? '' : host.currentRowIndex + 1;
+        const podName = state.sheetData?.metadata?.podName || state.sheetData?.title || 'Unknown Pod';
+        const matchId = state.rowIndex === null ? '' : state.rowIndex + 1;
         document.title = `${podName} ${matchId}`;
     }
 
     updateGuruColorDisplay() {
         const host = this.host;
-        host.view.renderGuruColor(host.currentGuruColor);
-        host.guruColorSelector?.update(host.currentGuruColor);
+        host.view.renderGuruColor(host.state.guruColor);
+        host.guruColorSelector?.update(host.state.guruColor);
     }
 
     async render() {
         const host = this.host;
+        const { state } = host;
         this.updateURL();
 
         host.view.renderSheetInfo({
-            sheetId: host.currentData.sheetId,
-            title: host.currentData.title,
-            podName: host.currentData.metadata?.podName,
-            matchNumber: host.currentRowIndex + 1
+            sheetId: state.sheetId,
+            title: state.sheetData.title,
+            podName: state.sheetData.metadata?.podName,
+            matchNumber: state.rowIndex + 1
         });
 
-        if (host.currentRowIndex >= host.allRows.length || host.currentRowIndex < 0) {
+        if (state.rowIndex >= state.rows.length || state.rowIndex < 0) {
             host.showMatchTableModal();
             return;
         }
 
-        const currentRow = host.allRows[host.currentRowIndex];
+        const currentRow = state.rows[state.rowIndex];
 
-        host.view.renderProgress(host.currentRowIndex, host.allRows.length);
+        host.view.renderProgress(state.rowIndex, state.rows.length);
         this.updateGuruColorDisplay();
 
         const cards1Loaded = host.cards.loadPlayerCards('player1', currentRow.player1);
@@ -78,20 +79,20 @@ export class AnalysisRowRenderer {
         const currentAnalysisValue = currentAnalysis ? parseFloat(currentAnalysis) : null;
         host.view.renderButtons({
             row: currentRow,
-            colour: host.currentGuruColor,
-            signature: host.guruSignature,
+            colour: state.guruColor,
+            signature: state.signature,
             analysisValue: currentAnalysisValue,
             deckStats: host.getDeckStats()
         });
 
-        host.view.renderNavigation(host.currentRowIndex, host.allRows.length);
-        host.view.renderDiscrepancyButton(host.numDiscrepancies);
+        host.view.renderNavigation(state.rowIndex, state.rows.length);
+        host.view.renderDiscrepancyButton(state.numDiscrepancies);
         host.updateInverseResultDisplay();
 
         await cards1Loaded;
         await cards2Loaded;
 
-        host.cards.preloadRows(host.allRows, this.rowsToPreload());
+        host.cards.preloadRows(state.rows, this.rowsToPreload());
     }
 
     /** Build the analysis list, fetching its Discord thread link if any. */
@@ -102,21 +103,21 @@ export class AnalysisRowRenderer {
         host.view.buildAnalysisList({
             row: currentRow,
             outcomeValue: currentRow.outcomeValue || '',
-            colour: host.currentGuruColor,
+            colour: host.state.guruColor,
             showOtherGurus,
             threadUrl,
-            rowIndex: host.currentRowIndex
+            rowIndex: host.state.rowIndex
         });
     }
 
     async getThreadUrl(currentRow) {
         const host = this.host;
-        if (!host.hub) {
+        if (!host.state.hub) {
             return null;
         }
         try {
-            const rowId = currentRow.rowIndex || host.currentRowIndex + 1;
-            return await host.hub.getThreadById(rowId);
+            const rowId = currentRow.rowIndex || host.state.rowIndex + 1;
+            return await host.state.hub.getThreadById(rowId);
         } catch (error) {
             console.warn('Failed to fetch thread link:', error);
             return null;
@@ -125,7 +126,7 @@ export class AnalysisRowRenderer {
 
     displayDeckInfo(playerId, deckString) {
         const host = this.host;
-        const deckInfo = host.deckNotesMap?.get(deckString) || null;
+        const deckInfo = host.state.deckNotesMap?.get(deckString) || null;
         host.view.renderDeckInfo(playerId, deckString, deckInfo, {
             onSaveField: (deck, type, oldValue, newValue, span) =>
                 host.saveDeckInfoField(deck, type, oldValue, newValue, span)
@@ -135,16 +136,17 @@ export class AnalysisRowRenderer {
     /** Indices worth warming: the next empty, plus the adjacent rows. */
     rowsToPreload() {
         const host = this.host;
+        const { state } = host;
         const indices = new Set();
 
-        const nextEmptyIndex = host.findFirstEmptyAnalysis(host.currentRowIndex + 1);
+        const nextEmptyIndex = host.findFirstEmptyAnalysis(state.rowIndex + 1);
         if (nextEmptyIndex != null) {
             indices.add(nextEmptyIndex);
         }
 
         for (const offset of [1, -1]) {
-            const index = host.currentRowIndex + offset;
-            if (index >= 0 && index < host.allRows.length) {
+            const index = state.rowIndex + offset;
+            if (index >= 0 && index < state.rows.length) {
                 indices.add(index);
             }
         }
