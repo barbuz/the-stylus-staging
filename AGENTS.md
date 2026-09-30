@@ -207,6 +207,11 @@ Notes:
   handler reloads the page mid-test.
 - Keep fixtures shaped like the real API payloads (ragged rows, header row at
   range index 0) so parsing paths stay honest.
+- The stub records `spreadsheetId` but does not validate it, so a write that
+  names the wrong spreadsheet still lands in the modelled cells. Assert on the
+  batchUpdate `spreadsheetId` (as `app.spec.js` does) when touching a write
+  path: the file id and the tab id are easy to swap and only the real API
+  rejects the mix-up.
 - Some tests intentionally document current quirks rather than desired behaviour
   (look for the "Characterization:" comments). Update those deliberately.
 
