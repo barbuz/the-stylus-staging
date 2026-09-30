@@ -331,14 +331,14 @@ export class AnalysisController {
                 uiController: this.uiController,
                 scryfallAPI: this.scryfallAPI,
                 sheetsAPI: this.sheetsAPI,
-                spreadsheetID: this.state.sheetId,
+                spreadsheetId: this.state.spreadsheetId,
             });
         } else {
             // Update references in case they changed
             this.deckNotesEditor.uiController = this.uiController;
             this.deckNotesEditor.scryfallAPI = this.scryfallAPI;
             this.deckNotesEditor.sheetsAPI = this.sheetsAPI;
-            this.deckNotesEditor.spreadsheetID = this.state.sheetId;
+            this.deckNotesEditor.spreadsheetId = this.state.spreadsheetId;
         }
         this.deckNotesEditor.show(notesData, this.state.sheetData.title);
     }
@@ -473,7 +473,7 @@ export class AnalysisController {
         this.threadPresenter.open({
             row: currentRow,
             rowIndex,
-            sheetId: this.state.sheetId,
+            spreadsheetId: this.state.spreadsheetId,
             podName: this.state.sheetData.metadata?.podName || 'Pod',
             mainSheetLink: this.state.sheetData.metadata?.mainSheetLink,
             currentAnalysis: this.getCurrentColorAnalysis(currentRow)

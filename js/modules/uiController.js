@@ -52,7 +52,7 @@ export class UIController {
         this.statusMessage.className = 'status-message';
     }
 
-    showSheetEditor(title = 'Sheet Editor', sheetId) {
+    showSheetEditor(title = 'Sheet Editor') {
         // Hide the other sections for fullscreen experience
         const guruSignatureSection = document.getElementById('guru-signature-section');
         const sheetInputSection = document.getElementById('sheet-input-section');

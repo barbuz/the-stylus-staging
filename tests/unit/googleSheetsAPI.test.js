@@ -147,7 +147,7 @@ test('getSheetMetadata reshapes the API response', async () => {
         const metadata = await api.getSheetMetadata(SHEET_ID);
 
         assert.equal(metadata.title, 'Test Pod');
-        assert.equal(metadata.sheetId, SHEET_ID);
+        assert.equal(metadata.spreadsheetId, SHEET_ID);
         assert.deepEqual(metadata.sheets.map(s => s.sheetId), [11, 22]);
         assert.equal(metadata.sheets[1].hidden, true);
     } finally {
@@ -282,7 +282,7 @@ test('getSheetData assembles deck notes, merged gurus and custom metadata', asyn
         const api = new GoogleSheetsAPI(fakeAuthManager());
         const data = await api.getSheetData(SHEET_ID);
 
-        assert.equal(data.sheetId, SHEET_ID);
+        assert.equal(data.spreadsheetId, SHEET_ID);
         assert.equal(data.title, 'Test Pod');
         assert.deepEqual(data.sheets.map(s => s.title).sort(), ['Deck Notes', 'Merged Gurus']);
         // Characterization: the metadata sheet's header row is NOT skipped, so

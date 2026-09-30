@@ -194,8 +194,8 @@ export function getMergedGuruSheet(sheetData) {
 }
 
 /** The Google Sheets edit URL for a spreadsheet id. */
-export function guruSheetLink(sheetId) {
-    return `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+export function guruSheetLink(spreadsheetId) {
+    return `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 }
 
 /**

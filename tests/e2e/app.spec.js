@@ -283,3 +283,42 @@ test.describe('The Stylus (no Google, no network)', () => {
         await expect(page.locator('#current-analysis-value')).toBeVisible();
     });
 });
+
+test.describe('Recent-pod id naming', () => {
+    // A record saved before the rename carries `sheetId`. The app must still
+    // list and open it, then persist it back under `spreadsheetId`.
+    const legacyPods = [{
+        sheetId: POD_ID,
+        title: 'Legacy Pod',
+        url: POD_URL,
+        lastAccessed: Date.now(),
+        dateAdded: Date.now()
+    }];
+
+    test('lists a pod saved under the legacy sheetId key', async ({ page }) => {
+        await bootApp(page, {
+            preferences: { guruSignature: 'alice', recentPods: legacyPods, recentHubs: [] }
+        });
+        await signIn(page);
+
+        await expect(page.locator('#recent-pods-section')).toBeVisible();
+        await expect(page.locator('#recent-pods-list .recent-pod-name')).toHaveText('Legacy Pod');
+    });
+
+    test('opening a legacy pod rewrites it under spreadsheetId', async ({ page }) => {
+        await bootApp(page, {
+            preferences: { guruSignature: 'alice', recentPods: legacyPods, recentHubs: [] }
+        });
+        await signIn(page);
+
+        await page.locator('#recent-pods-list .recent-pod-info').first().click();
+        await expect(page.locator('#sheet-editor')).toBeVisible();
+
+        await expect.poll(() => page.evaluate(() =>
+            window.__stylus.getPreferences().recentPods[0].spreadsheetId
+        )).toBe(POD_ID);
+
+        const saved = await page.evaluate(() => window.__stylus.getPreferences().recentPods[0]);
+        expect(saved.sheetId).toBeUndefined();
+    });
+});

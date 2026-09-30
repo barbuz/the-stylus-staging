@@ -18,15 +18,15 @@ export class HubManager {
             this.podCode = null;
         }
         
-        // Extract sheet ID from URL if a full URL was provided
+        // Extract the spreadsheet id from the URL if a full URL was provided
         if (isValidGoogleSheetsUrl(hubLink)) {
-            const sheetId = extractSheetId(hubLink);
-            if (!sheetId) {
-                throw new Error('Invalid hub link or sheet ID');
+            const spreadsheetId = extractSheetId(hubLink);
+            if (!spreadsheetId) {
+                throw new Error('Invalid hub link or spreadsheet id');
             }
-            this.hubSheetId = sheetId;
+            this.hubSpreadsheetId = spreadsheetId;
         } else {
-            this.hubSheetId = hubLink;
+            this.hubSpreadsheetId = hubLink;
         }
         
         // Cache for the ID# -> Thread mapping
@@ -48,7 +48,7 @@ export class HubManager {
             // Get the spreadsheet data with hyperlinks
             // We need to use spreadsheets.get to access hyperlink formulas
             const response = await gapi.client.sheets.spreadsheets.get({
-                spreadsheetId: this.hubSheetId,
+                spreadsheetId: this.hubSpreadsheetId,
                 ranges: ["'All Threads'!A:D"],
                 fields: 'sheets.data.rowData.values(formattedValue,hyperlink)'
             });
@@ -171,7 +171,7 @@ export class HubManager {
 
             // Get the spreadsheet data with hyperlinks
             const response = await gapi.client.sheets.spreadsheets.get({
-                spreadsheetId: this.hubSheetId,
+                spreadsheetId: this.hubSpreadsheetId,
                 ranges: ["'Totals'"],
                 fields: 'sheets.data.rowData.values(formattedValue,hyperlink)'
             });
@@ -305,10 +305,10 @@ export class HubManager {
      */
     async getHubTitle() {
         try {
-            console.log(`📥 Loading hub title for sheet ID: ${this.hubSheetId}`);
+            console.log(`📥 Loading hub title for spreadsheet: ${this.hubSpreadsheetId}`);
 
             const response = await gapi.client.sheets.spreadsheets.get({
-                spreadsheetId: this.hubSheetId,
+                spreadsheetId: this.hubSpreadsheetId,
                 fields: 'properties.title'
             });
 
@@ -327,6 +327,6 @@ export class HubManager {
      * @returns {string} The Google Sheets URL for this hub
      */
     getHubUrl() {
-        return `https://docs.google.com/spreadsheets/d/${this.hubSheetId}`;
+        return `https://docs.google.com/spreadsheets/d/${this.hubSpreadsheetId}`;
     }
 }

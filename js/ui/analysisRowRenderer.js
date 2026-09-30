@@ -14,11 +14,11 @@ export class AnalysisRowRenderer {
     /** Sync the browser URL and document title with the current session state. */
     updateURL() {
         const { state } = this.host;
-        if (!state.sheetId) return;
+        if (!state.spreadsheetId) return;
 
         const newUrl = new URL(window.location);
         newUrl.search = '';
-        newUrl.searchParams.set('pod', state.sheetId);
+        newUrl.searchParams.set('pod', state.spreadsheetId);
 
         if (state.rowIndex !== undefined && state.rows.length > 0) {
             newUrl.searchParams.set('match', (state.rowIndex + 1).toString());
@@ -28,7 +28,7 @@ export class AnalysisRowRenderer {
         }
 
         window.history.replaceState({
-            podId: state.sheetId,
+            podId: state.spreadsheetId,
             guruColor: state.guruColor,
             rowIndex: state.rowIndex
         }, '', newUrl);
@@ -50,7 +50,7 @@ export class AnalysisRowRenderer {
         this.updateURL();
 
         host.view.renderSheetInfo({
-            sheetId: state.sheetId,
+            spreadsheetId: state.spreadsheetId,
             title: state.sheetData.title,
             podName: state.sheetData.metadata?.podName,
             matchNumber: state.rowIndex + 1

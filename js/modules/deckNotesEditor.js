@@ -1,12 +1,12 @@
 // DeckNotesEditor: Handles rendering and editing of the deck notes table
 // Extracted from GuruAnalysisInterface.showDeckNotesEditor
 export class DeckNotesEditor {
-    constructor({ analysisInterface, uiController, scryfallAPI, sheetsAPI, spreadsheetID }) {
+    constructor({ analysisInterface, uiController, scryfallAPI, sheetsAPI, spreadsheetId }) {
         this.analysisInterface = analysisInterface;
         this.uiController = uiController;
         this.scryfallAPI = scryfallAPI;
         this.sheetsAPI = sheetsAPI;
-        this.spreadsheetID = spreadsheetID;
+        this.spreadsheetId = spreadsheetId;
         this.notesData = null; // Will hold the current notes data
         this.clocksFilled = false; // Track if all clocks are filled
     }
@@ -133,7 +133,7 @@ export class DeckNotesEditor {
                         valueType: 'auto-detect',
                     }]
                 };
-                const result = await this.sheetsAPI.checkedUpdateSheetData(this.spreadsheetID, updates);
+                const result = await this.sheetsAPI.checkedUpdateSheetData(this.spreadsheetId, updates);
                 if (!result || result.skippedCells > 0) {
                     this.uiController.showStatus('Cell update failed, content may have been changed by someone else.', 'info');
                 } else {
@@ -151,7 +151,7 @@ export class DeckNotesEditor {
                                 valueType: 'string',
                             }]
                         };
-                        await this.sheetsAPI.updateSheetData(this.spreadsheetID, signatureUpdates);
+                        await this.sheetsAPI.updateSheetData(this.spreadsheetId, signatureUpdates);
                         this.notesData.values[row][signatureCol] = signature;
                         // Update the signature in the UI
                         const signatureCell = deckNotesTable.querySelector(`td[data-row="${row}"][data-col="${signatureCol}"]`);
@@ -294,7 +294,7 @@ export class DeckNotesEditor {
 
     async pullUpdates() {
         // Pull updates from the Google Sheets API
-        const notesData = await this.sheetsAPI.getDeckNotes(this.spreadsheetID, this.notesData);
+        const notesData = await this.sheetsAPI.getDeckNotes(this.spreadsheetId, this.notesData);
         await this.updateValues(notesData);
     }
 
@@ -369,10 +369,10 @@ export class DeckNotesEditor {
 
     async unhideGuruSheets() {
         // Unhide the Guru sheets in the spreadsheet and move to the analysis interface
-        await this.sheetsAPI.unhideGuruSheets(this.spreadsheetID);
+        await this.sheetsAPI.unhideGuruSheets(this.spreadsheetId);
         this.close();
 
-        const sheetData = await this.sheetsAPI.getSheetData(this.spreadsheetID);
+        const sheetData = await this.sheetsAPI.getSheetData(this.spreadsheetId);
         this.analysisInterface.loadData(sheetData);
     }
 }

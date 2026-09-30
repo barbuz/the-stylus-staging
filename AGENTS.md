@@ -52,13 +52,13 @@ Phase 4 of #18 moved the analysis session's mutable state off the controller and
 onto one object.
 
 - `AppState` is the single source of truth for the open pod: `sheetData`
-  (and its derived `sheetId`), `rows`, `rowIndex`, `guruColor`, `signature`,
-  `numDiscrepancies`, the deck-notes map/column map, the resolved per-colour
-  `columnIndex` and the `hub`. Mutate it only through its setters; `reset()`
-  clears the per-pod fields but deliberately keeps `signature`, which belongs to
-  the session rather than the pod. `currentRowKey()` / `findRowIndexByKey()`
-  give a stable row identity (sheet id + original row index) so a reload does
-  not depend on the player names.
+  (and its derived `spreadsheetId`), `rows`, `rowIndex`, `guruColor`,
+  `signature`, `numDiscrepancies`, the deck-notes map/column map, the resolved
+  per-colour `columnIndex` and the `hub`. Mutate it only through its setters;
+  `reset()` clears the per-pod fields but deliberately keeps `signature`, which
+  belongs to the session rather than the pod. `currentRowKey()` /
+  `findRowIndexByKey()` give a stable row identity (tab id + original row index)
+  so a reload does not depend on the player names.
 - `AnalysisController.state` is that object; the views (`analysisView`,
   `analysisRowRenderer`, ...) and the extracted services (`analysisActions`,
   `analysisNavigation`, `analysisSessionLoader`) read it via `host.state`.
@@ -105,7 +105,8 @@ the-stylus/
 │   │   ├── deckNotes.js        # deck-notes parsing + per-colour statistics
 │   │   ├── guruColor.js        # colour registry: fields, sheet names, merged-column layout
 │   │   ├── inverseCheck.js     # inverse-error detection helpers
-│   │   └── matchRows.js        # row model build + find first incomplete/discrepancy/mirror, deck stats
+│   │   ├── matchRows.js        # row model build + find first incomplete/discrepancy/mirror, deck stats
+│   │   └── recentEntries.js    # recent-pod/hub record shape + legacy sheetId fallback
 │   ├── modules/                # ES6 class-based feature modules
 │   │   ├── authManager.js
 │   │   ├── deckNotesEditor.js
@@ -372,6 +373,7 @@ only flips between exactly two.
 - **DOM access:** use helpers from `js/utils/domUtils.js` (`getElement`, `waitForElement`, `addEventListenerSafe`) rather than direct `document.getElementById`, so missing elements degrade gracefully.
 - **Event handling:** register UI events in `uiController.js` / the owning module's setup method rather than inline `onclick` handlers.
 - **Config:** `js/config.js` holds the public OAuth client ID and storage keys. Do not move secrets here; `public/js/config.local.js` is gitignored for local overrides.
+- **Sheet ids:** `spreadsheetId` is the spreadsheet file id (the `batchUpdate` / `values.get` target); `sheetId` is the numeric tab id inside it (Google's own `updateCells.start.sheetId`). Never use `sheetId` for the file — passing the tab id where the file id belongs makes the real API 404, and the e2e stub does not catch it. The persisted recent-pods/hubs records are the one place the old key lingers: they are shared with production via localStorage and Drive appData, so new writes use `spreadsheetId` while reads still accept the legacy `sheetId` through `js/domain/recentEntries.js`. That fallback is temporary and marked `LEGACY`; drop it once no old records remain.
 - **No new dependencies:** the project deliberately loads everything from CDNs and ships no bundler. Confirm with the user before adding a package. Playwright is the one agreed exception, and it is dev-only: it must never be imported by app code or added to `sw.js`/`index.html`.
 - **Commits:** short imperative subjects, often `<Area>: <change>` (e.g. `Fix next button not going to current guru's matches first`).
 

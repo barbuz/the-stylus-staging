@@ -14,21 +14,21 @@ export class GoogleSheetsAPI {
         this.authManager = authManager;
     }
 
-    async getSheetData(sheetId) {
+    async getSheetData(spreadsheetId) {
         try {
             if (!this.authManager.isLoggedIn()) {
                 throw new Error('User not authenticated');
             }
 
             // Get metadata first to find all sheets
-            const metadata = await this.getSheetMetadata(sheetId);
+            const metadata = await this.getSheetMetadata(spreadsheetId);
             
             // Check for optional metadata sheet and start loading it in parallel
             const metadataSheet = metadata.sheets.find(sheet => 
                 sheet.title.toLowerCase() === 'metadata'
             );
             const customMetadataPromise = metadataSheet 
-                ? this.getCustomMetadata(sheetId, metadataSheet)
+                ? this.getCustomMetadata(spreadsheetId, metadataSheet)
                 : Promise.resolve({});
             
             // Only process specific sheets needed for the application
@@ -54,11 +54,11 @@ export class GoogleSheetsAPI {
             const sheetPromises = [];
             
             if (deckNotesSheet) {
-                sheetPromises.push(this.getDeckNotes(sheetId, deckNotesSheet));
+                sheetPromises.push(this.getDeckNotes(spreadsheetId, deckNotesSheet));
             }
             
             if (guruSheets.length > 0) {
-                sheetPromises.push(this.mergeGuruSheets(sheetId, guruSheets));
+                sheetPromises.push(this.mergeGuruSheets(spreadsheetId, guruSheets));
             }
 
             // Wait for all sheet processing to complete
@@ -78,7 +78,7 @@ export class GoogleSheetsAPI {
             }
 
             return {
-                sheetId,
+                spreadsheetId,
                 title: metadata.title,
                 sheets: allSheetsData,
                 metadata: customMetadata
@@ -137,7 +137,7 @@ export class GoogleSheetsAPI {
         }
     }
 
-    async mergeGuruSheets(sheetId, guruSheets) {
+    async mergeGuruSheets(spreadsheetId, guruSheets) {
         // Sort sheets into colour order (Red, Blue, Green) so the merge is stable.
         const sortedSheets = [...guruSheets].sort((a, b) =>
             GURU_COLORS.indexOf(colourFromSheetTitle(a.title)) -
@@ -157,7 +157,7 @@ export class GoogleSheetsAPI {
         const allPromises = [
             // Base data query (A:C from the base sheet, excluding outcome column D)
             gapi.client.sheets.spreadsheets.values.get({
-                spreadsheetId: sheetId,
+                spreadsheetId,
                 range: `'${baseGuruSheet.title}'!A1:C1000`,
             }),
             // Analysis and signature queries for all guru sheets
@@ -165,7 +165,7 @@ export class GoogleSheetsAPI {
                 const colour = colourFromSheetTitle(sheet.title);
 
                 const response = await gapi.client.sheets.spreadsheets.values.get({
-                    spreadsheetId: sheetId,
+                    spreadsheetId,
                     range: `'${sheet.title}'!E1:F1000`, // Only columns E and F (analysis and signature)
                 });
 
@@ -333,14 +333,14 @@ export class GoogleSheetsAPI {
         }
     }
 
-    async updateSheetData(sheetId, updates) {
+    async updateSheetData(spreadsheetId, updates) {
         try {
             if (!this.authManager.isLoggedIn()) {
                 throw new Error('User not authenticated');
             }
 
             console.log('📝 Updating sheet data:', {
-                spreadsheetId: sheetId,
+                spreadsheetId,
                 updates: updates.updates.map(u => ({
                     sheetId: u.sheetId,
                     row: u.row,
@@ -404,7 +404,7 @@ export class GoogleSheetsAPI {
             });
 
             const response = await gapi.client.sheets.spreadsheets.batchUpdate({
-                spreadsheetId: sheetId,
+                spreadsheetId,
                 resource: {
                     requests: requests
                 }
@@ -426,14 +426,14 @@ export class GoogleSheetsAPI {
         }
     }
 
-    async checkedUpdateSheetData(sheetId, updates) {
+    async checkedUpdateSheetData(spreadsheetId, updates) {
         try {
             if (!this.authManager.isLoggedIn()) {
                 throw new Error('User not authenticated');
             }
 
             console.log('🔒 Performing checked update:', {
-                spreadsheetId: sheetId,
+                spreadsheetId,
                 updates: updates.updates.map(u => ({
                     sheetId: u.sheetId,
                     row: u.row,
@@ -465,7 +465,7 @@ export class GoogleSheetsAPI {
             }
 
             // Get all sheet metadata once
-            const metadata = await this.getSheetMetadata(sheetId);
+            const metadata = await this.getSheetMetadata(spreadsheetId);
 
             // Build A1 ranges and map to checks
             const ranges = [];
@@ -483,7 +483,7 @@ export class GoogleSheetsAPI {
 
             // Batch get all values
             const batchResponse = await gapi.client.sheets.spreadsheets.values.batchGet({
-                spreadsheetId: sheetId,
+                spreadsheetId,
                 ranges: ranges
             });
 
@@ -548,7 +548,7 @@ export class GoogleSheetsAPI {
             let response = null;
             if (updateRequests.length > 0) {
                 response = await gapi.client.sheets.spreadsheets.batchUpdate({
-                    spreadsheetId: sheetId,
+                    spreadsheetId,
                     resource: {
                         requests: updateRequests
                     }
@@ -580,19 +580,19 @@ export class GoogleSheetsAPI {
         }
     }
 
-    async getSheetMetadata(sheetId) {
+    async getSheetMetadata(spreadsheetId) {
         try {
             if (!this.authManager.isLoggedIn()) {
                 throw new Error('User not authenticated');
             }
 
             const response = await gapi.client.sheets.spreadsheets.get({
-                spreadsheetId: sheetId,
+                spreadsheetId,
             });
 
             return {
                 title: response.result.properties.title,
-                sheetId: sheetId,
+                spreadsheetId: spreadsheetId,
                 sheets: response.result.sheets.map(sheet => ({
                     title: sheet.properties.title,
                     sheetId: sheet.properties.sheetId,
@@ -606,14 +606,14 @@ export class GoogleSheetsAPI {
         }
     }
 
-    async batchUpdate(sheetId, requests) {
+    async batchUpdate(spreadsheetId, requests) {
         try {
             if (!this.authManager.isLoggedIn()) {
                 throw new Error('User not authenticated');
             }
 
             const response = await gapi.client.sheets.spreadsheets.batchUpdate({
-                spreadsheetId: sheetId,
+                spreadsheetId,
                 resource: {
                     requests: requests
                 }
@@ -633,12 +633,12 @@ export class GoogleSheetsAPI {
      * Unhides the Red, Blue, and Green Guru sheets in the spreadsheet.
      * Returns a promise that resolves when the operation is complete.
     */
-    async unhideGuruSheets(sheetId) {
+    async unhideGuruSheets(spreadsheetId) {
         if (!this.authManager.isLoggedIn()) {
             throw new Error('User not authenticated');
         }
         // Get all sheet metadata
-        const metadata = await this.getSheetMetadata(sheetId);
+        const metadata = await this.getSheetMetadata(spreadsheetId);
         // Only match exact Guru sheet names (case-insensitive)
         const guruSheetNames = GURU_COLORS.map(guruSheetName);
         const guruSheets = metadata.sheets.filter(sheet =>
@@ -658,7 +658,7 @@ export class GoogleSheetsAPI {
             }
         }));
         // Send batch update
-        const response = await this.batchUpdate(sheetId, requests);
+        const response = await this.batchUpdate(spreadsheetId, requests);
         return response;
     }
 

@@ -23,7 +23,7 @@ export class ThreadPresenter {
         return this.scryfallAPI.parseDeckString(deckString).join(' | ');
     }
 
-    open({ row, rowIndex, sheetId, podName, mainSheetLink, currentAnalysis }) {
+    open({ row, rowIndex, spreadsheetId, podName, mainSheetLink, currentAnalysis }) {
         const matchNumber = rowIndex + 1;
 
         // A shared link always points at the canonical production URL; the
@@ -31,7 +31,7 @@ export class ThreadPresenter {
         const matchLink = deploymentSheetLink(
             window.location.href,
             DEPLOYMENTS.production.path,
-            sheetId,
+            spreadsheetId,
             mainSheetLink
         );
 

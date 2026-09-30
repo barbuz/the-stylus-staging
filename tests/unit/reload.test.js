@@ -16,8 +16,8 @@ function makeHost({ sheetData, refetched, guruColor = 'red', signature = 'alice'
         state: new AppState(),
         rendered: 0,
         sheetsAPI: {
-            getSheetData: async (sheetId) => {
-                assert.equal(sheetId, sheetData.sheetId);
+            getSheetData: async (spreadsheetId) => {
+                assert.equal(spreadsheetId, sheetData.spreadsheetId);
                 return refetched;
             }
         },

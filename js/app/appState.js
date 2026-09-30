@@ -35,9 +35,9 @@ export class AppState {
         this.hub = null;
     }
 
-    /** The open spreadsheet's id, or null when no pod is loaded. */
-    get sheetId() {
-        return this.sheetData?.sheetId ?? null;
+    /** The open spreadsheet's file id, or null when no pod is loaded. */
+    get spreadsheetId() {
+        return this.sheetData?.spreadsheetId ?? null;
     }
 
     get currentRow() {
