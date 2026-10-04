@@ -56,7 +56,8 @@ export class AuthManager {
                         return;
                     }
                     const idToken = response.id_token;
-                    logger.debug('OAuth response:', response);
+                    // Do not log the response object: it carries the access and
+                    // ID tokens. The diagnostic buffer must stay secret-free.
                     logger.debug('✅ OAuth token received');
                     this.handleAuthSuccess(response.access_token, response.expires_in);
                 }

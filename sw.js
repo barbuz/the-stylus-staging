@@ -1,7 +1,7 @@
 // Service Worker for The Stylus PWA
 
 // Version configuration - UPDATE THIS to trigger a service worker update
-const APP_VERSION = 'v20261004a';
+const APP_VERSION = 'v20261004b';
 const APP_NAME = 'the-stylus';
 
 // Get the base path (works for both root and subdirectory deployments)
@@ -26,6 +26,7 @@ const urlsToCache = [
   `${BASE_PATH}js/app/events.js`,
   `${BASE_PATH}js/domain/analyses.js`,
   `${BASE_PATH}js/domain/deckNotes.js`,
+  `${BASE_PATH}js/domain/diagnosticLog.js`,
   `${BASE_PATH}js/domain/guruColor.js`,
   `${BASE_PATH}js/domain/inverseCheck.js`,
   `${BASE_PATH}js/domain/matchRows.js`,

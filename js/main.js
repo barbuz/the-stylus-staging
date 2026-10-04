@@ -14,7 +14,8 @@ import {
     alternateDeploymentUrl,
     resolveDeploymentRedirect
 } from './utils/urlUtils.js';
-import { logger } from './utils/log.js';
+import { logger, getLogEntries, isDebugEnabled } from './utils/log.js';
+import { formatDiagnosticLog, logFilename } from './domain/diagnosticLog.js';
 import { getElement } from './utils/domUtils.js';
 import { getItem, setItem, removeItem } from './services/storage.js';
 
@@ -37,6 +38,8 @@ class ThreeCardBlindGuruTool {
         this.currentSpreadsheetId = null;
         this._domBound = false;
         this._signatureHandlersBound = false;
+        this._logDownloadBound = false;
+        this._appVersion = 'unknown';
 
         this.setupEventSubscriptions();
         this.init();
@@ -147,6 +150,63 @@ class ThreeCardBlindGuruTool {
             return;
         }
         setItem(CONFIG.STORAGE_KEYS.PREFERRED_DEPLOYMENT, key);
+    }
+
+    /**
+     * Wire the shared "Download log" handler once, on load and independently of
+     * auth. The footer button is the only escape hatch on the login / sheet-input
+     * screens, so it must work even if authentication never completes.
+     */
+    setupLogDownload() {
+        if (this._logDownloadBound) {
+            return;
+        }
+        this._logDownloadBound = true;
+        document.addEventListener('click', (event) => {
+            if (event.target.closest('[data-log-download]')) {
+                this.downloadDiagnosticLog();
+            }
+        });
+    }
+
+    /**
+     * Build the diagnostic text from the buffered log and save it as a `.txt`
+     * file. Client-side and user-initiated; the URL is revoked after the click.
+     */
+    downloadDiagnosticLog() {
+        const key = this.currentDeploymentKey();
+        const meta = {
+            generatedAt: new Date(),
+            version: this._appVersion,
+            deploymentLabel: key ? DEPLOYMENTS[key].label : '',
+            url: window.location.href,
+            userAgent: navigator.userAgent,
+            debug: isDebugEnabled()
+        };
+        const text = formatDiagnosticLog(getLogEntries(), meta);
+        const blob = new Blob([text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = logFilename();
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    /**
+     * Record uncaught errors and unhandled rejections so crashes are in the
+     * diagnostic buffer even when nothing logged them explicitly.
+     */
+    setupGlobalErrorCapture() {
+        window.addEventListener('error', (event) => {
+            logger.error('Uncaught error:', event.message, event.filename, event.lineno, event.colno, event.error);
+        });
+        window.addEventListener('unhandledrejection', (event) => {
+            logger.error('Unhandled rejection:', event.reason);
+        });
     }
 
     setupDeploymentSwitch() {
@@ -443,10 +503,12 @@ class ThreeCardBlindGuruTool {
 document.addEventListener('DOMContentLoaded', () => {
     applyDeploymentBranding();
 
-    new ThreeCardBlindGuruTool();
+    const app = new ThreeCardBlindGuruTool();
+    app.setupGlobalErrorCapture();
+    app.setupLogDownload();
 
     // Display app version
-    displayAppVersion();
+    displayAppVersion(app);
 
     // Register service worker for PWA functionality
     if ('serviceWorker' in navigator) {
@@ -507,7 +569,7 @@ function applyDeploymentBranding() {
 /**
  * Display the app version from the service worker
  */
-async function displayAppVersion() {
+async function displayAppVersion(app) {
     const versionElement = getElement('app-version');
 
     if (!versionElement) {
@@ -524,6 +586,9 @@ async function displayAppVersion() {
 
         if (match && match[1]) {
             const version = match[1];
+            if (app) {
+                app._appVersion = version;
+            }
             const key = deploymentForPath(window.location.pathname, DEPLOYMENTS);
             const deployment = key ? DEPLOYMENTS[key] : null;
             versionElement.textContent = deployment

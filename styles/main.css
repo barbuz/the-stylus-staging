@@ -843,7 +843,38 @@ section h2, .login-section h2 {
 
 .editor-controls {
     display: flex;
+    align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
+}
+
+/* Low-emphasis diagnostic-log download control. Deliberately not a
+   `.secondary-btn`: it must not compete with Refresh / Exit or change the row
+   height. Pushed to the far end of the row so the primary pair stays grouped. */
+.log-download-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #8a949b;
+    font-size: 0.8rem;
+    font-family: inherit;
+    padding: 4px 6px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    border-radius: 4px;
+    line-height: 1;
+}
+
+.log-download-btn:hover {
+    color: #495057;
+    text-decoration: underline;
+}
+
+.log-download-btn:focus-visible {
+    outline: 2px solid #3498db;
+    outline-offset: 2px;
 }
 
 /* Match Table Modal Styles */
@@ -2079,6 +2110,10 @@ section h2, .login-section h2 {
     
     .editor-controls {
         justify-content: center;
+    }
+
+    .log-download-btn {
+        margin-left: 0;
     }
     
     /* Mobile - revert to vertical layout */

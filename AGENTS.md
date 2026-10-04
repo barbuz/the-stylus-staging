@@ -131,6 +131,7 @@ the-stylus/
 │   ├── domain/                 # PURE: no DOM, no gapi, no fetch, no instance state
 │   │   ├── analyses.js         # outcome calc, normalize, labels, css class, correction string
 │   │   ├── deckNotes.js        # deck-notes parsing + per-colour statistics
+│   │   ├── diagnosticLog.js    # diagnostic-log formatting + redaction (buffer cap, filename)
 │   │   ├── guruColor.js        # colour registry: fields, sheet names, merged-column layout
 │   │   ├── inverseCheck.js     # inverse-error detection helpers
 │   │   ├── matchRows.js        # row model build + find first incomplete/discrepancy/mirror, deck stats
@@ -162,11 +163,11 @@ the-stylus/
 │   │   ├── threadModal.js             # Create-thread modal, open/close/destroy
 │   │   └── threadPresenter.js         # Builds the Discord thread text for a row
 │   ├── services/               # Small infrastructure helpers
-│   │   └── storage.js          # localStorage wrapper: get/set/remove + JSON, safe when unavailable
+│   │   └── storage.js          # localStorage/sessionStorage wrapper: get/set/remove + JSON, safe when unavailable
 │   └── utils/                  # Pure helper functions
 │       ├── constants.js        # STATUS_TYPES, ANALYSIS_VALUES, TIME_CONSTANTS
 │       ├── domUtils.js         # Safe DOM access (getElement/waitForElement/addEventListenerSafe)
-│       ├── log.js              # logger.debug (gated by ?debug) / warn / error
+│       ├── log.js              # logger + bounded diagnostic buffer (debug gated by ?debug)
 │       ├── podUtils.js         # pod name <-> code conversion
 │       └── urlUtils.js         # Sheet URL validation/parsing/sanitising
 ├── styles/main.css             # All application styles
@@ -419,7 +420,7 @@ only flips between exactly two.
 - **Modules:** `export class X` with a `constructor` that wires dependencies; shared helper functions live in `js/utils/` as named exports.
 - **DOM access:** use helpers from `js/utils/domUtils.js` (`getElement`, `waitForElement`, `addEventListenerSafe`) rather than direct `document.getElementById`, so missing elements degrade gracefully.
 - **Storage:** route browser persistence through `js/services/storage.js` (`getItem` / `setItem` / `removeItem` and the JSON variants) rather than calling `localStorage` directly; it degrades to a no-op when storage is unavailable or throws. Keys still come from `CONFIG.STORAGE_KEYS`.
-- **Logging:** use `logger` from `js/utils/log.js`. `logger.debug` is suppressed unless `?debug` is in the URL or `window.__stylusDebug = true`; `logger.warn` / `logger.error` always pass through, so keep genuine failure paths on those.
+- **Logging:** use `logger` from `js/utils/log.js`. `logger.debug` is suppressed from the console unless `?debug` is in the URL or `window.__stylusDebug = true`; `logger.warn` / `logger.error` always pass through, so keep genuine failure paths on those. Independently of the flag, every call is captured in a 500-entry ring buffer (oldest dropped) and mirrored into `sessionStorage`; a "Log" button on the analysis screen and in the footer downloads it as a redacted `.txt` for bug reports (`js/domain/diagnosticLog.js`). Never log whole response objects, tokens or emails — capture redacts known-sensitive keys and email shapes, but the call site should not rely on it.
 - **Event handling:** register UI events in `uiController.js` / the owning module's setup method rather than inline `onclick` handlers.
 - **Config:** `js/config.js` holds the public OAuth client ID and storage keys. Do not move secrets here; `public/js/config.local.js` is gitignored for local overrides.
 - **Sheet ids:** `spreadsheetId` is the spreadsheet file id (the `batchUpdate` / `values.get` target); `sheetId` is the numeric tab id inside it (Google's own `updateCells.start.sheetId`). Never use `sheetId` for the file — passing the tab id where the file id belongs makes the real API 404, and the e2e stub does not catch it. The persisted recent-pods/hubs records are the one place the old key lingers: they are shared with production via localStorage and Drive appData, so new writes use `spreadsheetId` while reads still accept the legacy `sheetId` through `js/domain/recentEntries.js`. That fallback is temporary and marked `LEGACY`; drop it once no old records remain.
