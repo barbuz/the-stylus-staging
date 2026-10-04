@@ -8,6 +8,7 @@ import {
     GURU_SHEET_ANALYSIS_COLUMN,
     GURU_SHEET_SIGNATURE_COLUMN
 } from '../domain/guruColor.js';
+import { logger } from '../utils/log.js';
 
 export class GoogleSheetsAPI {
     constructor(authManager) {
@@ -22,59 +23,59 @@ export class GoogleSheetsAPI {
 
             // Get metadata first to find all sheets
             const metadata = await this.getSheetMetadata(spreadsheetId);
-            
+
             // Check for optional metadata sheet and start loading it in parallel
-            const metadataSheet = metadata.sheets.find(sheet => 
+            const metadataSheet = metadata.sheets.find(sheet =>
                 sheet.title.toLowerCase() === 'metadata'
             );
-            const customMetadataPromise = metadataSheet 
+            const customMetadataPromise = metadataSheet
                 ? this.getCustomMetadata(spreadsheetId, metadataSheet)
                 : Promise.resolve({});
-            
+
             // Only process specific sheets needed for the application
             const requiredSheetNames = ['Deck Notes', ...GURU_COLORS.map(guruSheetName)];
-            const sheetsToProcess = metadata.sheets.filter(sheet => 
-                requiredSheetNames.some(requiredName => 
+            const sheetsToProcess = metadata.sheets.filter(sheet =>
+                requiredSheetNames.some(requiredName =>
                     sheet.title.toLowerCase().includes(requiredName.toLowerCase())
                 )
             );
 
-            console.log(`Processing sheets: ${sheetsToProcess.map(s => s.title).join(', ')}`);
+            logger.debug(`Processing sheets: ${sheetsToProcess.map(s => s.title).join(', ')}`);
 
             // Separate Deck Notes and Guru sheets
-            const deckNotesSheet = sheetsToProcess.find(sheet => 
+            const deckNotesSheet = sheetsToProcess.find(sheet =>
                 sheet.title.toLowerCase().includes('deck notes')
             );
-            
-            const guruSheets = sheetsToProcess.filter(sheet => 
+
+            const guruSheets = sheetsToProcess.filter(sheet =>
                 !sheet.title.toLowerCase().includes('deck notes')
             );
 
             // Process both in parallel
             const sheetPromises = [];
-            
+
             if (deckNotesSheet) {
                 sheetPromises.push(this.getDeckNotes(spreadsheetId, deckNotesSheet));
             }
-            
+
             if (guruSheets.length > 0) {
                 sheetPromises.push(this.mergeGuruSheets(spreadsheetId, guruSheets));
             }
 
             // Wait for all sheet processing to complete
             const allSheetsData = await Promise.all(sheetPromises);
-            
+
             if (guruSheets.length > 0) {
                 const mergedGuruSheet = allSheetsData.find(sheet => sheet.title === 'Merged Gurus');
                 if (mergedGuruSheet) {
-                    console.log("Merged Guru Sheets:", mergedGuruSheet);
+                    logger.debug("Merged Guru Sheets:", mergedGuruSheet);
                 }
             }
 
             // Wait for custom metadata to finish loading
             const customMetadata = await customMetadataPromise;
             if (metadataSheet && Object.keys(customMetadata).length > 0) {
-                console.log('📋 Found metadata sheet:', customMetadata);
+                logger.debug('📋 Found metadata sheet:', customMetadata);
             }
 
             return {
@@ -84,7 +85,7 @@ export class GoogleSheetsAPI {
                 metadata: customMetadata
             };
         } catch (error) {
-            console.error('API Error:', error);
+            logger.error('API Error:', error);
             throw new Error(error.message || 'Failed to fetch sheet data');
         }
     }
@@ -117,13 +118,13 @@ export class GoogleSheetsAPI {
                         // Convert to camelCase for consistency (e.g., "Pod Name" -> "podName")
                         const key = variableName
                             .split(' ')
-                            .map((word, index) => 
-                                index === 0 
-                                    ? word.toLowerCase() 
+                            .map((word, index) =>
+                                index === 0
+                                    ? word.toLowerCase()
                                     : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
                             )
                             .join('');
-                        
+
                         metadata[key] = value;
                     }
                 }
@@ -131,7 +132,7 @@ export class GoogleSheetsAPI {
 
             return metadata;
         } catch (error) {
-            console.error('API Error (getCustomMetadata):', error);
+            logger.error('API Error (getCustomMetadata):', error);
             // Don't throw - just return empty object if metadata sheet can't be read
             return {};
         }
@@ -328,7 +329,7 @@ export class GoogleSheetsAPI {
                 columnMapping: this.getColumnMapping(deckNotesSheet.title)
             };
         } catch (error) {
-            console.error('API Error (getDeckNotes):', error);
+            logger.error('API Error (getDeckNotes):', error);
             throw new Error(error.message || 'Failed to fetch Deck Notes sheet');
         }
     }
@@ -339,7 +340,7 @@ export class GoogleSheetsAPI {
                 throw new Error('User not authenticated');
             }
 
-            console.log('📝 Updating sheet data:', {
+            logger.debug('📝 Updating sheet data:', {
                 spreadsheetId,
                 updates: updates.updates.map(u => ({
                     sheetId: u.sheetId,
@@ -362,7 +363,7 @@ export class GoogleSheetsAPI {
 
                 // Use the explicitly specified value type
                 let userEnteredValue;
-                
+
                 switch (update.valueType) {
                     case 'number':
                         userEnteredValue = { numberValue: parseFloat(update.value) };
@@ -410,7 +411,7 @@ export class GoogleSheetsAPI {
                 }
             });
 
-            console.log('✅ Sheet update successful:', {
+            logger.debug('✅ Sheet update successful:', {
                 updatedCells: updates.updates.length,
                 responseReplies: response.result.replies?.length || 0
             });
@@ -421,7 +422,7 @@ export class GoogleSheetsAPI {
                 response: response.result
             };
         } catch (error) {
-            console.error('API Error:', error);
+            logger.error('API Error:', error);
             throw new Error(error.message || 'Failed to update sheet data');
         }
     }
@@ -432,7 +433,7 @@ export class GoogleSheetsAPI {
                 throw new Error('User not authenticated');
             }
 
-            console.log('🔒 Performing checked update:', {
+            logger.debug('🔒 Performing checked update:', {
                 spreadsheetId,
                 updates: updates.updates.map(u => ({
                     sheetId: u.sheetId,
@@ -555,7 +556,7 @@ export class GoogleSheetsAPI {
                 });
             }
 
-            console.log('✅ Checked sheet update complete:', {
+            logger.debug('✅ Checked sheet update complete:', {
                 updatedCells: updateRequests.length,
                 skippedCells: failedChecks.length,
                 responseReplies: response?.result?.replies?.length || 0
@@ -575,7 +576,7 @@ export class GoogleSheetsAPI {
             };
 
         } catch (error) {
-            console.error('Checked API Error:', error);
+            logger.error('Checked API Error:', error);
             throw new Error(error.message || 'Failed to perform checked update');
         }
     }
@@ -601,7 +602,7 @@ export class GoogleSheetsAPI {
                 }))
             };
         } catch (error) {
-            console.error('API Error:', error);
+            logger.error('API Error:', error);
             throw new Error(error.message || 'Failed to fetch sheet metadata');
         }
     }
@@ -624,7 +625,7 @@ export class GoogleSheetsAPI {
                 response: response.result
             };
         } catch (error) {
-            console.error('API Error:', error);
+            logger.error('API Error:', error);
             throw new Error(error.message || 'Failed to perform batch update');
         }
     }
@@ -720,7 +721,7 @@ export class GoogleSheetsAPI {
                 response: response.result
             };
         } catch (error) {
-            console.error('API Error (clearCell):', error);
+            logger.error('API Error (clearCell):', error);
             throw new Error(error.message || 'Failed to clear cell');
         }
     }

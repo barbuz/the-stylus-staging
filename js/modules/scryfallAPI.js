@@ -3,6 +3,7 @@
  * Handles fetching card images from Scryfall API
  * Implements rate limiting as per Scryfall guidelines (50-100ms delay between requests)
  */
+import { logger } from '../utils/log.js';
 export class ScryfallAPI {
     constructor() {
         this.baseUrl = 'https://api.scryfall.com';
@@ -33,12 +34,12 @@ export class ScryfallAPI {
     async enforceRateLimit() {
         const now = Date.now();
         const timeSinceLastRequest = now - this.lastRequestTime;
-        
+
         if (timeSinceLastRequest < this.rateLimitDelay) {
             const waitTime = this.rateLimitDelay - timeSinceLastRequest;
             await new Promise(resolve => setTimeout(resolve, waitTime));
         }
-        
+
         this.lastRequestTime = Date.now();
     }
 
@@ -69,7 +70,7 @@ export class ScryfallAPI {
         }
 
         const trimmedName = cardName.trim();
-        
+
         // Check cache first - if we have the image cached, return it directly
         if (this.cache.has(trimmedName)) {
             // Return a copy of the cached image to avoid mutation
@@ -80,16 +81,16 @@ export class ScryfallAPI {
         try {
             // Enforce rate limiting before making API request
             await this.enforceRateLimit();
-            
+
             const encodedName = encodeURIComponent(trimmedName);
             const imageUrl = `${this.baseUrl}/cards/named?exact=${encodedName}&format=image&version=normal`;
-            
+
             // Load and cache the actual image
             const loadedImage = await this.loadAndCacheImage(trimmedName, imageUrl);
-            
+
             return loadedImage;
         } catch (error) {
-            console.warn(`Failed to get image for card "${trimmedName}":`, error);
+            logger.warn(`Failed to get image for card "${trimmedName}":`, error);
             throw new Error(`Card "${trimmedName}" not found`);
         }
     }
@@ -132,7 +133,7 @@ export class ScryfallAPI {
      */
     async getDeckImages(deckString) {
         const cardNames = this.parseDeckString(deckString);
-        
+
         if (cardNames.length === 0) {
             return [];
         }
@@ -143,10 +144,10 @@ export class ScryfallAPI {
         for (const cardName of cardNames) {
             try {
                 const loadedImage = await this.getCardImage(cardName);
-                results.push({ 
-                    cardName, 
+                results.push({
+                    cardName,
                     imageUrl: loadedImage.src,
-                    image: loadedImage 
+                    image: loadedImage
                 });
             } catch (error) {
                 results.push({ cardName, error: error.message });
@@ -154,31 +155,6 @@ export class ScryfallAPI {
         }
 
         return results;
-    }
-
-    /**
-     * Clear the image cache
-     */
-    clearCache() {
-        this.cache.clear();
-    }
-
-    /**
-     * Get cache statistics
-     * @returns {object} Cache info
-     */
-    getCacheInfo() {
-        return {
-            size: this.cache.size,
-            entries: Array.from(this.cache.keys()),
-            preloadQueue: Array.from(this.preloadQueue),
-            isPreloading: this.isPreloading,
-            cachedImages: Array.from(this.cache.entries()).map(([name, img]) => ({
-                name,
-                loaded: img.complete,
-                src: img.src
-            }))
-        };
     }
 
     /**
@@ -192,12 +168,12 @@ export class ScryfallAPI {
      */
     async preloadCards(deckString, options = {}) {
         const { delay = 200, silent = true } = options;
-        
+
         // Parse deck string to get card names
-        const cardNames = Array.isArray(deckString) 
+        const cardNames = Array.isArray(deckString)
             ? deckString.flatMap(deck => this.parseDeckString(deck)) // Parse each deck string in the array
             : this.parseDeckString(deckString);
-        
+
         if (cardNames.length === 0) {
             return;
         }
@@ -209,15 +185,15 @@ export class ScryfallAPI {
         });
 
         if (cardsToPreload.length === 0) {
-            if (!silent) console.log('🎯 All cards already cached or queued for preload');
+            if (!silent) logger.debug('🎯 All cards already cached or queued for preload');
             return;
         }
 
         // Add cards to preload queue
         cardsToPreload.forEach(cardName => this.preloadQueue.add(cardName.trim()));
-        
-        if (!silent) console.log(`🔄 Starting background preload for ${cardsToPreload.length} cards`);
-        
+
+        if (!silent) logger.debug(`🔄 Starting background preload for ${cardsToPreload.length} cards`);
+
         // Start preloading if not already in progress
         if (!this.isPreloading) {
             this.isPreloading = true;
@@ -248,20 +224,20 @@ export class ScryfallAPI {
 
                 const encodedName = encodeURIComponent(cardName);
                 const imageUrl = `${this.baseUrl}/cards/named?exact=${encodedName}&format=image&version=normal`;
-                
+
                 // For preloading, load and cache the actual image
                 const loadedImage = await this.loadAndCacheImage(cardName, imageUrl);
 
-                if (!silent) console.log(`✅ Preloaded: ${cardName}`);
-                
+                if (!silent) logger.debug(`✅ Preloaded: ${cardName}`);
+
             } catch (error) {
-                if (!silent) console.warn(`⚠️ Failed to preload "${cardName}":`, error.message);
+                if (!silent) logger.warn(`⚠️ Failed to preload "${cardName}":`, error.message);
                 // Don't cache failed preloads, let them be retried on actual request
             }
         }
-        
+
         this.isPreloading = false;
-        if (!silent) console.log('🎯 Background preloading completed');
+        if (!silent) logger.debug('🎯 Background preloading completed');
     }
 
     /**
@@ -270,7 +246,7 @@ export class ScryfallAPI {
     stopPreloading() {
         this.preloadQueue.clear();
         this.isPreloading = false;
-        console.log('🛑 Preloading stopped and queue cleared');
+        logger.debug('🛑 Preloading stopped and queue cleared');
     }
 
     /**

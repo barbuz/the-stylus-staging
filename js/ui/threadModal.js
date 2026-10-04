@@ -5,6 +5,7 @@
  * overlay, copy buttons and escape-key listener, and removes them on close.
  */
 import { escapeHtml } from '../utils/domUtils.js';
+import { logger } from '../utils/log.js';
 
 function setupCopyButton(button, textToCopy, defaultTitle, textarea) {
     if (!button) {
@@ -24,7 +25,7 @@ function setupCopyButton(button, textToCopy, defaultTitle, textarea) {
                 button.title = defaultTitle;
             }, 2000);
         }).catch(err => {
-            console.error('Failed to copy:', err);
+            logger.error('Failed to copy:', err);
             button.textContent = '✗';
             button.style.color = '#dc3545';
             button.title = 'Failed to copy';

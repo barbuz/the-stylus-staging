@@ -10,6 +10,7 @@ import { HubManager } from '../modules/hubManager.js';
 import { processDeckNotes, calculateColorStatistics } from '../domain/deckNotes.js';
 import { determineGuruColorFromSheet } from '../domain/guruColor.js';
 import { parsePodSheets } from '../domain/matchRows.js';
+import { logger } from '../utils/log.js';
 
 export class AnalysisSessionLoader {
     constructor(host) {
@@ -50,7 +51,7 @@ export class AnalysisSessionLoader {
                     host.showGuruColorSelection(sheetData);
                     return false;
                 }
-                console.error('Error determining guru color:', error);
+                logger.error('Error determining guru color:', error);
                 host.uiController.showError('An error occurred while determining guru color');
                 return false;
             }

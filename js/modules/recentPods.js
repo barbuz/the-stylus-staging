@@ -2,6 +2,8 @@ import { CONFIG } from '../config.js';
 import { getElement } from '../utils/domUtils.js';
 import { HubManager } from './hubManager.js';
 import { getRecordSpreadsheetId, normaliseRecords } from '../domain/recentEntries.js';
+import { logger } from '../utils/log.js';
+import { getItem, setItem } from '../services/storage.js';
 
 export class RecentPodsManager {
     constructor() {
@@ -38,22 +40,22 @@ export class RecentPodsManager {
     async loadRecentPods() {
         try {
             let pods = [];
-            
+
             if (this.userPreferences && this.userPreferences.isInitialized) {
                 // Load from Google appData
                 pods = await this.userPreferences.getRecentPods();
-                console.log('📥 Loaded recent pods from Google appData:', pods.length, 'pods');
+                logger.debug('📥 Loaded recent pods from Google appData:', pods.length, 'pods');
             } else {
                 // Fall back to localStorage
-                const stored = localStorage.getItem(CONFIG.STORAGE_KEYS.RECENT_PODS);
+                const stored = getItem(CONFIG.STORAGE_KEYS.RECENT_PODS);
                 pods = stored ? JSON.parse(stored) : [];
-                console.log('📥 Loaded recent pods from localStorage:', pods.length, 'pods');
+                logger.debug('📥 Loaded recent pods from localStorage:', pods.length, 'pods');
             }
-            
+
             this.recentPods = normaliseRecords(pods);
             return this.recentPods;
         } catch (error) {
-            console.error('Error loading recent pods:', error);
+            logger.error('Error loading recent pods:', error);
             this.recentPods = [];
             return [];
         }
@@ -65,36 +67,36 @@ export class RecentPodsManager {
      * then saves to Google appData in background
      */
     async saveRecentPods() {
-        try { 
-            
+        try {
+
             // Keep only the maximum number of pods
             if (this.recentPods.length > this.maxRecentPods) {
                 this.recentPods = this.recentPods.slice(0, this.maxRecentPods);
             }
-            
+
             // Always save to localStorage first for instant response
-            localStorage.setItem(CONFIG.STORAGE_KEYS.RECENT_PODS, JSON.stringify(this.recentPods));
-            console.log('💾 Saved recent pods to localStorage:', this.recentPods.length, 'pods');
-            
+            setItem(CONFIG.STORAGE_KEYS.RECENT_PODS, JSON.stringify(this.recentPods));
+            logger.debug('💾 Saved recent pods to localStorage:', this.recentPods.length, 'pods');
+
             // Then save to Google appData in background if available
             if (this.userPreferences && this.userPreferences.isInitialized) {
                 // Don't await - let this happen in background
                 this.userPreferences.setRecentPods(this.recentPods)
                     .then(() => {
-                        console.log('☁️ Synced recent pods to Google appData in background');
+                        logger.debug('☁️ Synced recent pods to Google appData in background');
                     })
                     .catch((error) => {
-                        console.warn('Failed to sync recent pods to Google appData:', error);
+                        logger.warn('Failed to sync recent pods to Google appData:', error);
                         // localStorage already has the data, so this is not critical
                     });
             }
         } catch (error) {
-            console.error('Error saving recent pods:', error);
+            logger.error('Error saving recent pods:', error);
             // Try localStorage as last resort
             try {
-                localStorage.setItem(CONFIG.STORAGE_KEYS.RECENT_PODS, JSON.stringify(this.recentPods));
+                setItem(CONFIG.STORAGE_KEYS.RECENT_PODS, JSON.stringify(this.recentPods));
             } catch (e) {
-                console.error('Failed to save to localStorage:', e);
+                logger.error('Failed to save to localStorage:', e);
             }
         }
     }
@@ -107,7 +109,7 @@ export class RecentPodsManager {
      */
     async addRecentPod(spreadsheetId, title, url) {
         if (!spreadsheetId || !title || !url) {
-            console.warn('Invalid pod data provided to addRecentPod');
+            logger.warn('Invalid pod data provided to addRecentPod');
             return;
         }
 
@@ -130,8 +132,8 @@ export class RecentPodsManager {
 
         await this.saveRecentPods();
         this.renderRecentPods();
-        
-        console.log(`📋 ${existingPod ? 'Updated' : 'Added'} "${title}" ${existingPod ? 'in' : 'to'} recent pods`);
+
+        logger.debug(`📋 ${existingPod ? 'Updated' : 'Added'} "${title}" ${existingPod ? 'in' : 'to'} recent pods`);
     }
 
     /**
@@ -142,7 +144,7 @@ export class RecentPodsManager {
         this.recentPods = this.recentPods.filter(pod => getRecordSpreadsheetId(pod) !== spreadsheetId);
         await this.saveRecentPods();
         this.renderRecentPods();
-        console.log(`🗑️ Removed pod from recent list: ${spreadsheetId}`);
+        logger.debug(`🗑️ Removed pod from recent list: ${spreadsheetId}`);
     }
 
     /**
@@ -152,7 +154,7 @@ export class RecentPodsManager {
         this.recentPods = [];
         await this.saveRecentPods();
         this.renderRecentPods();
-        console.log('🗑️ Cleared all recent pods');
+        logger.debug('🗑️ Cleared all recent pods');
     }
 
     /**
@@ -168,22 +170,22 @@ export class RecentPodsManager {
     async loadRecentHubs() {
         try {
             let hubs = [];
-            
+
             if (this.userPreferences && this.userPreferences.isInitialized) {
                 // Load from Google appData
                 hubs = await this.userPreferences.getRecentHubs();
-                console.log('📥 Loaded recent hubs from Google appData:', hubs.length, 'hubs');
+                logger.debug('📥 Loaded recent hubs from Google appData:', hubs.length, 'hubs');
             } else {
                 // Fall back to localStorage
-                const stored = localStorage.getItem(CONFIG.STORAGE_KEYS.RECENT_HUBS);
+                const stored = getItem(CONFIG.STORAGE_KEYS.RECENT_HUBS);
                 hubs = stored ? JSON.parse(stored) : [];
-                console.log('📥 Loaded recent hubs from localStorage:', hubs.length, 'hubs');
+                logger.debug('📥 Loaded recent hubs from localStorage:', hubs.length, 'hubs');
             }
-            
+
             this.recentHubs = normaliseRecords(hubs);
             return this.recentHubs;
         } catch (error) {
-            console.error('Error loading recent hubs:', error);
+            logger.error('Error loading recent hubs:', error);
             this.recentHubs = [];
             return [];
         }
@@ -193,35 +195,35 @@ export class RecentPodsManager {
      * Save recent hubs to localStorage or Google Drive
      */
     async saveRecentHubs() {
-        try { 
+        try {
             // Keep only the maximum number of hubs
             if (this.recentHubs.length > this.maxRecentHubs) {
                 this.recentHubs = this.recentHubs.slice(0, this.maxRecentHubs);
             }
-            
+
             // Always save to localStorage first for instant response
-            localStorage.setItem(CONFIG.STORAGE_KEYS.RECENT_HUBS, JSON.stringify(this.recentHubs));
-            console.log('💾 Saved recent hubs to localStorage:', this.recentHubs.length, 'hubs');
-            
+            setItem(CONFIG.STORAGE_KEYS.RECENT_HUBS, JSON.stringify(this.recentHubs));
+            logger.debug('💾 Saved recent hubs to localStorage:', this.recentHubs.length, 'hubs');
+
             // Then save to Google appData in background if available
             if (this.userPreferences && this.userPreferences.isInitialized) {
                 // Don't await - let this happen in background
                 this.userPreferences.setRecentHubs(this.recentHubs)
                     .then(() => {
-                        console.log('☁️ Synced recent hubs to Google appData in background');
+                        logger.debug('☁️ Synced recent hubs to Google appData in background');
                     })
                     .catch((error) => {
-                        console.warn('Failed to sync recent hubs to Google appData:', error);
+                        logger.warn('Failed to sync recent hubs to Google appData:', error);
                         // localStorage already has the data, so this is not critical
                     });
             }
         } catch (error) {
-            console.error('Error saving recent hubs:', error);
+            logger.error('Error saving recent hubs:', error);
             // Try localStorage as last resort
             try {
-                localStorage.setItem(CONFIG.STORAGE_KEYS.RECENT_HUBS, JSON.stringify(this.recentHubs));
+                setItem(CONFIG.STORAGE_KEYS.RECENT_HUBS, JSON.stringify(this.recentHubs));
             } catch (e) {
-                console.error('Failed to save to localStorage:', e);
+                logger.error('Failed to save to localStorage:', e);
             }
         }
     }
@@ -232,7 +234,7 @@ export class RecentPodsManager {
      */
     async addRecentHub(hubLink) {
         if (!hubLink) {
-            console.warn('Invalid hub link provided to addRecentHub');
+            logger.warn('Invalid hub link provided to addRecentHub');
             return;
         }
 
@@ -268,11 +270,11 @@ export class RecentPodsManager {
 
             await this.saveRecentHubs();
             this.renderRecentPods(); // Re-render to update UI
-            
-            console.log(`📋 ${existingHub ? 'Updated' : 'Added'} "${title}" ${existingHub ? 'in' : 'to'} recent hubs`);
+
+            logger.debug(`📋 ${existingHub ? 'Updated' : 'Added'} "${title}" ${existingHub ? 'in' : 'to'} recent hubs`);
 
         } catch (error) {
-            console.error('Error adding recent hub:', error);
+            logger.error('Error adding recent hub:', error);
         }
     }
 
@@ -284,7 +286,7 @@ export class RecentPodsManager {
         this.recentHubs = this.recentHubs.filter(hub => getRecordSpreadsheetId(hub) !== spreadsheetId);
         await this.saveRecentHubs();
         this.renderRecentPods();
-        console.log(`🗑️ Removed hub from recent list: ${spreadsheetId}`);
+        logger.debug(`🗑️ Removed hub from recent list: ${spreadsheetId}`);
     }
 
     /**
@@ -295,7 +297,7 @@ export class RecentPodsManager {
         const recentPodsList = getElement('recent-pods-list');
 
         if (!recentPodsSection || !recentPodsList) {
-            console.warn('⚠️ Recent pods DOM elements not found');
+            logger.warn('⚠️ Recent pods DOM elements not found');
             return;
         }
 
@@ -313,7 +315,7 @@ export class RecentPodsManager {
 
         // Use document fragment for better performance
         const fragment = document.createDocumentFragment();
-        
+
         // Add hubs section if we have hubs
         if (this.recentHubs.length > 0) {
             this.recentHubs.forEach((hub) => {
@@ -321,7 +323,7 @@ export class RecentPodsManager {
                 fragment.appendChild(hubElement);
             });
         }
-        
+
         // Add pods section if we have pods (only those without corresponding hub)
         if (this.recentPods.length > 0) {
             const podsHeader = document.createElement('h3');
@@ -334,13 +336,13 @@ export class RecentPodsManager {
                 fragment.appendChild(podElement);
             });
         }
-        
+
         recentPodsList.appendChild(fragment);
-        
+
         // Re-expand any hubs that were previously expanded, or expand the first hub if none were expanded
         const expandPromises = [];
         let hasExpandedHub = false;
-        
+
         this.recentHubs.forEach((hub, index) => {
             if (this.expandedHubs.has(getRecordSpreadsheetId(hub))) {
                 hasExpandedHub = true;
@@ -352,7 +354,7 @@ export class RecentPodsManager {
                 }
             }
         });
-        
+
         // If no hubs were previously expanded, expand the first hub
         if (!hasExpandedHub && this.recentHubs.length > 0) {
             const firstHub = this.recentHubs[0];
@@ -361,11 +363,11 @@ export class RecentPodsManager {
                 expandPromises.push(this.toggleHubPods(firstHub, firstHubElement));
             }
         }
-        
+
         // Wait for all expansions to complete
         if (expandPromises.length > 0) {
             Promise.all(expandPromises).catch(err => {
-                console.warn('Error re-expanding hubs:', err);
+                logger.warn('Error re-expanding hubs:', err);
             });
         }
     }
@@ -379,11 +381,11 @@ export class RecentPodsManager {
         const hubElement = document.createElement('div');
         hubElement.className = 'recent-pod-item recent-hub-item';
         hubElement.dataset.hubId = getRecordSpreadsheetId(hub); // Add identifier for tracking
-        
+
         // Format date added time
         const dateAddedDate = new Date(hub.dateAdded);
         const addedTimeAgo = this.getTimeAgo(dateAddedDate);
-        
+
         // Format last accessed time
         const lastAccessedDate = new Date(hub.lastAccessed);
         const lastOpenedTimeAgo = this.getTimeAgo(lastAccessedDate);
@@ -444,11 +446,11 @@ export class RecentPodsManager {
     createPodElement(pod) {
         const podElement = document.createElement('div');
         podElement.className = 'recent-pod-item';
-        
+
         // Format date added time
         const dateAddedDate = new Date(pod.dateAdded);
         const addedTimeAgo = this.getTimeAgo(dateAddedDate);
-        
+
         // Format last accessed time
         const lastAccessedDate = new Date(pod.lastAccessed);
         const lastOpenedTimeAgo = this.getTimeAgo(lastAccessedDate);
@@ -493,7 +495,7 @@ export class RecentPodsManager {
     async toggleHubPods(hub, hubElement) {
         const hubSpreadsheetId = getRecordSpreadsheetId(hub);
         const expandIcon = hubElement.querySelector('.hub-expand-icon');
-        
+
         // Check if this hub is already expanded
         if (this.expandedHubs.has(hubSpreadsheetId)) {
             // Collapse: remove the pods list
@@ -506,41 +508,41 @@ export class RecentPodsManager {
             if (expandIcon) expandIcon.textContent = '▶';
             return;
         }
-        
+
         // Expand: load and show pods
         try {
-            console.log(`🔄 Loading pods for hub: ${hub.title}`);
+            logger.debug(`🔄 Loading pods for hub: ${hub.title}`);
             hubElement.classList.add('loading');
             if (expandIcon) expandIcon.textContent = '⏳';
-            
+
             // Get or create HubManager for this hub
             let hubManager = this.hubManagers.get(hubSpreadsheetId);
             if (!hubManager) {
                 hubManager = new HubManager(hub.url);
                 this.hubManagers.set(hubSpreadsheetId, hubManager);
             }
-            
+
             // Load pods from the hub
             const pods = await hubManager.getPods();
-            
+
             // Mark as expanded
             this.expandedHubs.add(hubSpreadsheetId);
             hubElement.classList.add('expanded');
             hubElement.classList.remove('loading');
             if (expandIcon) expandIcon.textContent = '▼';
-            
+
             // Create and insert pods list
             const podsList = this.createHubPodsList(pods, hub);
             if (hubElement.parentNode) {
                 hubElement.parentNode.insertBefore(podsList, hubElement.nextSibling);
-                console.log(`✅ Loaded ${pods.length} pods for hub: ${hub.title}`);
+                logger.debug(`✅ Loaded ${pods.length} pods for hub: ${hub.title}`);
             } else {
-                console.warn('Hub element has no parent node, cannot insert pods list');
+                logger.warn('Hub element has no parent node, cannot insert pods list');
             }
 
-            
+
         } catch (error) {
-            console.error('Error loading hub pods:', error);
+            logger.error('Error loading hub pods:', error);
             hubElement.classList.remove('loading');
             if (expandIcon) expandIcon.textContent = '▶';
             // Show error message
@@ -548,7 +550,7 @@ export class RecentPodsManager {
             errorMsg.className = 'hub-pods-error';
             errorMsg.textContent = `Error loading pods: ${error.message}`;
             hubElement.parentNode.insertBefore(errorMsg, hubElement.nextSibling);
-            
+
             // Remove error after 3 seconds
             setTimeout(() => errorMsg.remove(), 3000);
         }
@@ -561,66 +563,66 @@ export class RecentPodsManager {
      */
     async refreshHub(hub, hubElement) {
         const hubSpreadsheetId = getRecordSpreadsheetId(hub);
-        
+
         try {
-            console.log(`🔄 Refreshing hub data: ${hub.title}`);
-            
+            logger.debug(`🔄 Refreshing hub data: ${hub.title}`);
+
             // Add loading state
             const refreshBtn = hubElement.querySelector('.hub-refresh-btn');
             const originalIcon = refreshBtn.innerHTML;
             refreshBtn.classList.add('refreshing');
             refreshBtn.disabled = true;
-            
+
             // Get or create HubManager for this hub
             let hubManager = this.hubManagers.get(hubSpreadsheetId);
             if (!hubManager) {
                 hubManager = new HubManager(hub.url);
                 this.hubManagers.set(hubSpreadsheetId, hubManager);
             }
-            
+
             // Force reload by calling loadPods() directly
             await hubManager.loadPods();
-            
-            console.log(`✅ Hub data refreshed: ${hub.title}`);
-            
+
+            logger.debug(`✅ Hub data refreshed: ${hub.title}`);
+
             // If the hub is currently expanded, refresh the pods list
             if (this.expandedHubs.has(hubSpreadsheetId)) {
                 const podsList = hubElement.nextElementSibling;
                 if (podsList && podsList.classList.contains('hub-pods-list')) {
                     podsList.remove();
                 }
-                
+
                 // Remove from expanded set temporarily so toggleHubPods will expand it
                 this.expandedHubs.delete(hubSpreadsheetId);
                 // Update the expand icon since we're collapsing
                 const expandIcon = hubElement.querySelector('.hub-expand-icon');
                 if (expandIcon) expandIcon.textContent = '▶';
                 hubElement.classList.remove('expanded');
-                
+
                 // Re-expand with fresh data
                 await this.toggleHubPods(hub, hubElement);
             }
-            
+
             // Remove loading state
             refreshBtn.classList.remove('refreshing');
             refreshBtn.disabled = false;
-            
+
         } catch (error) {
-            console.error('Error refreshing hub:', error);
-            
+            logger.error('Error refreshing hub:', error);
+
             // Remove loading state
             const refreshBtn = hubElement.querySelector('.hub-refresh-btn');
             if (refreshBtn) {
                 refreshBtn.classList.remove('refreshing');
                 refreshBtn.disabled = false;
             }
-            
+
             // Show error message
             const errorMsg = document.createElement('div');
             errorMsg.className = 'hub-pods-error';
             errorMsg.textContent = `Error refreshing hub: ${error.message}`;
             hubElement.parentNode.insertBefore(errorMsg, hubElement.nextSibling);
-            
+
             // Remove error after 3 seconds
             setTimeout(() => errorMsg.remove(), 3000);
         }
@@ -635,7 +637,7 @@ export class RecentPodsManager {
     createHubPodsList(pods, hub) {
         const container = document.createElement('div');
         container.className = 'hub-pods-list';
-        
+
         if (pods.length === 0) {
             const emptyMsg = document.createElement('div');
             emptyMsg.className = 'hub-pods-empty';
@@ -643,7 +645,7 @@ export class RecentPodsManager {
             container.appendChild(emptyMsg);
             return container;
         }
-        
+
         pods.forEach(pod => {
             const podItem = document.createElement('div');
             if (pod.sheetLink) {
@@ -655,7 +657,7 @@ export class RecentPodsManager {
             } else {
                 podItem.className = 'hub-pod-missing';
             }
-            
+
             // Create status indicators
             const statusParts = [];
             if (!pod.sheetLink) {
@@ -670,8 +672,8 @@ export class RecentPodsManager {
                     statusParts.push(`<div class="hub-pod-status" title="${pod.incompletes} ${text}">⏳ ${pod.incompletes}</div>`);
                 }
             }
-            
-            const statusText = statusParts.length > 0 
+
+            const statusText = statusParts.length > 0
                 ? statusParts.join('')
                 : '<div class="hub-pod-status-ok" title="Complete">✓</div>';
 
@@ -681,10 +683,10 @@ export class RecentPodsManager {
                     <div class="hub-pod-meta">${statusText}</div>
                 </div>
             `;
-            
+
             container.appendChild(podItem);
         });
-        
+
         return container;
     }
 
@@ -695,14 +697,14 @@ export class RecentPodsManager {
      */
     loadHubPod(pod, hub) {
         try {
-            console.log(`🔄 Loading pod from hub: ${pod.podName}`);
-            
+            logger.debug(`🔄 Loading pod from hub: ${pod.podName}`);
+
             // Set the URL in the input field
             const urlInput = getElement('sheet-url');
             if (urlInput) {
                 urlInput.value = pod.sheetLink;
             } else {
-                console.warn('Sheet URL input element not found');
+                logger.warn('Sheet URL input element not found');
             }
 
             // Trigger the main load function
@@ -710,10 +712,10 @@ export class RecentPodsManager {
             if (loadBtn) {
                 loadBtn.click();
             } else {
-                console.warn('Load sheet button not found');
+                logger.warn('Load sheet button not found');
             }
         } catch (error) {
-            console.error('Error loading hub pod:', error);
+            logger.error('Error loading hub pod:', error);
         }
     }
 
@@ -723,17 +725,17 @@ export class RecentPodsManager {
      */
     loadRecentPod(pod) {
         try {
-            console.log(`🔄 Loading recent pod: ${pod.title}`);
-            
+            logger.debug(`🔄 Loading recent pod: ${pod.title}`);
+
             // Add to recent pods to update lastAccessed timestamp
             this.addRecentPod(getRecordSpreadsheetId(pod), pod.title, pod.url);
-            
+
             // Set the URL in the input field
             const urlInput = getElement('sheet-url');
             if (urlInput) {
                 urlInput.value = pod.url;
             } else {
-                console.warn('Sheet URL input element not found');
+                logger.warn('Sheet URL input element not found');
             }
 
             // Also trigger the main load function
@@ -741,10 +743,10 @@ export class RecentPodsManager {
             if (loadBtn) {
                 loadBtn.click();
             } else {
-                console.warn('Load sheet button not found');
+                logger.warn('Load sheet button not found');
             }
         } catch (error) {
-            console.error('Error loading recent pod:', error);
+            logger.error('Error loading recent pod:', error);
         }
     }
 
@@ -756,12 +758,12 @@ export class RecentPodsManager {
     getTimeAgo(date) {
         const timestamp = date.getTime();
         const cacheKey = `${timestamp}-${Math.floor(Date.now() / this.cacheExpiry)}`;
-        
+
         // Check cache first
         if (this.timeAgoCache.has(cacheKey)) {
             return this.timeAgoCache.get(cacheKey);
         }
-        
+
         const now = new Date();
         const diffMs = now - date;
         const diffMins = Math.floor(diffMs / (1000 * 60));
@@ -774,15 +776,15 @@ export class RecentPodsManager {
         else if (diffHours < 24) result = `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
         else if (diffDays < 7) result = `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
         else result = date.toLocaleDateString();
-        
+
         // Cache the result
         this.timeAgoCache.set(cacheKey, result);
-        
+
         // Clean old cache entries periodically
         if (this.timeAgoCache.size > 100) {
             this.cleanTimeAgoCache();
         }
-        
+
         return result;
     }
 

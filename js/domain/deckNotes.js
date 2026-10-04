@@ -6,6 +6,7 @@
  */
 import { GURU_COLORS, colourLabel } from './guruColor.js';
 import { findColumnIndex } from './matchRows.js';
+import { logger } from '../utils/log.js';
 
 /**
  * Parse the "Deck Notes" sheet into a map keyed by decklist, plus the resolved
@@ -18,7 +19,7 @@ export function processDeckNotes(sheetData) {
     const deckNotesMap = new Map();
 
     if (!sheetData.sheets) {
-        console.log('No sheets found in sheetData');
+        logger.debug('No sheets found in sheetData');
         return { deckNotesMap, columnMap: {} };
     }
 
@@ -28,13 +29,13 @@ export function processDeckNotes(sheetData) {
     );
 
     if (!deckNotesSheet) {
-        console.log('No "Deck Notes" sheet found. Available sheets:',
+        logger.debug('No "Deck Notes" sheet found. Available sheets:',
             sheetData.sheets.map(s => s.title));
         return { deckNotesMap, columnMap: {} };
     }
 
     if (!deckNotesSheet.values || deckNotesSheet.values.length < 2) {
-        console.log('Deck Notes sheet has no data or insufficient rows');
+        logger.debug('Deck Notes sheet has no data or insufficient rows');
         return { deckNotesMap, columnMap: {} };
     }
 
@@ -55,7 +56,7 @@ export function processDeckNotes(sheetData) {
     };
 
     if (decklistsColIndex === -1) {
-        console.log('Decklists column not found');
+        logger.debug('Decklists column not found');
         return { deckNotesMap, columnMap };
     }
 
@@ -91,7 +92,7 @@ export function processDeckNotes(sheetData) {
         }
     }
 
-    console.log('Total deck notes processed:', deckNotesMap.size);
+    logger.debug('Total deck notes processed:', deckNotesMap.size);
     return { deckNotesMap, columnMap };
 }
 

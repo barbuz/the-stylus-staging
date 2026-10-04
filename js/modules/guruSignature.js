@@ -4,6 +4,9 @@
  */
 import { CONFIG } from '../config.js';
 import { APP_EVENTS } from '../app/events.js';
+import { logger } from '../utils/log.js';
+import { getElement } from '../utils/domUtils.js';
+import { getItem, setItem } from '../services/storage.js';
 
 
 export class GuruSignature {
@@ -26,7 +29,7 @@ export class GuruSignature {
     async initSignature() {
         const signature = this.userPreferences
             ? await this.userPreferences.getGuruSignature()
-            : localStorage.getItem(this.storageKey) || '';
+            : getItem(this.storageKey) || '';
 
         if (signature) {
             this.signature = signature;
@@ -42,9 +45,9 @@ export class GuruSignature {
     }
 
     bindEvents() {
-        const setSignatureBtn = document.getElementById('set-signature-btn');
-        const changeSignatureBtn = document.getElementById('change-signature-btn');
-        const signatureInput = document.getElementById('guru-signature');
+        const setSignatureBtn = getElement('set-signature-btn');
+        const changeSignatureBtn = getElement('change-signature-btn');
+        const signatureInput = getElement('guru-signature');
 
         if (setSignatureBtn) {
             setSignatureBtn.addEventListener('click', () => this.setSignature());
@@ -70,7 +73,7 @@ export class GuruSignature {
 
 
     async setSignature(signature = null) {
-        const signatureInput = document.getElementById('guru-signature');
+        const signatureInput = getElement('guru-signature');
         const finalSignature = signature || signatureInput.value.trim();
 
         if (!finalSignature) {
@@ -94,7 +97,7 @@ export class GuruSignature {
     }
 
     changeSignature() {
-        const signatureInput = document.getElementById('guru-signature');
+        const signatureInput = getElement('guru-signature');
         const currentSignature = this.getSignature();
 
         signatureInput.value = currentSignature;
@@ -108,7 +111,7 @@ export class GuruSignature {
         if (this.userPreferences) {
             await this.userPreferences.setGuruSignature(signature);
         } else {
-            localStorage.setItem(this.storageKey, signature);
+            setItem(this.storageKey, signature);
         }
         this.signature = signature;
     }
@@ -118,9 +121,9 @@ export class GuruSignature {
     }
 
     displaySignature(signature) {
-        const guruDisplayName = document.getElementById('guru-display-name');
-        const guruInfo = document.getElementById('guru-info');
-        
+        const guruDisplayName = getElement('guru-display-name');
+        const guruInfo = getElement('guru-info');
+
         if (guruDisplayName && guruInfo) {
             guruDisplayName.textContent = signature;
             guruInfo.style.display = 'block';
@@ -128,11 +131,11 @@ export class GuruSignature {
     }
 
     showSignatureSection() {
-        const signatureSection = document.getElementById('guru-signature-section');
-        const guruSignatureInput = document.getElementById('guru-signature');
-        const sheetInputSection = document.getElementById('sheet-input-section');
-        const guruInfo = document.getElementById('guru-info');
-        
+        const signatureSection = getElement('guru-signature-section');
+        const guruSignatureInput = getElement('guru-signature');
+        const sheetInputSection = getElement('sheet-input-section');
+        const guruInfo = getElement('guru-info');
+
         if (signatureSection) {
             signatureSection.style.display = 'block';
         }
@@ -150,16 +153,16 @@ export class GuruSignature {
     }
 
     hideSignatureSection() {
-        const signatureSection = document.getElementById('guru-signature-section');
-        
+        const signatureSection = getElement('guru-signature-section');
+
         if (signatureSection) {
             signatureSection.style.display = 'none';
         }
     }
 
     showSheetInputSection() {
-        const sheetInputSection = document.getElementById('sheet-input-section');
-        
+        const sheetInputSection = getElement('sheet-input-section');
+
         if (sheetInputSection) {
             sheetInputSection.style.display = 'block';
         }
@@ -167,21 +170,21 @@ export class GuruSignature {
 
     showError(message) {
         // Create or update error message
-        let errorDiv = document.getElementById('guru-signature-error');
+        let errorDiv = getElement('guru-signature-error');
         if (!errorDiv) {
             errorDiv = document.createElement('div');
             errorDiv.id = 'guru-signature-error';
             errorDiv.className = 'status-message error';
-            
-            const signatureSection = document.getElementById('guru-signature-section');
+
+            const signatureSection = getElement('guru-signature-section');
             if (signatureSection) {
                 signatureSection.appendChild(errorDiv);
             }
         }
-        
+
         errorDiv.textContent = message;
         errorDiv.style.display = 'block';
-        
+
         // Hide error after 5 seconds
         setTimeout(() => {
             if (errorDiv) {
@@ -204,7 +207,7 @@ export class GuruSignature {
             try {
                 callback(signature);
             } catch (error) {
-                console.error('Error in guru signature callback:', error);
+                logger.error('Error in guru signature callback:', error);
             }
         });
     }

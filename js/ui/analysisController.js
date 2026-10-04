@@ -49,6 +49,7 @@ import { AnalysisSessionLoader } from './analysisSessionLoader.js';
 import { AnalysisRowRenderer } from './analysisRowRenderer.js';
 import { AnalysisEventBinder } from './analysisEventBinder.js';
 import { AppState } from '../app/appState.js';
+import { logger } from '../utils/log.js';
 
 export class AnalysisController {
     constructor(sheetsAPI, uiController, guruSignature) {
@@ -122,7 +123,7 @@ export class AnalysisController {
 
             this.uiController.showStatus(`Switched to ${newColor} guru`, 'success');
         } catch (error) {
-            console.error('Error changing guru color:', error);
+            logger.error('Error changing guru color:', error);
             this.uiController.showStatus(`Error switching guru color: ${error.message}`, 'error');
 
             this.state.setGuruColor(oldColor);
@@ -349,7 +350,7 @@ export class AnalysisController {
     }
 
     async selectGuruColor(color, sheetData) {
-        console.log(`User selected guru color: ${color}`);
+        logger.debug(`User selected guru color: ${color}`);
 
         // Set the guru color
         this.state.setGuruColor(color);
@@ -423,7 +424,7 @@ export class AnalysisController {
         try {
             return await this.state.hub.getThreads();
         } catch (error) {
-            console.warn('Failed to load thread data for match table:', error);
+            logger.warn('Failed to load thread data for match table:', error);
             return this.state.hub.threadsCache || null;
         }
     }
@@ -458,7 +459,7 @@ export class AnalysisController {
      */
     showCreateThreadModal(rowIndex) {
         if (rowIndex < 0 || rowIndex >= this.state.rows.length) {
-            console.warn('Invalid row index for thread creation');
+            logger.warn('Invalid row index for thread creation');
             return;
         }
 

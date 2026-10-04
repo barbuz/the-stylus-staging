@@ -1,6 +1,9 @@
 import { CONFIG } from '../config.js';
 import { UserPreferences } from './userPreferences.js';
 import { APP_EVENTS } from '../app/events.js';
+import { logger } from '../utils/log.js';
+import { getElement } from '../utils/domUtils.js';
+import { getItem, setItem, removeItem } from '../services/storage.js';
 
 export class AuthManager {
     constructor(events, guruSignature = null) {
@@ -25,7 +28,7 @@ export class AuthManager {
 
     async initialize() {
         if (this.initialized) return;
-        
+
         try {
             // Initialize Google API client for Sheets API
             await new Promise((resolve, reject) => {
@@ -34,14 +37,14 @@ export class AuthManager {
                     onerror: reject
                 });
             });
-            
+
             await gapi.client.init({
                 discoveryDocs: CONFIG.DISCOVERY_DOCS,
             });
 
             // Load user ID from localStorage if available
-            const userId = localStorage.getItem(CONFIG.STORAGE_KEYS.USER_ID);
-            
+            const userId = getItem(CONFIG.STORAGE_KEYS.USER_ID);
+
             // Initialize Google Identity Services for authentication
             this.tokenClient = google.accounts.oauth2.initTokenClient({
                 client_id: CONFIG.GOOGLE_CLIENT_ID,
@@ -49,41 +52,41 @@ export class AuthManager {
                 login_hint: userId || '', // Use stored user ID if available
                 callback: (response) => {
                     if (response.error) {
-                        console.error('OAuth error:', response.error);
+                        logger.error('OAuth error:', response.error);
                         return;
                     }
                     const idToken = response.id_token;
-                    console.log('OAuth response:', response);
-                    console.log('✅ OAuth token received');
+                    logger.debug('OAuth response:', response);
+                    logger.debug('✅ OAuth token received');
                     this.handleAuthSuccess(response.access_token, response.expires_in);
                 }
             });
-            
+
             this.initialized = true;
-            console.log('✅ Google API client and Identity Services initialized');
-            
+            logger.debug('✅ Google API client and Identity Services initialized');
+
         } catch (error) {
-            console.error('Error initializing Google services:', error);
+            logger.error('Error initializing Google services:', error);
             throw error;
         }
     }
 
 
     async handleAuthSuccess(accessToken, expiresIn = 3600) {
-        localStorage.setItem(CONFIG.STORAGE_KEYS.LAST_LOGIN, Date.now().toString());
+        setItem(CONFIG.STORAGE_KEYS.LAST_LOGIN, Date.now().toString());
         try {
             // Set access token for gapi client
             gapi.client.setToken({
                 access_token: accessToken
             });
-            
+
             let userEmail = null;
             if (this.shouldRememberUser()) {
                 // get email address from localStorage if available
-                userEmail = localStorage.getItem(CONFIG.STORAGE_KEYS.USER_ID);
+                userEmail = getItem(CONFIG.STORAGE_KEYS.USER_ID);
 
                 if (!userEmail) {
-                    console.log('🔐 No user email found in localStorage, fetching from Google UserInfo API');
+                    logger.debug('🔐 No user email found in localStorage, fetching from Google UserInfo API');
                 }
                 // Fetch user email from Google UserInfo endpoint
                 try {
@@ -97,12 +100,12 @@ export class AuthManager {
                         userEmail = userInfo.email || null;
                     }
                     // If we successfully fetched the email, save it to localStorage
-                    localStorage.setItem(CONFIG.STORAGE_KEYS.USER_ID, userEmail);
+                    setItem(CONFIG.STORAGE_KEYS.USER_ID, userEmail);
                 } catch (e) {
-                    console.warn('Could not fetch user email:', e);
+                    logger.warn('Could not fetch user email:', e);
                 }
             } else {
-                localStorage.removeItem(CONFIG.STORAGE_KEYS.USER_ID);
+                removeItem(CONFIG.STORAGE_KEYS.USER_ID);
             }
 
             // Create minimal user object with email if available
@@ -117,29 +120,29 @@ export class AuthManager {
 
             // Set up automatic silent re-auth timer
             this.setupReauthTimer(expiresIn);
-            
+
             // Initialize user preferences in Google Drive
             await this.initializeUserPreferences();
-            
+
             // Update UI immediately
             this.renderAuthSection();
             this.showAppContent();
-            
+
             // Notify the app that the user logged in
             this.events?.emit(APP_EVENTS.USER_LOGGED_IN);
 
-            console.log('✅ User successfully authenticated');
-            
+            logger.debug('✅ User successfully authenticated');
+
         } catch (error) {
-            console.error('Error during authentication:', error);
-            
+            logger.error('Error during authentication:', error);
+
             // Show error to user and reset login button
             this.setLoginButtonLoading(false);
-            
+
             // If we can't proceed with authentication, reset state
             this.isAuthenticated = false;
             this.user = null;
-            
+
             // Show a user-friendly error message
             alert('Authentication failed. Please try logging in again.');
         }
@@ -150,20 +153,20 @@ export class AuthManager {
             // Initialize user preferences with appData storage
             await this.userPreferences.initialize(this.user);
 
-            console.log('✅ User preferences initialized from Google appData');
+            logger.debug('✅ User preferences initialized from Google appData');
         } catch (error) {
-            console.error('Error initializing user preferences:', error);
+            logger.error('Error initializing user preferences:', error);
         }
     }
 
     saveTokens(accessToken, expiresIn = 3600) {
-        localStorage.setItem(CONFIG.STORAGE_KEYS.ACCESS_TOKEN, accessToken);
-        
+        setItem(CONFIG.STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+
         // Calculate expiry time
         const expiryTime = Date.now() + (expiresIn * 1000);
-        localStorage.setItem(CONFIG.STORAGE_KEYS.TOKEN_EXPIRY, expiryTime.toString());
-        
-        console.log('💾 Token saved for persistent session', {
+        setItem(CONFIG.STORAGE_KEYS.TOKEN_EXPIRY, expiryTime.toString());
+
+        logger.debug('💾 Token saved for persistent session', {
             expires_at: new Date(expiryTime).toLocaleString(),
             expires_in_minutes: Math.round(expiresIn / 60)
         });
@@ -171,39 +174,39 @@ export class AuthManager {
 
     setRememberUser(remember = true) {
         if (remember) {
-            localStorage.setItem(CONFIG.STORAGE_KEYS.REMEMBER_USER, 'true');
+            setItem(CONFIG.STORAGE_KEYS.REMEMBER_USER, 'true');
         } else {
-            localStorage.removeItem(CONFIG.STORAGE_KEYS.REMEMBER_USER);
+            removeItem(CONFIG.STORAGE_KEYS.REMEMBER_USER);
         }
     }
 
     shouldRememberUser() {
-        return localStorage.getItem(CONFIG.STORAGE_KEYS.REMEMBER_USER) === 'true';
+        return getItem(CONFIG.STORAGE_KEYS.REMEMBER_USER) === 'true';
     }
 
     getLastLoginTime() {
-        const lastLogin = localStorage.getItem(CONFIG.STORAGE_KEYS.LAST_LOGIN);
+        const lastLogin = getItem(CONFIG.STORAGE_KEYS.LAST_LOGIN);
         return lastLogin ? parseInt(lastLogin) : null;
     }
 
     getStoredTokens() {
-        const accessToken = localStorage.getItem(CONFIG.STORAGE_KEYS.ACCESS_TOKEN);
-        const expiryTime = localStorage.getItem(CONFIG.STORAGE_KEYS.TOKEN_EXPIRY);
-        
+        const accessToken = getItem(CONFIG.STORAGE_KEYS.ACCESS_TOKEN);
+        const expiryTime = getItem(CONFIG.STORAGE_KEYS.TOKEN_EXPIRY);
+
         if (!accessToken) {
             return null;
         }
-        
-        return { 
-            accessToken, 
-            expiryTime: expiryTime ? parseInt(expiryTime) : null 
+
+        return {
+            accessToken,
+            expiryTime: expiryTime ? parseInt(expiryTime) : null
         };
     }
 
     clearStoredAuth() {
-        localStorage.removeItem(CONFIG.STORAGE_KEYS.ACCESS_TOKEN);
-        localStorage.removeItem(CONFIG.STORAGE_KEYS.TOKEN_EXPIRY);
-        console.log('🗑️ Cleared stored authentication');
+        removeItem(CONFIG.STORAGE_KEYS.ACCESS_TOKEN);
+        removeItem(CONFIG.STORAGE_KEYS.TOKEN_EXPIRY);
+        logger.debug('🗑️ Cleared stored authentication');
 
         // Clear any pending re-auth timer
         if (this.reauthTimer) {
@@ -224,7 +227,7 @@ export class AuthManager {
         // Re-auth 2 minutes before expiry, but not less than 10 seconds from now
         const reauthMs = Math.max((expiresIn - 120) * 1000, 10000);
         this.reauthTimer = setTimeout(async () => {
-            console.log('⏰ Token expiring soon, attempting silent re-auth...');
+            logger.debug('⏰ Token expiring soon, attempting silent re-auth...');
             await this.attemptAutoReauth();
         }, reauthMs);
     }
@@ -233,23 +236,23 @@ export class AuthManager {
         try {
             // Only attempt auto re-auth if user opted to be remembered
             if (!this.shouldRememberUser()) {
-                console.log('🔐 Auto re-auth skipped - user chose not to be remembered');
+                logger.debug('🔐 Auto re-auth skipped - user chose not to be remembered');
                 return false;
             }
 
             // Load user ID from localStorage
-            const userId = localStorage.getItem(CONFIG.STORAGE_KEYS.USER_ID);
+            const userId = getItem(CONFIG.STORAGE_KEYS.USER_ID);
             if (!userId) {
-                console.log('🔐 Auto re-auth skipped - user ID not found');
+                logger.debug('🔐 Auto re-auth skipped - user ID not found');
                 return false;
             }
 
-            console.log('🔄 Attempting automatic re-authentication...');
-            
+            logger.debug('🔄 Attempting automatic re-authentication...');
+
             // Try silent authentication with Google Identity Services
             return new Promise((resolve) => {
                 const timeout = setTimeout(() => {
-                    console.log('⏰ Auto re-auth timeout after 5 seconds');
+                    logger.debug('⏰ Auto re-auth timeout after 5 seconds');
                     resolve(false);
                 }, 5000);
 
@@ -262,12 +265,12 @@ export class AuthManager {
                         prompt: 'none', // No user interaction
                         callback: (response) => {
                             clearTimeout(timeout);
-                            
+
                             if (response.error) {
-                                console.log('❌ Silent auto re-auth failed:', response.error);
+                                logger.debug('❌ Silent auto re-auth failed:', response.error);
                                 resolve(false);
                             } else {
-                                console.log('✅ Silent auto re-auth successful');
+                                logger.debug('✅ Silent auto re-auth successful');
                                 this.handleAuthSuccess(response.access_token, response.expires_in);
                                 resolve(true);
                             }
@@ -276,16 +279,16 @@ export class AuthManager {
 
                     // Request token silently (no user interaction)
                     silentTokenClient.requestAccessToken();
-                    
+
                 } catch (error) {
                     clearTimeout(timeout);
-                    console.log('❌ Error during silent auth:', error);
+                    logger.debug('❌ Error during silent auth:', error);
                     resolve(false);
                 }
             });
-            
+
         } catch (error) {
-            console.error('Auto re-authentication failed:', error);
+            logger.error('Auto re-authentication failed:', error);
             return false;
         }
     }
@@ -295,101 +298,101 @@ export class AuthManager {
             if (!this.initialized) {
                 await this.initialize();
             }
-            
+
             // First, check for stored tokens in localStorage
             const storedTokens = this.getStoredTokens();
             if (storedTokens) {
-                console.log('🔄 Found stored tokens, checking expiry...');
-                
+                logger.debug('🔄 Found stored tokens, checking expiry...');
+
                 // Check if access token is expired
                 const isExpired = storedTokens.expiryTime && Date.now() >= storedTokens.expiryTime;
-                
+
                 if (isExpired) {
-                    console.log('🕒 Access token expired, attempting automatic re-authentication...');
-                    
+                    logger.debug('🕒 Access token expired, attempting automatic re-authentication...');
+
                     // Try automatic re-authentication
                     const reauthSuccess = await this.attemptAutoReauth();
                     if (reauthSuccess) {
                         this.isAuthenticated = true;
-                        console.log('✅ Automatic re-authentication successful');
+                        logger.debug('✅ Automatic re-authentication successful');
                         return true;
                     }
-                    
-                    console.log('❌ Automatic re-authentication failed, clearing stored auth');
+
+                    logger.debug('❌ Automatic re-authentication failed, clearing stored auth');
                     this.clearStoredAuth();
-                    
+
                     return false;
                 } else {
                     // Set up automatic silent re-auth timer
                     this.setupReauthTimer((storedTokens.expiryTime - Date.now()) / 1000);
                 }
-                
+
                 // Try to validate the token using stored tokens only
                 try {
                     // Set access token for gapi client
                     gapi.client.setToken({
                         access_token: storedTokens.accessToken
                     });
-                    
+
                     this.user = {
                         accessToken: storedTokens.accessToken
                     };
                     this.isAuthenticated = true;
-                    
+
                     // Initialize user preferences for restored session
                     await this.initializeUserPreferences();
-                    
-                    console.log('✅ Session restored successfully');
-                    
+
+                    logger.debug('✅ Session restored successfully');
+
                     // Render auth section to show guru signature
                     this.renderAuthSection();
-                    
+
                     // Notify the app of the restored session
                     setTimeout(() => {
                         this.events?.emit(APP_EVENTS.USER_LOGGED_IN);
                     }, 100);
-                    
+
                     return true;
                 } catch (error) {
-                    console.log('❌ Error validating stored token, attempting silent re-auth...', error);
-                    
+                    logger.debug('❌ Error validating stored token, attempting silent re-auth...', error);
+
                     // Try automatic re-authentication when there's an error
                     const reauthSuccess = await this.attemptAutoReauth();
                     if (reauthSuccess) {
-                        console.log('✅ Silent re-authentication successful after token validation error');
+                        logger.debug('✅ Silent re-authentication successful after token validation error');
                         return true;
                     }
-                    
-                    console.log('❌ Silent re-authentication failed, clearing stored auth');
+
+                    logger.debug('❌ Silent re-authentication failed, clearing stored auth');
                     this.clearStoredAuth();
-                    
+
                     // Show login screen when silent re-auth fails
                     return false;
                 }
             }
-            
+
             // Final attempt: try silent authentication if no valid tokens found
             if (!this.isAuthenticated) {
-                console.log('🔄 No valid tokens found, attempting silent authentication...');
+                logger.debug('🔄 No valid tokens found, attempting silent authentication...');
                 const reauthSuccess = await this.attemptAutoReauth();
                 if (reauthSuccess) {
-                    console.log('✅ Silent authentication successful as fallback');
+                    logger.debug('✅ Silent authentication successful as fallback');
                     return true;
                 }
             }
-            
+
             this.isAuthenticated = false;
             this.user = null;
-            console.log('❌ No valid authentication found');
-            
+            logger.debug('❌ No valid authentication found');
+
             // Show login screen when no authentication is found
             this.showLoginScreen();
             return false;
         } catch (error) {
-            console.error('Error checking auth status:', error);
+            logger.error('Error checking auth status:', error);
             this.isAuthenticated = false;
             this.user = null;
-            
+
             // Show login screen when there's an error checking auth
             this.showLoginScreen();
             return false;
@@ -401,15 +404,15 @@ export class AuthManager {
             if (!this.initialized) {
                 await this.initialize();
             }
-            
+
             // Show loading state on login button
             this.setLoginButtonLoading(true);
-            
+
             // Request access token using Google Identity Services
             this.tokenClient.requestAccessToken();
-            
+
         } catch (error) {
-            console.error('Error during login:', error);
+            logger.error('Error during login:', error);
             this.setLoginButtonLoading(false);
             return false;
         }
@@ -419,28 +422,28 @@ export class AuthManager {
         try {
             // Notify the app before logging out
             this.events?.emit(APP_EVENTS.USER_LOGGED_OUT);
-            
+
             // Revoke the token if we have one
             if (this.user && this.user.accessToken) {
                 google.accounts.oauth2.revoke(this.user.accessToken);
             }
-            
+
             this.isAuthenticated = false;
             this.user = null;
 
             // Clear all stored authentication data
             this.clearStoredAuth();
-            
+
             // Clear remember preference and login time (user manually logged out)
-            localStorage.removeItem(CONFIG.STORAGE_KEYS.REMEMBER_USER);
-            localStorage.removeItem(CONFIG.STORAGE_KEYS.LAST_LOGIN);
-            
+            removeItem(CONFIG.STORAGE_KEYS.REMEMBER_USER);
+            removeItem(CONFIG.STORAGE_KEYS.LAST_LOGIN);
+
             // Note: We intentionally keep the guru signature in localStorage so it persists across logout/login
-            
-            console.log('👋 User logged out successfully');
+
+            logger.debug('👋 User logged out successfully');
             window.location.reload();
         } catch (error) {
-            console.error('Error logging out:', error);
+            logger.error('Error logging out:', error);
         }
     }
 
@@ -456,17 +459,17 @@ export class AuthManager {
         if (this.user && this.user.accessToken) {
             return this.user.accessToken;
         }
-        
+
         // Try to get token from localStorage as fallback
         const storedTokens = this.getStoredTokens();
         return storedTokens ? storedTokens.accessToken : null;
     }
 
     renderAuthSection() {
-        const authSection = document.getElementById('auth-section');
+        const authSection = getElement('auth-section');
         const signature = this.getGuruSignature();
-        console.log('AuthManager: Rendering auth section with guruSignature:', signature);
-        
+        logger.debug('AuthManager: Rendering auth section with guruSignature:', signature);
+
         if (this.isAuthenticated && this.user) {
             authSection.innerHTML = `
                 <div class="user-info">
@@ -479,14 +482,14 @@ export class AuthManager {
                 </div>
                 <button id="logout-btn" class="logout-btn">Logout</button>
             `;
-            
-            document.getElementById('logout-btn').addEventListener('click', () => {
+
+            getElement('logout-btn').addEventListener('click', () => {
                 this.logout();
             });
-            
+
             // Add click handler for guru signature to change it
             if (signature) {
-                const guruSignatureDisplay = document.getElementById('guru-signature-display');
+                const guruSignatureDisplay = getElement('guru-signature-display');
                 if (guruSignatureDisplay) {
                     guruSignatureDisplay.addEventListener('click', () => {
                         this.promptGuruSignatureChange();
@@ -509,23 +512,23 @@ export class AuthManager {
     }
 
     showLoginScreen() {
-        document.getElementById('login-section').style.display = 'block';
-        document.getElementById('app-content').style.display = 'none';
-        
-        const loginBtn = document.getElementById('login-btn');
+        getElement('login-section').style.display = 'block';
+        getElement('app-content').style.display = 'none';
+
+        const loginBtn = getElement('login-btn');
         // Remove existing listeners to prevent duplicates
         const newLoginBtn = loginBtn.cloneNode(true);
         loginBtn.parentNode.replaceChild(newLoginBtn, loginBtn);
-        
+
         // Set checkbox state based on stored preference
-        const rememberCheckbox = document.getElementById('remember-me-checkbox');
+        const rememberCheckbox = getElement('remember-me-checkbox');
         if (rememberCheckbox) {
             rememberCheckbox.checked = this.shouldRememberUser();
         }
-        
+
         newLoginBtn.addEventListener('click', () => {
             // Save the remember me preference before login
-            const rememberMe = document.getElementById('remember-me-checkbox')?.checked ?? true;
+            const rememberMe = getElement('remember-me-checkbox')?.checked ?? true;
             this.setRememberUser(rememberMe);
             this.login();
         });
@@ -535,7 +538,7 @@ export class AuthManager {
      * Set loading state on login button
      */
     setLoginButtonLoading(isLoading) {
-        const loginBtn = document.getElementById('login-btn');
+        const loginBtn = getElement('login-btn');
         if (loginBtn) {
             if (isLoading) {
                 loginBtn.disabled = true;
@@ -559,7 +562,7 @@ export class AuthManager {
     }
 
     showAppContent() {
-        document.getElementById('login-section').style.display = 'none';
-        document.getElementById('app-content').style.display = 'block';
+        getElement('login-section').style.display = 'none';
+        getElement('app-content').style.display = 'block';
     }
 }

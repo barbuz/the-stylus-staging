@@ -6,6 +6,7 @@
  * presenter. The controller calls `render()`; this class owns the ordering and
  * the card preloading decisions, so the controller holds no rendering logic.
  */
+import { logger } from '../utils/log.js';
 export class AnalysisRowRenderer {
     constructor(host) {
         this.host = host;
@@ -119,7 +120,7 @@ export class AnalysisRowRenderer {
             const rowId = currentRow.rowIndex || host.state.rowIndex + 1;
             return await host.state.hub.getThreadById(rowId);
         } catch (error) {
-            console.warn('Failed to fetch thread link:', error);
+            logger.warn('Failed to fetch thread link:', error);
             return null;
         }
     }

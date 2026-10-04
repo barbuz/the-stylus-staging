@@ -20,11 +20,7 @@ import {
     getOutcomeDisplayName,
     describeOutcome
 } from '../domain/analyses.js';
-import { escapeHtml } from '../utils/domUtils.js';
-
-function getElement(id) {
-    return document.getElementById(id);
-}
+import { escapeHtml, getElement } from '../utils/domUtils.js';
 
 function setDisplay(element, value) {
     if (element) {

@@ -4,10 +4,8 @@
  * Owns the header dropdown that lets a guru switch colour. Listens for its own
  * document-level dismiss events and removes them on destroy.
  */
-
-function getElement(id) {
-    return document.getElementById(id);
-}
+import { getElement } from '../utils/domUtils.js';
+import { logger } from '../utils/log.js';
 
 export class GuruColorSelector {
     /**
@@ -36,7 +34,7 @@ export class GuruColorSelector {
 
     bind() {
         if (!this.trigger || !this.dropdown) {
-            console.warn('Guru color selector elements not found');
+            logger.warn('Guru color selector elements not found');
             return;
         }
 
