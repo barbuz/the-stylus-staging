@@ -337,6 +337,12 @@ Do not open PRs against or push to the production repo until the staging copy ha
 been tested. The two repositories are independent copies (see below), so a change
 merged in staging does not appear in production by itself.
 
+**Agents do not merge PRs.** The procedure above describes the project's release
+flow, not a grant of authority to an agent: opening a PR is the end of an agent's
+job. Do not mark a PR ready for review, merge it, or delete its branch unless the
+user explicitly asks. Leave the PR open with its CI status for the user to review
+and merge themselves.
+
 ### Production and preview deployments
 
 The app ships from two GitHub Pages project sites. Both live on the same origin
@@ -425,6 +431,7 @@ only flips between exactly two.
 - **Sheet ids:** `spreadsheetId` is the spreadsheet file id (the `batchUpdate` / `values.get` target); `sheetId` is the numeric tab id inside it (Google's own `updateCells.start.sheetId`). Never use `sheetId` for the file — passing the tab id where the file id belongs makes the real API 404, and the e2e stub does not catch it. The persisted recent-pods/hubs records are the one place the old key lingers: they are shared with production via localStorage and Drive appData, so new writes use `spreadsheetId` while reads still accept the legacy `sheetId` through `js/domain/recentEntries.js`. That fallback is temporary and marked `LEGACY`; drop it once no old records remain.
 - **No new dependencies:** the project deliberately loads everything from CDNs and ships no bundler. Confirm with the user before adding a package. Playwright is the one agreed exception, and it is dev-only: it must never be imported by app code or added to `sw.js`/`index.html`.
 - **Commits:** short imperative subjects, often `<Area>: <change>` (e.g. `Fix next button not going to current guru's matches first`).
+- **Pull requests:** open a PR and stop there. Never mark a PR ready for review, merge it, or delete its branch unless the user explicitly asks. See "Work happens in staging first" above.
 
 ## Keeping Docs in Sync
 
