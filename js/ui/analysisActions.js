@@ -21,6 +21,7 @@ import {
     setColourAnalysis,
     setColourSignature
 } from '../domain/guruColor.js';
+import { logger } from '../utils/log.js';
 
 export class AnalysisActions {
     constructor(host) {
@@ -71,7 +72,7 @@ export class AnalysisActions {
 
             host.reload();
         } catch (error) {
-            console.error('Error saving analysis:', error);
+            logger.error('Error saving analysis:', error);
             host.uiController.showStatus(`Error saving analysis: ${error.message}`, 'error');
         }
     }
@@ -106,7 +107,7 @@ export class AnalysisActions {
             host.uiController.showStatus('Match claimed successfully!', 'success');
             await host.showCurrentRow();
         } catch (error) {
-            console.error('Error claiming match:', error);
+            logger.error('Error claiming match:', error);
             host.view.endSpinner(claimButton);
             host.uiController.showStatus(`Error claiming match: ${error.message}`, 'error');
         }
@@ -147,7 +148,7 @@ export class AnalysisActions {
             host.uiController.showStatus('Match unclaimed successfully!', 'success');
             await host.showCurrentRow();
         } catch (error) {
-            console.error('Error unclaiming match:', error);
+            logger.error('Error unclaiming match:', error);
             host.view.endSpinner(unclaimButton);
             host.uiController.showStatus(`Error unclaiming match: ${error.message}`, 'error');
         }
@@ -202,7 +203,7 @@ export class AnalysisActions {
 
             await host.showCurrentRow();
         } catch (error) {
-            console.error('Error clearing analysis:', error);
+            logger.error('Error clearing analysis:', error);
             host.view.endSpinner(clearButton);
             host.uiController.showStatus(`Error clearing analysis: ${error.message}`, 'error');
         }
@@ -252,7 +253,7 @@ export class AnalysisActions {
             host.uiController.showStatus(`Claimed ${actuallyClaimed} of ${rowsToClaim.length} matches for this deck.`, 'success');
             host.showCurrentRow();
         } catch (error) {
-            console.error('Error claiming deck matches:', error);
+            logger.error('Error claiming deck matches:', error);
             host.uiController.showStatus(`Error claiming deck matches: ${error.message}`, 'error');
         }
     }
@@ -277,7 +278,7 @@ export class AnalysisActions {
             state.setRowIndex(newRowIndex >= 0 ? newRowIndex : 0);
             await host.showCurrentRow();
         } catch (error) {
-            console.warn('Background data refresh failed:', error);
+            logger.warn('Background data refresh failed:', error);
         }
     }
 
@@ -323,7 +324,7 @@ export class AnalysisActions {
             host.uiController.showStatus(`${type.charAt(0).toUpperCase() + type.slice(1)} saved successfully!`, 'success');
         } else {
             host.uiController.showStatus(`Failed to save ${type} changes. The original data may have been modified.`, 'info');
-            console.warn(`Failed to save ${type} changes:`, result);
+            logger.warn(`Failed to save ${type} changes:`, result);
         }
     }
 }

@@ -1,6 +1,7 @@
 /**
  * DOM utility functions for safer element access
  */
+import { logger } from './log.js';
 
 /**
  * Safely get DOM element with error handling
@@ -14,7 +15,9 @@ export function getElement(id, required = false) {
         throw new Error(`Required DOM element not found: ${id}`);
     }
     if (!element) {
-        console.warn(`DOM element not found: ${id}`);
+        // Optional lookups miss during normal operation (a modal not yet built,
+        // an error banner that only appears on failure); keep it at debug level.
+        logger.debug(`DOM element not found: ${id}`);
     }
     return element;
 }

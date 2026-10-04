@@ -14,6 +14,9 @@ import {
     alternateDeploymentUrl,
     resolveDeploymentRedirect
 } from './utils/urlUtils.js';
+import { logger } from './utils/log.js';
+import { getElement } from './utils/domUtils.js';
+import { getItem, setItem, removeItem } from './services/storage.js';
 
 class ThreeCardBlindGuruTool {
     constructor() {
@@ -104,16 +107,16 @@ class ThreeCardBlindGuruTool {
                 }
             } else {
                 // User is not authenticated, show login screen
-                console.log('User not authenticated, showing login screen');
+                logger.debug('User not authenticated, showing login screen');
                 this.authManager.showLoginScreen();
             }
         } catch (error) {
-            console.error('Error initializing application:', error);
+            logger.error('Error initializing application:', error);
             this.hideLoading();
             this.uiController.showStatus('Error initializing Google API. Please refresh the page.', 'error');
         }
     }
-    
+
     currentDeploymentKey() {
         return deploymentForPath(window.location.pathname, DEPLOYMENTS);
     }
@@ -123,14 +126,14 @@ class ThreeCardBlindGuruTool {
      * when a redirect was started (the caller must stop initialising).
      */
     applyDeploymentPreference() {
-        const preferred = localStorage.getItem(CONFIG.STORAGE_KEYS.PREFERRED_DEPLOYMENT);
+        const preferred = getItem(CONFIG.STORAGE_KEYS.PREFERRED_DEPLOYMENT);
         const target = resolveDeploymentRedirect(
             window.location.pathname, window.location.search, preferred, DEPLOYMENTS
         );
         if (!target) {
             return false;
         }
-        console.log(`🔀 Redirecting to preferred deployment: ${target}`);
+        logger.debug(`🔀 Redirecting to preferred deployment: ${target}`);
         window.location.replace(target);
         return true;
     }
@@ -143,11 +146,11 @@ class ThreeCardBlindGuruTool {
         if (!Object.prototype.hasOwnProperty.call(DEPLOYMENTS, key)) {
             return;
         }
-        localStorage.setItem(CONFIG.STORAGE_KEYS.PREFERRED_DEPLOYMENT, key);
+        setItem(CONFIG.STORAGE_KEYS.PREFERRED_DEPLOYMENT, key);
     }
 
     setupDeploymentSwitch() {
-        const container = document.getElementById('deployment-switch');
+        const container = getElement('deployment-switch');
         if (!container) {
             return;
         }
@@ -185,8 +188,8 @@ class ThreeCardBlindGuruTool {
      * Show simple loading indicator under header
      */
     showLoading(message = 'Loading...') {
-        const loadingElement = document.getElementById('app-loading');
-        const loadingText = document.getElementById('loading-text');
+        const loadingElement = getElement('app-loading');
+        const loadingText = getElement('loading-text');
         if (loadingElement && loadingText) {
             loadingText.textContent = message;
             loadingElement.style.display = 'flex';
@@ -197,7 +200,7 @@ class ThreeCardBlindGuruTool {
      * Hide loading indicator
      */
     hideLoading() {
-        const loadingElement = document.getElementById('app-loading');
+        const loadingElement = getElement('app-loading');
         if (loadingElement) {
             loadingElement.style.display = 'none';
         }
@@ -205,10 +208,10 @@ class ThreeCardBlindGuruTool {
 
     clearLocalPreferences() {
         // Clear local storage
-        localStorage.removeItem(CONFIG.STORAGE_KEYS.GURU_SIGNATURE);
-        localStorage.removeItem(CONFIG.STORAGE_KEYS.RECENT_PODS);
-        localStorage.removeItem(CONFIG.STORAGE_KEYS.RECENT_HUBS);
-        console.log('🗑️ Cleared local preferences from localStorage');
+        removeItem(CONFIG.STORAGE_KEYS.GURU_SIGNATURE);
+        removeItem(CONFIG.STORAGE_KEYS.RECENT_PODS);
+        removeItem(CONFIG.STORAGE_KEYS.RECENT_HUBS);
+        logger.debug('🗑️ Cleared local preferences from localStorage');
     }
 
     setupGuruSignatureHandlers() {
@@ -219,7 +222,7 @@ class ThreeCardBlindGuruTool {
 
         // Listen for the signature being set (initial load or an explicit change).
         this.guruSignature.onSignatureSet((signature) => {
-            console.log('Guru signature set:', signature);
+            logger.debug('Guru signature set:', signature);
             this.uiController.showStatus(`Welcome, ${signature}! Ready to edit pod sheets.`, 'success');
             // A change while a pod is open must not leave a stale snapshot behind.
             this.refreshSignatureForOpenPod();
@@ -248,10 +251,10 @@ class ThreeCardBlindGuruTool {
         }
         this._domBound = true;
 
-        const loadBtn = document.getElementById('load-sheet-btn');
-        const refreshBtn = document.getElementById('refresh-btn');
-        const exitAnalysisBtn = document.getElementById('exit-analysis-btn');
-        const sheetUrlInput = document.getElementById('sheet-url');
+        const loadBtn = getElement('load-sheet-btn');
+        const refreshBtn = getElement('refresh-btn');
+        const exitAnalysisBtn = getElement('exit-analysis-btn');
+        const sheetUrlInput = getElement('sheet-url');
 
         loadBtn.addEventListener('click', () => this.loadSheet());
         refreshBtn.addEventListener('click', () => this.refreshSheet());
@@ -270,21 +273,21 @@ class ThreeCardBlindGuruTool {
         const urlParams = new URLSearchParams(window.location.search);
         const podId = sanitizeUrlParam(urlParams.get('pod'));
         const hubId = sanitizeUrlParam(urlParams.get('hub'));
-        
+
         if (podId) {
-            console.log('🔗 URL parameters detected, going directly to analysis mode');
-            
+            logger.debug('🔗 URL parameters detected, going directly to analysis mode');
+
             // Hide the home screen sections
             this.uiController.hideHomeScreen();
-            
+
             // Handle URL parameters for auto-loading (includes hub if present)
             await this.handleURLParameters();
-            
+
             return true; // Indicates we went to analysis mode
         } else if (hubId) {
             await this.handleURLParameters();
         }
-        
+
         return false; // No URL parameters, use normal flow
     }
 
@@ -294,32 +297,32 @@ class ThreeCardBlindGuruTool {
         const guruColor = sanitizeUrlParam(urlParams.get('guru'));
         const hubId = sanitizeUrlParam(urlParams.get('hub'));
         let rowNumber = sanitizeUrlParam(urlParams.get('match'));
-        
+
         // If hub parameter is present, add it to recent hubs before rendering
         if (hubId) {
             try {
-                console.log(`🔗 Adding hub from URL parameter: ${hubId}`);
+                logger.debug(`🔗 Adding hub from URL parameter: ${hubId}`);
                 await this.recentPodsManager.addRecentHub(hubId);
             } catch (error) {
-                console.warn('Failed to add hub from URL parameter:', error);
+                logger.warn('Failed to add hub from URL parameter:', error);
             }
         }
-        
+
         if (podId) {
             try {
-                console.log(`🔗 Auto-loading pod from URL: ${podId}, color: ${guruColor}, row: ${rowNumber}`);
-                
+                logger.debug(`🔗 Auto-loading pod from URL: ${podId}, color: ${guruColor}, row: ${rowNumber}`);
+
                 this.showLoading('Loading pod data...');
                 // Load the pod by ID
                 await this.loadSheet(podId, guruColor, rowNumber ? parseInt(rowNumber, 10) : null);
-                
+
                 this.hideLoading();
-                
+
             } catch (error) {
-                console.warn('Failed to auto-load pod from URL:', error);
+                logger.warn('Failed to auto-load pod from URL:', error);
                 this.hideLoading();
                 this.uiController.showStatus(`Could not load pod from URL: ${error.message}`, 'error');
-                
+
                 // Clear invalid pod ID from URL
                 this.clearInvalidURLParameters();
             }
@@ -335,7 +338,7 @@ class ThreeCardBlindGuruTool {
     async loadSheet(spreadsheetId = null, guruColor = null, rowNumber = null) {
         // Check if guru signature is set before loading sheet
         if (!this.guruSignature.hasSignature()) {
-            console.warn('Guru signature not set, cannot load sheet');
+            logger.warn('Guru signature not set, cannot load sheet');
             this.uiController.showStatus('Please set your Guru Signature before loading a sheet', 'error');
             this.guruSignature.showSignatureSection();
             return;
@@ -343,11 +346,11 @@ class ThreeCardBlindGuruTool {
 
         let targetSpreadsheetId = spreadsheetId;
         let sheetUrl = '';
-        
+
         // If no spreadsheetId provided, get it from the URL input
         if (!targetSpreadsheetId) {
-            const url = document.getElementById('sheet-url').value.trim();
-            
+            const url = getElement('sheet-url').value.trim();
+
             if (!url) {
                 this.uiController.showStatus('Please enter a pod Google Sheets URL', 'error');
                 return;
@@ -357,7 +360,7 @@ class ThreeCardBlindGuruTool {
                 this.uiController.showStatus('Please enter a valid Google Sheets URL', 'error');
                 return;
             }
-            
+
             targetSpreadsheetId = extractSheetId(url);
             sheetUrl = url;
         } else {
@@ -370,10 +373,10 @@ class ThreeCardBlindGuruTool {
             this.uiController.setLoadingState(true);
 
             const sheetData = await this.sheetsAPI.getSheetData(targetSpreadsheetId);
-            
+
             this.currentSheetData = sheetData;
             this.currentSpreadsheetId = targetSpreadsheetId;
-            
+
             // Load data into the analysis interface
             if (!this.analysisInterface) {
                 // The signature is a snapshot taken at load: it cannot change
@@ -389,20 +392,20 @@ class ThreeCardBlindGuruTool {
             if (isLoaded) {
                 await this.analysisInterface.showCurrentRow();
             }
-            
+
             // Add to recent pods
             if (sheetData.metadata && sheetData.metadata.guruHubLink) {
-                console.log('Adding recent hub link:', sheetData.metadata.guruHubLink);
+                logger.debug('Adding recent hub link:', sheetData.metadata.guruHubLink);
                 this.recentPodsManager.addRecentHub(sheetData.metadata.guruHubLink);
             }
 
-            console.log('Adding recent pod:', sheetData.title || 'Untitled Pod');
+            logger.debug('Adding recent pod:', sheetData.title || 'Untitled Pod');
             this.recentPodsManager.addRecentPod(targetSpreadsheetId, sheetData.title || 'Untitled Pod', sheetUrl);
 
             this.uiController.showStatus(`Loaded pod - ${sheetData.title || 'Untitled Pod'}`, 'success');
 
         } catch (error) {
-            console.error('Error loading pod:', error);
+            logger.error('Error loading pod:', error);
             this.uiController.showStatus(`Error loading pod: ${error.message}`, 'error');
         } finally {
             this.uiController.setLoadingState(false);
@@ -417,20 +420,20 @@ class ThreeCardBlindGuruTool {
 
         try {
             this.uiController.showStatus('Refreshing pod...', 'loading');
-            
+
             const sheetData = await this.sheetsAPI.getSheetData(this.currentSpreadsheetId);
             this.currentSheetData = sheetData;
-            
+
             // Reload data into the analysis interface
             this.analysisInterface.reset();
             await this.analysisInterface.loadData(sheetData);
             await this.analysisInterface.showCurrentRow();
-            
+
             const totalRows = this.analysisInterface.getTotalRows();
             this.uiController.showStatus(`Refreshed - ${totalRows} rows available`, 'success');
-            
+
         } catch (error) {
-            console.error('Error refreshing pod:', error);
+            logger.error('Error refreshing pod:', error);
             this.uiController.showStatus(`Error refreshing: ${error.message}`, 'error');
         }
     }
@@ -441,44 +444,44 @@ document.addEventListener('DOMContentLoaded', () => {
     applyDeploymentBranding();
 
     new ThreeCardBlindGuruTool();
-    
+
     // Display app version
     displayAppVersion();
-    
+
     // Register service worker for PWA functionality
     if ('serviceWorker' in navigator) {
         // Listen for the controlling service worker changing (global listener)
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-            console.log('🔄 Service worker controller changed, reloading...');
+            logger.debug('🔄 Service worker controller changed, reloading...');
             window.location.reload();
         });
-        
+
         window.addEventListener('load', () => {
             // Use relative path for GitHub Pages subdirectory deployment
             const swPath = new URL('sw.js', window.location.href).pathname;
-            console.log('Registering service worker at:', swPath);
+            logger.debug('Registering service worker at:', swPath);
             navigator.serviceWorker.register(swPath)
                 .then((registration) => {
-                    console.log('✅ Service Worker registered successfully:', registration.scope);
-                    
+                    logger.debug('✅ Service Worker registered successfully:', registration.scope);
+
                     // Listen for service worker updates
                     registration.addEventListener('updatefound', () => {
                         const newWorker = registration.installing;
-                        console.log('🔄 New service worker found, installing...');
-                        
+                        logger.debug('🔄 New service worker found, installing...');
+
                         newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                                 // New service worker is installed and waiting
-                                console.log('✨ New version available! Reload page to update.');
+                                logger.debug('✨ New version available! Reload page to update.');
                             }
                         });
                     });
                 })
                 .catch((error) => {
-                    console.error('❌ Service Worker registration failed:', error);
+                    logger.error('❌ Service Worker registration failed:', error);
                 });
         });
-        console.log('Service Worker is supported in this browser.');
+        logger.debug('Service Worker is supported in this browser.');
     }
 });
 
@@ -505,20 +508,20 @@ function applyDeploymentBranding() {
  * Display the app version from the service worker
  */
 async function displayAppVersion() {
-    const versionElement = document.getElementById('app-version');
-    
+    const versionElement = getElement('app-version');
+
     if (!versionElement) {
         return;
     }
-    
+
     try {
         // Fetch the service worker file to extract version
         const swResponse = await fetch('sw.js');
         const swText = await swResponse.text();
-        
+
         // Extract version from APP_VERSION constant (simple and targeted)
         const match = swText.match(/const APP_VERSION\s*=\s*['"]([^'"]+)['"]/);
-        
+
         if (match && match[1]) {
             const version = match[1];
             const key = deploymentForPath(window.location.pathname, DEPLOYMENTS);
@@ -526,12 +529,12 @@ async function displayAppVersion() {
             versionElement.textContent = deployment
                 ? `${deployment.appName} — Version: ${version}`
                 : `Version: ${version}`;
-            console.log('📦 App version:', version);
+            logger.debug('📦 App version:', version);
         } else {
             versionElement.textContent = 'Version: unknown';
         }
     } catch (error) {
-        console.error('Error getting app version:', error);
+        logger.error('Error getting app version:', error);
         versionElement.textContent = 'Version: error';
     }
 }

@@ -2,7 +2,7 @@
 export const CONFIG = {
     // Google OAuth 2.0 settings
     GOOGLE_CLIENT_ID: '367897767302-uu5fqngr2cpb1f5fuhrdd03u9fm629ir.apps.googleusercontent.com',
-    
+
     // Google API settings
     DISCOVERY_DOCS: [
         'https://sheets.googleapis.com/$discovery/rest?version=v4',
@@ -13,10 +13,10 @@ export const CONFIG = {
         'https://www.googleapis.com/auth/drive.appdata',
         'https://www.googleapis.com/auth/userinfo.email'
     ].join(' '),
-    
+
     // Application settings
     APP_NAME: 'The Stylus',
-    
+
     // Local storage keys
     STORAGE_KEYS: {
         GURU_SIGNATURE: 'guru_signature',

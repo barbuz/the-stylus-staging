@@ -8,6 +8,8 @@
  *
  * `emit` never lets one failing listener break the others.
  */
+import { logger } from '../utils/log.js';
+
 export class EventBus {
     constructor() {
         this.listeners = new Map();
@@ -52,7 +54,7 @@ export class EventBus {
             try {
                 handler(payload);
             } catch (error) {
-                console.error(`Error in "${event}" listener:`, error);
+                logger.error(`Error in "${event}" listener:`, error);
             }
         }
     }

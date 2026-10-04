@@ -1,3 +1,5 @@
+import { getElement } from '../utils/domUtils.js';
+import { logger } from '../utils/log.js';
 // DeckNotesEditor: Handles rendering and editing of the deck notes table
 // Extracted from GuruAnalysisInterface.showDeckNotesEditor
 export class DeckNotesEditor {
@@ -18,7 +20,7 @@ export class DeckNotesEditor {
         }
 
         // Get the deck notes editor container or create a new one
-        let deckNotesContainer = document.getElementById('deck-notes-screen');
+        let deckNotesContainer = getElement('deck-notes-screen');
         if (!deckNotesContainer) {
             deckNotesContainer = document.createElement('div');
             deckNotesContainer.id = 'deck-notes-screen';
@@ -30,7 +32,7 @@ export class DeckNotesEditor {
             this.uiController.showStatus('No deck notes found. Check the spreadsheet.', 'error');
             return;
         }
-        console.log(notesData)
+        logger.debug(notesData)
         const headers = notes[0] || [];
         const headersClean = headers.map(header => header.toLowerCase().trim().replace(/\s+/g, '-'));
         const numCols = headers.length;
@@ -120,7 +122,7 @@ export class DeckNotesEditor {
                     // No change, do nothing
                     return;
                 }
-                console.log(`Cell edited: Row ${row}, Col ${col}, Content: "${content}"`);
+                logger.debug(`Cell edited: Row ${row}, Col ${col}, Content: "${content}"`);
 
                 // Do a checked update to save the edited cell
                 const updates = {
@@ -256,11 +258,11 @@ export class DeckNotesEditor {
         }
 
         // Insert the deck notes container in the "sheet-editor" area
-        const sheetEditor = document.getElementById('sheet-editor');
+        const sheetEditor = getElement('sheet-editor');
         sheetEditor.insertBefore(deckNotesContainer, sheetEditor.firstChild);
 
         // Hide the guru analysis interface while the deck notes editor is open
-        const analysisInterfaceEl = document.getElementById('guru-analysis-interface');
+        const analysisInterfaceEl = getElement('guru-analysis-interface');
         if (analysisInterfaceEl) {
             analysisInterfaceEl.style.display = 'none';
         }
@@ -300,14 +302,14 @@ export class DeckNotesEditor {
 
     close(backToHome = false) {
         // Remove the deck notes editor from the DOM and stop updates
-        const deckNotesContainer = document.getElementById('deck-notes-screen');
+        const deckNotesContainer = getElement('deck-notes-screen');
         if (deckNotesContainer && deckNotesContainer.parentNode) {
             deckNotesContainer.parentNode.removeChild(deckNotesContainer);
         }
         this.stopPeriodicUpdate();
-        
+
         // Restore the guru analysis interface visibility when closing the deck notes editor
-        const analysisInterfaceEl = document.getElementById('guru-analysis-interface');
+        const analysisInterfaceEl = getElement('guru-analysis-interface');
         if (analysisInterfaceEl) {
             analysisInterfaceEl.style.display = '';
         }
@@ -322,11 +324,11 @@ export class DeckNotesEditor {
             clearInterval(this._updateInterval);
             this._updateInterval = null;
         }
-    }   
+    }
 
     async updateValues(notesData) {
         // Update the deck notes table with new data
-        const deckNotesTable = document.getElementById('deck-notes-table');
+        const deckNotesTable = getElement('deck-notes-table');
         if (!deckNotesTable) return;
 
         const notes = notesData.values || [];
@@ -353,7 +355,7 @@ export class DeckNotesEditor {
             }
         });
 
-        const publishBtn = document.getElementById('deck-notes-publish-btn');
+        const publishBtn = getElement('deck-notes-publish-btn');
         if (this.allClocksFilled()) {
             // Show publish button if all clocks are filled
             if (publishBtn) {

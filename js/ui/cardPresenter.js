@@ -5,6 +5,7 @@
  * adjacent matches, and hands the rendered slots to the view. It holds only the
  * image-loading concern; the controller decides which rows are worth preloading.
  */
+import { logger } from '../utils/log.js';
 export class CardPresenter {
     constructor(scryfallAPI, view) {
         this.scryfallAPI = scryfallAPI;
@@ -22,7 +23,7 @@ export class CardPresenter {
                 getCardUrl: (name, exact) => this.scryfallAPI.getCardUrl(name, exact)
             });
         } catch (error) {
-            console.error(`Error loading cards for ${playerId}:`, error);
+            logger.error(`Error loading cards for ${playerId}:`, error);
             this.view.renderCardError(slots);
         }
     }
@@ -49,6 +50,6 @@ export class CardPresenter {
         }
 
         this.scryfallAPI.preloadCards(decks, { delay: 300, silent: true });
-        console.log(`🔄 Started preloading cards for ${indices.length} matches (rows: ${indices.map(i => i + 1).join(', ')})`);
+        logger.debug(`🔄 Started preloading cards for ${indices.length} matches (rows: ${indices.map(i => i + 1).join(', ')})`);
     }
 }

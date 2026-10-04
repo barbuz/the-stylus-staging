@@ -7,6 +7,7 @@
  * rather than DOM event plumbing.
  */
 import { GuruColorSelector } from './guruColorSelector.js';
+import { addEventListenerSafe } from '../utils/domUtils.js';
 
 export class AnalysisEventBinder {
     constructor(host) {
@@ -17,23 +18,23 @@ export class AnalysisEventBinder {
     bind() {
         const host = this.host;
 
-        document.getElementById('win-btn').addEventListener('click', () => host.setAnalysis(1.0));
-        document.getElementById('tie-btn').addEventListener('click', () => host.setAnalysis(0.5));
-        document.getElementById('loss-btn').addEventListener('click', () => host.setAnalysis(0.0));
+        addEventListenerSafe('win-btn', 'click', () => host.setAnalysis(1.0));
+        addEventListenerSafe('tie-btn', 'click', () => host.setAnalysis(0.5));
+        addEventListenerSafe('loss-btn', 'click', () => host.setAnalysis(0.0));
 
-        document.getElementById('prev-btn').addEventListener('click', () => host.previousRow());
-        document.getElementById('next-btn').addEventListener('click', () => host.nextRow());
-        document.getElementById('skip-btn').addEventListener('click', () => host.skipToNextIncomplete());
-        document.getElementById('discrepancy-btn').addEventListener('click', () => host.skipToNextDiscrepancy());
-        document.getElementById('mirror-match-btn').addEventListener('click', () => host.skipToMirrorMatch());
-        document.getElementById('next-deck-btn').addEventListener('click', () => host.skipToNextDeck());
+        addEventListenerSafe('prev-btn', 'click', () => host.previousRow());
+        addEventListenerSafe('next-btn', 'click', () => host.nextRow());
+        addEventListenerSafe('skip-btn', 'click', () => host.skipToNextIncomplete());
+        addEventListenerSafe('discrepancy-btn', 'click', () => host.skipToNextDiscrepancy());
+        addEventListenerSafe('mirror-match-btn', 'click', () => host.skipToMirrorMatch());
+        addEventListenerSafe('next-deck-btn', 'click', () => host.skipToNextDeck());
 
         // Guru color selector (owns its own document-level dismiss listeners)
         host.guruColorSelector = new GuruColorSelector({
             onChange: (colour) => host.changeGuruColor(colour)
         });
 
-        document.getElementById('current-row-info').addEventListener('click', () => host.showMatchTableModal());
+        addEventListenerSafe('current-row-info', 'click', () => host.showMatchTableModal());
 
         // Use event delegation since the thread button is created dynamically in the view.
         this._onDocumentClick = (e) => {

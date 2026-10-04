@@ -1,10 +1,12 @@
+import { logger } from '../utils/log.js';
+import { getElement } from '../utils/domUtils.js';
+
 export class UIController {
     constructor(guruSignature = null) {
-        this.statusMessage = document.getElementById('status-message');
-        this.sheetEditor = document.getElementById('sheet-editor');
-        this.loadBtn = document.getElementById('load-sheet-btn');
-        this.saveBtn = document.getElementById('save-btn');
-        this.refreshBtn = document.getElementById('refresh-btn');
+        this.statusMessage = getElement('status-message');
+        this.sheetEditor = getElement('sheet-editor');
+        this.loadBtn = getElement('load-sheet-btn');
+        this.refreshBtn = getElement('refresh-btn');
         // The single owner of the signature, injected by main.js. Used only to
         // decide whether the signature section should stay hidden.
         this.guruSignature = guruSignature;
@@ -16,7 +18,7 @@ export class UIController {
             if (!this._pointerDetectionDone) {
                 this._pointerType = e.pointerType;
                 this._pointerDetectionDone = true;
-                console.log(`Pointer type detected: ${this._pointerType}`);
+                logger.debug(`Pointer type detected: ${this._pointerType}`);
                 window.removeEventListener('pointerdown', this._pointerHandler, true);
                 window.removeEventListener('pointermove', this._pointerHandler, true);
             }
@@ -55,18 +57,18 @@ export class UIController {
 
     showSheetEditor(title = 'Sheet Editor') {
         // Hide the other sections for fullscreen experience
-        const guruSignatureSection = document.getElementById('guru-signature-section');
-        const sheetInputSection = document.getElementById('sheet-input-section');
+        const guruSignatureSection = getElement('guru-signature-section');
+        const sheetInputSection = getElement('sheet-input-section');
         const header = document.querySelector('header');
-        
+
         if (guruSignatureSection) guruSignatureSection.style.display = 'none';
         if (sheetInputSection) sheetInputSection.style.display = 'none';
         if (header) header.style.display = 'none';
-        
+
         // Add fullscreen class and show the editor
         this.sheetEditor.classList.add('fullscreen-analysis');
         this.sheetEditor.style.display = 'block';
-        
+
         // Add body class for mobile scrolling support
         document.body.classList.add('fullscreen-mode');
     }
@@ -92,80 +94,71 @@ export class UIController {
 
     hideHomeScreen() {
         // Hide the home screen sections to go directly to analysis mode
-        const sheetInputSection = document.getElementById('sheet-input-section');
-        const guruSignatureSection = document.getElementById('guru-signature-section');
-        
+        const sheetInputSection = getElement('sheet-input-section');
+        const guruSignatureSection = getElement('guru-signature-section');
+
         if (sheetInputSection) {
             sheetInputSection.style.display = 'none';
         }
         if (guruSignatureSection) {
             guruSignatureSection.style.display = 'none';
         }
-        
-        console.log('🏠 Home screen hidden for direct analysis mode');
+
+        logger.debug('🏠 Home screen hidden for direct analysis mode');
     }
 
     showSheetInputSection() {
         // Clear URL parameters when returning to home
         this.clearURLParameters();
-        
+
         // Show the input sections again when exiting fullscreen analysis
-        const sheetInputSection = document.getElementById('sheet-input-section');
+        const sheetInputSection = getElement('sheet-input-section');
         const header = document.querySelector('header');
 
         // Hide the sheet editor
         this.sheetEditor.style.display = 'none';
-        
+
         // Always show these sections
         if (sheetInputSection) sheetInputSection.style.display = 'block';
         if (header) header.style.display = 'block';
-        
+
         // Remove body class for mobile scrolling support
         document.body.classList.remove('fullscreen-mode');
-        
+
         // Only show the guru signature section when no signature is set. Ask the
         // single owner rather than reading localStorage behind its back.
         const hasSignature = this.guruSignature?.hasSignature() ?? false;
-        const guruSignatureSection = document.getElementById('guru-signature-section');
-        
+        const guruSignatureSection = getElement('guru-signature-section');
+
         if (guruSignatureSection) {
             if (hasSignature) {
                 // User has a signature, keep the section hidden
                 guruSignatureSection.style.display = 'none';
-                console.log('🔒 Guru signature exists, keeping section hidden');
+                logger.debug('🔒 Guru signature exists, keeping section hidden');
             } else {
                 // No signature set, show the section
                 guruSignatureSection.style.display = 'block';
-                console.log('⚠️ No guru signature found, showing section');
+                logger.debug('⚠️ No guru signature found, showing section');
             }
         }
     }
 
     setLoadingState(isLoading) {
-        const buttons = [this.loadBtn, this.saveBtn, this.refreshBtn];
-        
-        buttons.forEach(btn => {
-            if (btn) {
-                btn.disabled = isLoading;
-                
-                if (isLoading && btn === this.loadBtn) {
-                    btn.innerHTML = '<span class="loading-spinner"></span>Loading...';
-                } else if (!isLoading && btn === this.loadBtn) {
-                    btn.innerHTML = 'Load Results';
-                }
-                
-                if (isLoading && btn === this.saveBtn) {
-                    btn.innerHTML = '<span class="loading-spinner"></span>Saving...';
-                } else if (!isLoading && btn === this.saveBtn) {
-                    btn.innerHTML = 'Save Results';
-                }
-                
-                if (isLoading && btn === this.refreshBtn) {
-                    btn.innerHTML = '<span class="loading-spinner"></span>Refreshing...';
-                } else if (!isLoading && btn === this.refreshBtn) {
-                    btn.innerHTML = 'Refresh';
-                }
+        // `#save-btn` does not exist in the markup: the analysis screen has no
+        // Save button, so there is nothing to toggle for it here.
+        const buttons = [
+            { element: this.loadBtn, idle: 'Load Results', busy: 'Loading...' },
+            { element: this.refreshBtn, idle: 'Refresh', busy: 'Refreshing...' }
+        ];
+
+        buttons.forEach(({ element, idle, busy }) => {
+            if (!element) {
+                return;
             }
+            element.disabled = isLoading;
+            element.innerHTML = isLoading
+                ? `<span class="loading-spinner"></span>${busy}`
+                : idle;
         });
     }
 
@@ -182,12 +175,10 @@ export class UIController {
     }
 
     enableEditorControls() {
-        if (this.saveBtn) this.saveBtn.disabled = false;
         if (this.refreshBtn) this.refreshBtn.disabled = false;
     }
 
     disableEditorControls() {
-        if (this.saveBtn) this.saveBtn.disabled = true;
         if (this.refreshBtn) this.refreshBtn.disabled = true;
     }
 
