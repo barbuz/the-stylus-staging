@@ -27,6 +27,9 @@ export const CONFIG = {
         LAST_LOGIN: 'last_login',
         RECENT_PODS: 'recent_pods',
         RECENT_HUBS: 'recent_hubs',
+        // Diagnostic log ring buffer, kept in sessionStorage (not localStorage)
+        // so it survives a reload but not a new session.
+        DIAGNOSTIC_LOG: 'stylus_diagnostic_log',
         // Which deployment this browser should open deep links in. Absent or
         // unknown means "leave me on whichever deployment the link points at".
         PREFERRED_DEPLOYMENT: 'preferred_deployment',

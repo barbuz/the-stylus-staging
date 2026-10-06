@@ -35,6 +35,14 @@ and continue guruing!
 - View completion status
 - Restart analysis if needed
 
+### 6. **Reporting a Bug**
+- Click the small **Log** button in the footer, or in the analysis screen's
+  top-right controls while a pod is open
+- This downloads `the-stylus-log-YYYYMMDD-HHMMSS.txt`, a plain-text diagnostic
+  log with the app version, the current URL and recent activity
+- Attach that file to your bug report; access tokens and email addresses are
+  removed automatically, but the file may still contain match data
+
 ## 🌐 Browser Requirements
 
 - **Modern Browser Support:**

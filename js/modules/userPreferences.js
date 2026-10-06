@@ -30,7 +30,7 @@ export class UserPreferences {
             // Load preferences from appData
             const preferences = await this.loadPreferences();
 
-            logger.debug('✅ User preferences initialized for:', user.email);
+            logger.debug('✅ User preferences initialized');
             return preferences;
         } catch (error) {
             logger.error('Error initializing user preferences:', error);

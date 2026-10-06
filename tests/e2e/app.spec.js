@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import fs from 'node:fs';
 
 import { installStubs, sampleSpreadsheet } from './stubs.js';
 
@@ -381,5 +382,76 @@ test.describe('Recent-pod id naming', () => {
 
         const saved = await page.evaluate(() => window.__stylus.getPreferences().recentPods[0]);
         expect(saved.sheetId).toBeUndefined();
+    });
+});
+
+test.describe('Diagnostic log download', () => {
+    test('the footer Log button works before sign-in', async ({ page }) => {
+        await bootApp(page);
+
+        // The footer is visible on the login screen, and the handler is bound on
+        // load, so this must work even when authentication never completes.
+        await expect(page.locator('#login-section')).toBeVisible();
+        const downloadPromise = page.waitForEvent('download');
+        await page.locator('.app-footer [data-log-download]').click();
+        const download = await downloadPromise;
+
+        const path = await download.path();
+        const text = fs.readFileSync(path, 'utf8');
+        expect(text).toContain('The Stylus — diagnostic log');
+    });
+
+    test('the footer Log button downloads a file containing a log line', async ({ page }) => {
+        await bootApp(page);
+        await signIn(page);
+
+        const downloadPromise = page.waitForEvent('download');
+        await page.locator('.app-footer [data-log-download]').click();
+        const download = await downloadPromise;
+
+        expect(download.suggestedFilename()).toMatch(/^the-stylus-log-\d{8}-\d{6}\.txt$/);
+
+        const path = await download.path();
+        const text = fs.readFileSync(path, 'utf8');
+        expect(text).toContain('The Stylus — diagnostic log');
+        expect(text).toContain('Version: v');
+        expect(text).toMatch(/\[\d{4}-\d{2}-\d{2}T[\d:.]+Z\] (DEBUG|WARN|ERROR)/);
+    });
+
+    test('the analysis screen exposes a Log button inside the pod', async ({ page }) => {
+        await bootApp(page);
+        await signIn(page);
+        await loadPod(page);
+
+        const downloadPromise = page.waitForEvent('download');
+        await page.locator('.editor-controls [data-log-download]').click();
+        const download = await downloadPromise;
+
+        const path = await download.path();
+        const text = fs.readFileSync(path, 'utf8');
+        expect(text).toContain('The Stylus — diagnostic log');
+    });
+
+    test('an uncaught error is captured in the downloaded log', async ({ page }) => {
+        await bootApp(page);
+        await signIn(page);
+
+        // Throw from a timer so it is genuinely uncaught and reaches the
+        // window error listener wired up on load. Register the pageerror wait
+        // first, then trigger, so it cannot resolve before we are listening.
+        const errorSeen = page.waitForEvent('pageerror');
+        await page.evaluate(() => {
+            setTimeout(() => { throw new Error('diagnostic-e2e-boom'); }, 0);
+        });
+        await errorSeen;
+
+        const downloadPromise = page.waitForEvent('download');
+        await page.locator('.app-footer [data-log-download]').click();
+        const download = await downloadPromise;
+
+        const path = await download.path();
+        const text = fs.readFileSync(path, 'utf8');
+        expect(text).toContain('Uncaught error:');
+        expect(text).toContain('diagnostic-e2e-boom');
     });
 });
