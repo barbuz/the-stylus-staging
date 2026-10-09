@@ -277,6 +277,14 @@ Notes:
   batchUpdate `spreadsheetId` (as `app.spec.js` does) when touching a write
   path: the file id and the tab id are easy to swap and only the real API
   rejects the mix-up.
+- The stub honours `updateSheetProperties` (sets the modelled `hidden` flag), so
+  `unhideGuruSheets` is observable and the clocks gate can hand off to analysis.
+  A synthetic fixture can seed hidden guru tabs with `realPodSpreadsheet({
+  guruHidden: true })`.
+- `values.batchGet` returns one cell per range; parsed A1 columns are 0-based,
+  so it adds 1 when indexing the modelled cells. Keep that offset when adding a
+  reader — an off-by-one here makes `checkedUpdateSheetData`'s precondition fail
+  and silently skips the write.
 - Some tests intentionally document current quirks rather than desired behaviour
   (look for the "Characterization:" comments). Update those deliberately.
 
