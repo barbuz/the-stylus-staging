@@ -877,8 +877,8 @@ section h2, .login-section h2 {
     outline-offset: 2px;
 }
 
-/* Match Table Modal Styles */
-.match-table-overlay {
+/* Overview Table Modal Styles */
+.overview-table-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -890,7 +890,7 @@ section h2, .login-section h2 {
     align-items: center;
     justify-content: center;
 }
-.match-table-modal {
+.overview-table-modal {
     background: white;
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0,0,0,0.25);
@@ -900,19 +900,19 @@ section h2, .login-section h2 {
     overflow: auto;
     position: relative;
 }
-.match-table {
-    --match-table-head-offset: 44px;
+.overview-table {
+    --overview-table-head-offset: 44px;
     width: 100%;
     border-collapse: collapse;
     font-size: 1rem;
     background: white;
 }
-.match-table th, .match-table td {
+.overview-table th, .overview-table td {
     border-bottom: 1px solid #e0e0e0;
     padding: 8px 12px;
     text-align: left;
 }
-.match-table th {
+.overview-table th {
     background: #f5f7fa;
     font-weight: 700;
     color: #2c3e50;
@@ -920,30 +920,30 @@ section h2, .login-section h2 {
     top: 0;
     z-index: 3;
 }
-.match-table tr {
+.overview-table tr {
     cursor: pointer;
 }
-.match-table tr.current-row {
+.overview-table tr.current-row {
     background: #bbdefb;
     font-weight: bold;
 }
-.match-table tr.current-guru-row {
+.overview-table tr.current-guru-row {
     background: #e8f5e8;
 }
-.match-table tr.current-row.current-guru-row {
+.overview-table tr.current-row.current-guru-row {
     background: #bbdefb;
     font-weight: bold;
 }
-.match-table tr[data-row]:hover {
+.overview-table tr[data-row]:hover {
     background: #e3f2fd;
 }
-.match-table td {
+.overview-table td {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 25vw;
 }
-.match-table .match-status-cell {
+.overview-table .match-status-cell {
     width: 5rem;
     text-align: center;
 }
@@ -965,9 +965,9 @@ section h2, .login-section h2 {
     border-radius: 50%;
     border: 1px dashed #b0bec5;
 }
-.match-table .deck-group-header th {
+.overview-table .deck-group-header th {
     position: sticky;
-    top: var(--match-table-head-offset, 0px);
+    top: var(--overview-table-head-offset, 0px);
     z-index: 2;
     background: #ffffff;
     box-shadow: inset 0 -1px 0 #e0e0e0, 0 2px 8px rgba(0,0,0,0.06);
@@ -988,20 +988,20 @@ section h2, .login-section h2 {
     color: #666;
 }
 @media (max-width: 1000px) {
-    .match-table-modal {
+    .overview-table-modal {
         width: 98vw;
         min-width: 98vw;
         padding: 0px 2vw;
     }
-    .match-table th, .match-table td {
+    .overview-table th, .overview-table td {
         padding: 6px 4px;
         font-size: 0.95em;
     }
-    .match-table th:nth-child(4),
-    .match-table td:nth-child(4) {
+    .overview-table th:nth-child(4),
+    .overview-table td:nth-child(4) {
         display: none;
     }
-    .match-table .deck-group-header th {
+    .overview-table .deck-group-header th {
         column-span: 3;
     }
 }
@@ -1803,6 +1803,11 @@ section h2, .login-section h2 {
     margin-bottom: 8px;
 }
 
+.deck-field-label {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
 .deck-separator {
     border: none;
     border-top: 1px solid #78a9d1;
@@ -1819,6 +1824,15 @@ section h2, .login-section h2 {
 
 .edit-deck-info-btn:hover {
     color: #1a3d5d;
+}
+
+/* The whole field is the edit target; the pencil is only a hint. */
+.deck-field {
+    cursor: pointer;
+}
+
+.deck-field:hover {
+    background: rgba(144, 202, 249, 0.25);
 }
 
 .card-slot {
@@ -2339,6 +2353,15 @@ section h2, .login-section h2 {
     font-weight: bold;
     color: #2c3e50;
     margin: 0;
+    cursor: pointer;
+}
+
+#deck-notes-progress:hover,
+#deck-notes-progress:focus {
+    background: #e3f2fd;
+    border-color: #90caf9;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.08);
+    outline: none;
 }
 
 .deck-notes-clocks {
@@ -2376,8 +2399,35 @@ section h2, .login-section h2 {
     margin-bottom: 12px;
 }
 
+/* Visible frame around each clickable field, so the whole area reads as
+   an edit affordance rather than just the small pencil. */
+.deck-info.prominent .deck-field {
+    display: block;
+    border: 2px dashed #90caf9;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: #f5faff;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.deck-info.prominent .deck-field:hover,
+.deck-info.prominent .deck-field:focus-within {
+    border-color: #2196f3;
+    background: #e3f2fd;
+}
+
+.deck-info.prominent .deck-field .edit-deck-info-btn {
+    float: right;
+    font-size: 1.1rem;
+}
+
 .deck-info.prominent .notes-value {
     display: block;
+}
+
+.deck-info.prominent .deck-clock .notes-value {
+    display: inline;
 }
 
 .deck-info.prominent .deck-info-edit-input {

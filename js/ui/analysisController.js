@@ -4,7 +4,7 @@
  * Owns the analysis session state (on `this.state`, see js/app/appState.js) and
  * orchestrates the services and views for the single-row scoring screen. It
  * contains no DOM construction: rendering is delegated to AnalysisView, modals
- * to MatchTableModal / ThreadModal, the colour dropdown to GuruColorSelector,
+ * to OverviewTableModal / ThreadModal, the colour dropdown to GuruColorSelector,
  * and pure logic to js/domain/.
  *
  * Extracted from the former guruAnalysisInterface.js god class (phase 3 of #18);
@@ -39,7 +39,7 @@ import { processDeckNotes, calculateColorStatistics } from '../domain/deckNotes.
 import { AnalysisView } from './analysisView.js';
 import { AnalysisWriter } from './analysisWriter.js';
 import { CardPresenter } from './cardPresenter.js';
-import { MatchTableModal } from './matchTableModal.js';
+import { OverviewTableModal } from './overviewTableModal.js';
 import { MatchTablePresenter } from './matchTablePresenter.js';
 import { ThreadModal } from './threadModal.js';
 import { ThreadPresenter } from './threadPresenter.js';
@@ -69,8 +69,8 @@ export class AnalysisController {
         this.writer = new AnalysisWriter(sheetsAPI);
         this.cards = new CardPresenter(this.scryfallAPI, this.view);
         this.guruColorSelector = null;
-        this.matchTableModal = new MatchTableModal();
-        this.matchTablePresenter = new MatchTablePresenter(this.matchTableModal);
+        this.overviewTableModal = new OverviewTableModal();
+        this.matchTablePresenter = new MatchTablePresenter(this.overviewTableModal);
         this.threadModal = new ThreadModal();
         this.threadPresenter = new ThreadPresenter(this.scryfallAPI, this.threadModal);
         this.actions = new AnalysisActions(this);
@@ -89,7 +89,7 @@ export class AnalysisController {
     destroy() {
         this.eventBinder.destroy();
         this.guruColorSelector?.destroy();
-        this.matchTableModal.destroy();
+        this.overviewTableModal.destroy();
         this.threadModal.destroy();
     }
 
@@ -333,9 +333,11 @@ export class AnalysisController {
             values: deckNotesSheet?.values || this.state.deckNotesValues || []
         };
         this._ensureDeckNotesEditor();
+        // Land on the deck the open match is about (Player 1's deck).
         this.deckNotesEditor.show(notesData, {
             sheetTitle: this.state.sheetData.title,
-            fromAnalysis: true
+            fromAnalysis: true,
+            startDeckString: this.state.currentRow?.player1
         });
     }
 
@@ -406,7 +408,7 @@ export class AnalysisController {
     }
 
     // --- MATCH TABLE MODAL ---
-    async showMatchTableModal() {
+    async showOverviewTableModal() {
         const threadMap = await this.getMatchTableThreadMap();
 
         await this.matchTablePresenter.open({
@@ -432,7 +434,7 @@ export class AnalysisController {
         });
     }
 
-    closeMatchTableModal() {
+    closeOverviewTableModal() {
         this.matchTablePresenter.close();
     }
 

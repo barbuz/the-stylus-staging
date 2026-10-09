@@ -25,6 +25,7 @@ export class DeckNotesView {
      * @param {Function} handlers.onPrev
      * @param {Function} handlers.onNext
      * @param {Function} handlers.onNextEmptyClock
+     * @param {Function} handlers.onShowDeckTable
      * @param {Function} handlers.onStart
      * @param {Function} handlers.onBack
      * @param {Function} handlers.onExit
@@ -72,7 +73,6 @@ export class DeckNotesView {
                             <button id="deck-notes-prev-btn" class="nav-arrow-btn" title="Previous deck">‹</button>
                             <button id="deck-notes-next-btn" class="nav-arrow-btn" title="Next deck">›</button>
                         </div>
-                        <p id="deck-notes-progress" class="deck-notes-progress"></p>
                         <p id="deck-notes-clocks" class="deck-notes-clocks"></p>
                         <button id="deck-notes-next-empty-btn" class="secondary-btn">Next without clock</button>
                         <button id="deck-notes-start-btn" class="primary-btn">Start guruing</button>
@@ -83,6 +83,9 @@ export class DeckNotesView {
                         <div class="header-left">
                             <div id="deck-notes-sheet-info">
                                 <h2 id="deck-notes-sheet-title">Deck Notes</h2>
+                            </div>
+                            <div class="analysis-progress">
+                                <span id="deck-notes-progress" class="deck-notes-progress" tabindex="0" role="button" title="Show all decks">Deck 1 of 0</span>
                             </div>
                         </div>
                         <div class="editor-controls">
@@ -109,6 +112,7 @@ export class DeckNotesView {
         getElement('deck-notes-prev-btn')?.addEventListener('click', () => this.handlers.onPrev?.());
         getElement('deck-notes-next-btn')?.addEventListener('click', () => this.handlers.onNext?.());
         getElement('deck-notes-next-empty-btn')?.addEventListener('click', () => this.handlers.onNextEmptyClock?.());
+        getElement('deck-notes-progress')?.addEventListener('click', () => this.handlers.onShowDeckTable?.());
         getElement('deck-notes-start-btn')?.addEventListener('click', () => this.handlers.onStart?.());
         getElement('deck-notes-back-btn')?.addEventListener('click', () => this.handlers.onBack?.());
         getElement('deck-notes-exit-btn')?.addEventListener('click', () => this.handlers.onExit?.());
@@ -191,6 +195,12 @@ export class DeckNotesView {
             start.style.display = showBack ? 'none' : '';
             start.disabled = !canStart;
             start.title = canStart ? '' : 'Fill every goldfish clock before guruing';
+        }
+
+        // Once every clock is filled there is no empty clock to jump to.
+        const nextEmpty = getElement('deck-notes-next-empty-btn');
+        if (nextEmpty) {
+            nextEmpty.style.display = canStart ? 'none' : '';
         }
 
         const back = getElement('deck-notes-back-btn');

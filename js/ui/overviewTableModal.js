@@ -1,76 +1,44 @@
 /**
- * Match table modal.
+ * Overview table modal.
  *
- * Shows the pod as a scrollable table with a status per match and lets a guru
- * jump to any row. Owns its overlay, listeners and teardown. The controller
- * supplies the per-row signature, row class and status markup, so no domain
- * logic lives here.
+ * A scrollable table that lets a guru jump to a row. It is generic: the caller
+ * supplies the column headers and the body markup, so the analysis screen uses
+ * it for the match list and the deck-notes screen for its deck list. Owns its
+ * overlay, listeners and teardown; no domain logic lives here.
  */
 import { escapeHtml } from '../utils/domUtils.js';
 
-export class MatchTableModal {
+export class OverviewTableModal {
     constructor() {
         this.overlay = null;
     }
 
     /**
      * @param {object} options
-     * @param {Array} options.rows
+     * @param {Array<string>} options.headers column header labels
+     * @param {string} options.bodyHtml trusted tbody markup; rows use data-row
      * @param {number} options.currentRowIndex
-     * @param {Function} options.statusMarkupFor (row, index) -> trusted HTML
-     * @param {Function} options.signatureFor (row) -> string
-     * @param {Function} options.rowClassFor (row, index) -> class string
      * @param {Function} options.onSelect called with the chosen row index
      */
-    async open({ rows, statusMarkupFor, signatureFor, rowClassFor, currentRowIndex, onSelect }) {
+    async open({ headers = [], bodyHtml = '', currentRowIndex, onSelect }) {
         this.close();
 
         const overlay = document.createElement('div');
-        overlay.className = 'match-table-overlay';
+        overlay.className = 'overview-table-overlay';
 
         const modal = document.createElement('div');
-        modal.className = 'match-table-modal';
+        modal.className = 'overview-table-modal';
 
         const table = document.createElement('table');
-        table.className = 'match-table';
-        const tableColumnCount = 4;
+        table.className = 'overview-table';
 
-        let lastDeck = null;
-        const bodyHtml = rows.map((row, idx) => {
-            const parts = [];
-            if (row.player1 !== lastDeck) {
-                lastDeck = row.player1;
-                parts.push(`
-                    <tr class="deck-group-header">
-                        <th colspan="${tableColumnCount}" class="deck-group-header-name">
-                            <span class="deck-group-header-p1">P1</span>
-                            ${escapeHtml(lastDeck || 'Unknown deck')}
-                        </th>
-                    </tr>
-                `);
-            }
-
-            const signature = signatureFor(row);
-            const classNames = rowClassFor(row, idx);
-            parts.push(`
-                <tr data-row="${idx}" class="${classNames}">
-                    <td>${idx + 1}</td>
-                    <td>${escapeHtml(row.player2)}</td>
-                    <td class="match-status-cell">${statusMarkupFor(row, idx)}</td>
-                    <td>${escapeHtml(signature)}</td>
-                </tr>
-            `);
-            return parts.join('');
-        }).join('');
+        const headerHtml = headers
+            .map(header => `<th>${escapeHtml(header)}</th>`)
+            .join('');
 
         table.innerHTML = `
             <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Player 2 Deck</th>
-                    <th>Status</th>
-                    <th>Signature</th>
-                </tr>
+                <tr>${headerHtml}</tr>
             </thead>
             <tbody>
                 ${bodyHtml}
@@ -111,7 +79,7 @@ export class MatchTableModal {
             if (thead) {
                 const headHeight = thead.getBoundingClientRect().height;
                 if (headHeight) {
-                    table.style.setProperty('--match-table-head-offset', `${headHeight}px`);
+                    table.style.setProperty('--overview-table-head-offset', `${headHeight}px`);
                 }
             }
 

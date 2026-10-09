@@ -118,8 +118,11 @@ at a time before guruing can start. It is a gate and a view at once:
   with the controls on the right, stacking under them on mobile.
 - The deck-info panel is shared with the analysis screen via
   `js/ui/deckInfoView.js`; the gate passes `variant: 'prominent'` for larger,
-  full-width edit affordances. Hovering the clock shows its goldfish
-  signature(s) with the analysis screen's `.guru-signature-tooltip`.
+  full-width edit affordances. Each field is a `.deck-field` that is itself the
+  edit target (the whole area is clickable); the pencil is only an affordance.
+  In the `prominent` variant the field carries a visible dashed frame and a
+  hover state. Hovering the clock shows its goldfish signature(s) with the
+  analysis screen's `.guru-signature-tooltip`.
 - Card slots are shared too: `js/ui/cardSlotsView.js` holds the three
   `renderCardSlots*` helpers, and both `AnalysisView` and `DeckNotesView`
   delegate to them. Card *loading* goes through one `CardPresenter` in each
@@ -132,7 +135,17 @@ at a time before guruing can start. It is a gate and a view at once:
   owning one.
 - `AnalysisController.openDeckNotes()` opens the same screen from an active
   session; the **Deck Notes** button in the analysis controls triggers it and the
-  screen offers **Back to analysis** instead of **Start guruing**.
+  screen offers **Back to analysis** instead of **Start guruing**. It passes
+  `startDeckString: state.currentRow?.player1`, so the screen lands on the deck
+  the open match is about rather than the first entry.
+- The gate hides **Next without clock** once `allClocksFilled` is true: there is
+  no empty clock left to jump to.
+- The header's **Deck N of M** line (`#deck-notes-progress`) is clickable and
+  opens `DeckTablePresenter` (`js/ui/deckTablePresenter.js`) over the shared
+  `OverviewTableModal`, so the gate gets a jump-to-deck table shaped like the
+  analysis screen's match table. The modal is generic: a caller passes `headers`
+  and `bodyHtml`; the analysis `MatchTablePresenter` now builds its rows the
+  same way.
 
 ## Characterization (intentional current quirks)
 
@@ -194,9 +207,10 @@ the-stylus/
 │   │   ├── cardSlotsView.js           # Shared card-slot renderers (both screens)
 │   │   ├── deckInfoView.js            # Shared deck-info panel (compact / prominent)
 │   │   ├── deckNotesView.js           # All DOM rendering for the one-deck gate screen
+│   │   ├── deckTablePresenter.js      # Deck-list body for the shared table modal
 │   │   ├── guruColorSelector.js       # Colour dropdown, owns its dismiss listeners
 │   │   ├── matchStatus.js             # Pure match-status descriptors/markup
-│   │   ├── matchTableModal.js         # Match table modal, open/close/destroy
+│   │   ├── overviewTableModal.js      # Generic jump-to-row table modal (matches/decks)
 │   │   ├── matchTablePresenter.js     # Row/status options for the match table
 │   │   ├── threadModal.js             # Create-thread modal, open/close/destroy
 │   │   └── threadPresenter.js         # Builds the Discord thread text for a row

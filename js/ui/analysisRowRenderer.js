@@ -58,7 +58,7 @@ export class AnalysisRowRenderer {
         });
 
         if (state.rowIndex >= state.rows.length || state.rowIndex < 0) {
-            host.showMatchTableModal();
+            host.showOverviewTableModal();
             return;
         }
 

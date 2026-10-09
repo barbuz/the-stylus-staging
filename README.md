@@ -28,8 +28,13 @@ and continue guruing!
 - Before analysing, the app opens the Deck Notes screen one deck at a time
 - The deck's cards are shown large, with its clock and notes on the right
   (under the cards on mobile)
+- Click anywhere in the clock or notes box to edit it; a frame marks each field
 - Every deck's goldfish clock must be filled before "Start guruing" unlocks
 - Repeated consecutive decks are shown once; your edits apply to each of them
+- **Next without clock** jumps to the next deck still missing a clock, and
+  disappears once every clock is filled
+- Click the **Deck N of M** line in the header to open a table of every deck and
+  jump straight to one
 - Hover a clock to see who filled it
 
 ### 5. **Analyse Matches**
@@ -37,7 +42,8 @@ and continue guruing!
 - Use Win/Tie/Loss buttons to score matches
 - Navigate between matches with Previous/Next buttons
 - Use the **Deck Notes** button in the controls to revisit the clocks and notes
-  screen, then **Back to analysis** to return
+  screen, opening on the current match's first player deck, then
+  **Back to analysis** to return
 - Changes are saved automatically to the Google Sheet
 
 ### 6. **Track Progress**
