@@ -1,7 +1,7 @@
 // Service Worker for The Stylus PWA
 
 // Version configuration - UPDATE THIS to trigger a service worker update
-const APP_VERSION = 'v20261004b';
+const APP_VERSION = 'v20261009';
 const APP_NAME = 'the-stylus';
 
 // Get the base path (works for both root and subdirectory deployments)

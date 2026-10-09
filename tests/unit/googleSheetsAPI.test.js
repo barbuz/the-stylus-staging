@@ -398,6 +398,63 @@ test('updateSheetData auto-detects numeric vs string values', async () => {
     }
 });
 
+test('updateSheetData still auto-detects a fully numeric clock like "8.0"', async () => {
+    const { fake, restore } = withFakeGapi();
+    try {
+        const api = new GoogleSheetsAPI(fakeAuthManager());
+        await api.updateSheetData(SHEET_ID, {
+            updates: [
+                { sheetId: 1, row: 1, col: 1, value: '8.0' },
+                { sheetId: 1, row: 2, col: 1, value: '' }
+            ]
+        });
+        const requests = fake.callsTo('spreadsheets.batchUpdate')[0].params.resource.requests;
+        assert.deepEqual(requests[0].updateCells.rows[0].values[0].userEnteredValue, { numberValue: 8 });
+        assert.deepEqual(requests[1].updateCells.rows[0].values[0].userEnteredValue, { stringValue: '' });
+    } finally {
+        restore();
+    }
+});
+
+// A free-text note whose text merely *starts* with a number ("2 mana, wins on
+// turn 5") must not be coerced to a number: parseFloat would silently drop
+// everything after the leading digits and write "2" instead of the note.
+test('updateSheetData preserves a note that begins with a number', async () => {
+    const { fake, restore } = withFakeGapi();
+    try {
+        const api = new GoogleSheetsAPI(fakeAuthManager());
+        await api.updateSheetData(SHEET_ID, {
+            updates: [{ sheetId: 1, row: 1, col: 1, value: '2 mana, wins on turn 5' }]
+        });
+        const request = fake.callsTo('spreadsheets.batchUpdate')[0].params.resource.requests[0];
+        assert.deepEqual(request.updateCells.rows[0].values[0].userEnteredValue,
+            { stringValue: '2 mana, wins on turn 5' });
+    } finally {
+        restore();
+    }
+});
+
+test('checkedUpdateSheetData preserves a note that begins with a number', async () => {
+    const { fake, restore } = withFakeGapi({
+        sheets: [{ title: 'Deck Notes', sheetId: 44 }],
+        valueRanges: [[['old note']]]
+    });
+    try {
+        const api = new GoogleSheetsAPI(fakeAuthManager());
+        await api.checkedUpdateSheetData(SHEET_ID, {
+            updates: [{
+                sheetId: 44, row: 2, col: 4, value: '2 mana, wins on turn 5',
+                expectedValue: 'old note', valueType: 'auto-detect'
+            }]
+        });
+        const request = fake.callsTo('spreadsheets.batchUpdate')[0].params.resource.requests[0];
+        assert.deepEqual(request.updateCells.rows[0].values[0].userEnteredValue,
+            { stringValue: '2 mana, wins on turn 5' });
+    } finally {
+        restore();
+    }
+});
+
 test('updateSheetData routes merged-sheet columns to the right guru sheet', async () => {
     const { fake, restore } = withFakeGapi();
     try {
