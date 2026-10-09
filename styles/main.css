@@ -947,6 +947,31 @@ section h2, .login-section h2 {
     width: 5rem;
     text-align: center;
 }
+/* Columns that only appear when there is room for them. */
+.overview-table .overview-table-optional {
+    display: none;
+}
+@media (min-width: 1001px) {
+    .overview-table .overview-table-optional {
+        display: table-cell;
+    }
+}
+.overview-table .deck-overview-index {
+    width: 3rem;
+    color: #666;
+}
+.overview-table .deck-overview-deck {
+    max-width: 24vw;
+}
+.overview-table .deck-overview-clock {
+    width: 5rem;
+    text-align: center;
+    font-weight: 600;
+}
+.overview-table .deck-overview-clock-empty {
+    color: #b0bec5;
+    font-weight: 400;
+}
 .match-status-icon {
     display: inline-flex;
     align-items: center;

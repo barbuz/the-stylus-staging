@@ -3,29 +3,24 @@
  *
  * Turns the grouped deck-notes entries into the table body for the shared
  * overview table modal, so the deck-notes screen gets a jump-to-deck table that
- * looks like the analysis screen's match table. Each deck is a group: the
- * header names the Player 1 deck and the single row shows its clock status.
+ * looks like the analysis screen's match table.
+ *
+ * One deck per row (a grouped entry never spans more than one row, so there is
+ * nothing to group). The clock is shown as its value, and a row whose goldfish
+ * signature matches the current guru is highlighted like the match table's
+ * `current-guru-row`. The signature and notes columns are marked optional: CSS
+ * hides them on narrow screens and the modal re-shows them when space allows.
  */
 import { escapeHtml } from '../utils/domUtils.js';
-import { renderMatchStatus } from './matchStatus.js';
 
-const COLUMN_COUNT = 2;
+const OPTIONAL_CELL = 'overview-table-optional';
 
-/** Status descriptor for a deck's goldfish clock. */
-function describeDeckStatus(entry) {
-    const clock = (entry.deckInfo?.goldfishClock || '').trim();
-    const signature = (entry.signatures || []).filter(Boolean).join(', ');
-
+/** The clock as its value, or an em dash when it is still empty. */
+function clockCell(clock) {
     if (clock) {
-        return {
-            key: 'clock-set',
-            label: signature ? `Clock ${clock} (${signature})` : `Clock ${clock}`,
-            type: 'emoji',
-            value: '✅'
-        };
+        return `<td class="deck-overview-clock">${escapeHtml(clock)}</td>`;
     }
-
-    return { key: 'clock-empty', label: 'No clock yet', type: 'emoji', value: '❗' };
+    return '<td class="deck-overview-clock deck-overview-clock-empty" aria-label="No clock yet" title="No clock yet">—</td>';
 }
 
 export class DeckTablePresenter {
@@ -33,27 +28,38 @@ export class DeckTablePresenter {
         this.overviewTableModal = overviewTableModal;
     }
 
-    async open({ entries, currentRow, onSelect }) {
+    /**
+     * @param {object} options
+     * @param {Array} options.entries grouped deck-notes entries
+     * @param {number} options.currentRow index of the open deck
+     * @param {string} options.signature current guru signature
+     * @param {Function} options.onSelect chosen deck index
+     */
+    async open({ entries, currentRow, signature = '', onSelect }) {
         const bodyHtml = (entries || []).map((entry, idx) => {
-            const status = renderMatchStatus(describeDeckStatus(entry));
-            const currentClass = idx === currentRow ? 'current-row' : '';
+            const info = entry.deckInfo || {};
+            const clock = (info.goldfishClock || '').trim();
+            const entrySignature = (entry.signatures || []).filter(Boolean).join(', ');
+            const isCurrent = idx === currentRow ? 'current-row' : '';
+            const isGurus = signature && (entry.signatures || []).includes(signature)
+                ? 'current-guru-row'
+                : '';
 
             return `
-                <tr class="deck-group-header">
-                    <th colspan="${COLUMN_COUNT}" class="deck-group-header-name">
-                        <span class="deck-group-header-p1">Deck ${idx + 1}</span>
-                        ${escapeHtml(entry.deckString || 'Unknown deck')}
-                    </th>
-                </tr>
-                <tr data-row="${idx}" class="${currentClass}">
-                    <td>${idx + 1}</td>
-                    <td class="match-status-cell">${status}</td>
+                <tr data-row="${idx}" class="${isCurrent} ${isGurus}">
+                    <td class="deck-overview-index">${idx + 1}</td>
+                    <td class="deck-overview-deck">${escapeHtml(entry.deckString || 'Unknown deck')}</td>
+                    ${clockCell(clock)}
+                    <td class="${OPTIONAL_CELL}">${escapeHtml(entrySignature)}</td>
+                    <td class="${OPTIONAL_CELL}">${escapeHtml(info.notes || '')}</td>
+                    <td class="${OPTIONAL_CELL}">${escapeHtml(info.additionalNotes || '')}</td>
                 </tr>
             `;
         }).join('');
 
         await this.overviewTableModal.open({
-            headers: ['#', 'Clock'],
+            headers: ['#', 'Deck', 'Clock', 'Signature', 'Notes', 'Additional Notes'],
+            optionalFromIndex: 3,
             bodyHtml,
             currentRowIndex: currentRow,
             onSelect

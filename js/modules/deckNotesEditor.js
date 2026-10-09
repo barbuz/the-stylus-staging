@@ -123,6 +123,7 @@ export class DeckNotesEditor {
         await this.deckTablePresenter.open({
             entries: this.entries,
             currentRow: this.deckIndex,
+            signature: this.analysisInterface.state.signature || '',
             onSelect: (idx) => {
                 if (idx >= 0 && idx < this.entries.length) {
                     this.deckIndex = idx;

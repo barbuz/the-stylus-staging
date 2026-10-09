@@ -34,7 +34,8 @@ and continue guruing!
 - **Next without clock** jumps to the next deck still missing a clock, and
   disappears once every clock is filled
 - Click the **Deck N of M** line in the header to open a table of every deck and
-  jump straight to one
+  jump straight to one; it shows each deck's clock (and, when there is room, its
+  signature and notes), highlighting decks you have already clocked
 - Hover a clock to see who filled it
 
 ### 5. **Analyse Matches**
