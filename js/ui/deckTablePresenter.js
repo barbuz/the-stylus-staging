@@ -2,7 +2,7 @@
  * Deck table presenter.
  *
  * Turns the grouped deck-notes entries into the table body for the shared
- * match-table modal, so the deck-notes screen gets a jump-to-deck table that
+ * overview table modal, so the deck-notes screen gets a jump-to-deck table that
  * looks like the analysis screen's match table. Each deck is a group: the
  * header names the Player 1 deck and the single row shows its clock status.
  */
@@ -29,8 +29,8 @@ function describeDeckStatus(entry) {
 }
 
 export class DeckTablePresenter {
-    constructor(matchTableModal) {
-        this.matchTableModal = matchTableModal;
+    constructor(overviewTableModal) {
+        this.overviewTableModal = overviewTableModal;
     }
 
     async open({ entries, currentRow, onSelect }) {
@@ -52,7 +52,7 @@ export class DeckTablePresenter {
             `;
         }).join('');
 
-        await this.matchTableModal.open({
+        await this.overviewTableModal.open({
             headers: ['#', 'Clock'],
             bodyHtml,
             currentRowIndex: currentRow,
@@ -61,6 +61,6 @@ export class DeckTablePresenter {
     }
 
     close() {
-        this.matchTableModal.close();
+        this.overviewTableModal.close();
     }
 }

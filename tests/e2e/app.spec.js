@@ -117,7 +117,7 @@ test.describe('The Stylus (no Google, no network)', () => {
 
         await page.locator('#current-row-info').click();
 
-        const modal = page.locator('.match-table-modal');
+        const modal = page.locator('.overview-table-modal');
         await expect(modal).toBeVisible();
         // All four match rows are listed; P1 group headers add no data-row.
         await expect(modal.locator('tr[data-row]')).toHaveCount(4);
@@ -125,7 +125,7 @@ test.describe('The Stylus (no Google, no network)', () => {
 
         // Clicking match 4 jumps the analysis screen to it.
         await modal.locator('tr[data-row="3"]').click();
-        await expect(page.locator('.match-table-modal')).toHaveCount(0);
+        await expect(page.locator('.overview-table-modal')).toHaveCount(0);
         await expect(page.locator('#current-row-info')).toHaveText('Match 4 of 4');
     });
 

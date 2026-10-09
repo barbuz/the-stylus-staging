@@ -35,7 +35,7 @@ export class AnalysisEventBinder {
             onChange: (colour) => host.changeGuruColor(colour)
         });
 
-        addEventListenerSafe('current-row-info', 'click', () => host.showMatchTableModal());
+        addEventListenerSafe('current-row-info', 'click', () => host.showOverviewTableModal());
 
         // Use event delegation since the thread button is created dynamically in the view.
         this._onDocumentClick = (e) => {

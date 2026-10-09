@@ -22,7 +22,7 @@ import {
 import { getElement } from '../utils/domUtils.js';
 import { DeckNotesView } from '../ui/deckNotesView.js';
 import { CardPresenter } from '../ui/cardPresenter.js';
-import { MatchTableModal } from '../ui/matchTableModal.js';
+import { OverviewTableModal } from '../ui/overviewTableModal.js';
 import { DeckTablePresenter } from '../ui/deckTablePresenter.js';
 import { isDeckInfoEditing } from '../ui/deckInfoView.js';
 
@@ -43,7 +43,7 @@ export class DeckNotesEditor {
         this.fromAnalysis = false;
         this._clockMessageShown = false;
 
-        this.deckTableModal = new MatchTableModal();
+        this.deckTableModal = new OverviewTableModal();
         this.deckTablePresenter = new DeckTablePresenter(this.deckTableModal);
 
         this.view = new DeckNotesView({

@@ -206,13 +206,13 @@ test.describe('Deck notes gate', () => {
         await expect(page.locator('#deck-notes-progress')).toHaveText('Deck 1 of 4');
         await page.locator('#deck-notes-progress').click();
 
-        const modal = page.locator('.match-table-modal');
+        const modal = page.locator('.overview-table-modal');
         await expect(modal).toBeVisible();
         await expect(modal.locator('.deck-group-header-name')).toHaveCount(4);
 
         // Jump to the third deck via its table row.
         await modal.locator('tr[data-row="2"]').click();
-        await expect(page.locator('.match-table-modal')).toHaveCount(0);
+        await expect(page.locator('.overview-table-modal')).toHaveCount(0);
         await expect(page.locator('#deck-notes-progress')).toHaveText('Deck 3 of 4');
     });
 

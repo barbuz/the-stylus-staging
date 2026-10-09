@@ -2,7 +2,7 @@
  * Match table presenter.
  *
  * Turns the controller's row list and per-row predicates into the options the
- * match-table modal needs, including each row's status markup and highlight
+ * overview table modal needs, including each row's status markup and highlight
  * class. Keeps the modal's wiring out of the controller.
  */
 import { escapeHtml } from '../utils/domUtils.js';
@@ -12,8 +12,8 @@ import { describeMatchStatus, renderMatchStatus } from './matchStatus.js';
 const COLUMN_COUNT = 4;
 
 export class MatchTablePresenter {
-    constructor(matchTableModal) {
-        this.matchTableModal = matchTableModal;
+    constructor(overviewTableModal) {
+        this.overviewTableModal = overviewTableModal;
     }
 
     async open({ rows, currentRowIndex, colour, signature, threadMap, statusFor, onSelect }) {
@@ -48,7 +48,7 @@ export class MatchTablePresenter {
             return parts.join('');
         }).join('');
 
-        await this.matchTableModal.open({
+        await this.overviewTableModal.open({
             headers: ['#', 'Player 2 Deck', 'Status', 'Signature'],
             bodyHtml,
             currentRowIndex,
@@ -57,6 +57,6 @@ export class MatchTablePresenter {
     }
 
     close() {
-        this.matchTableModal.close();
+        this.overviewTableModal.close();
     }
 }

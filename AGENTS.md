@@ -142,7 +142,7 @@ at a time before guruing can start. It is a gate and a view at once:
   no empty clock left to jump to.
 - The header's **Deck N of M** line (`#deck-notes-progress`) is clickable and
   opens `DeckTablePresenter` (`js/ui/deckTablePresenter.js`) over the shared
-  `MatchTableModal`, so the gate gets a jump-to-deck table shaped like the
+  `OverviewTableModal`, so the gate gets a jump-to-deck table shaped like the
   analysis screen's match table. The modal is generic: a caller passes `headers`
   and `bodyHtml`; the analysis `MatchTablePresenter` now builds its rows the
   same way.
@@ -210,7 +210,7 @@ the-stylus/
 │   │   ├── deckTablePresenter.js      # Deck-list body for the shared table modal
 │   │   ├── guruColorSelector.js       # Colour dropdown, owns its dismiss listeners
 │   │   ├── matchStatus.js             # Pure match-status descriptors/markup
-│   │   ├── matchTableModal.js         # Match table modal, open/close/destroy
+│   │   ├── overviewTableModal.js      # Generic jump-to-row table modal (matches/decks)
 │   │   ├── matchTablePresenter.js     # Row/status options for the match table
 │   │   ├── threadModal.js             # Create-thread modal, open/close/destroy
 │   │   └── threadPresenter.js         # Builds the Discord thread text for a row

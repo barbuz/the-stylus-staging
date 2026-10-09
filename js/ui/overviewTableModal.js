@@ -1,14 +1,14 @@
 /**
- * Match table modal.
+ * Overview table modal.
  *
- * A scrollable table that lets a guru jump to a row. Despite the name it is
- * generic: the caller supplies the column headers and the body markup, so the
- * deck-notes screen reuses it for its deck list. Owns its overlay, listeners
- * and teardown; no domain logic lives here.
+ * A scrollable table that lets a guru jump to a row. It is generic: the caller
+ * supplies the column headers and the body markup, so the analysis screen uses
+ * it for the match list and the deck-notes screen for its deck list. Owns its
+ * overlay, listeners and teardown; no domain logic lives here.
  */
 import { escapeHtml } from '../utils/domUtils.js';
 
-export class MatchTableModal {
+export class OverviewTableModal {
     constructor() {
         this.overlay = null;
     }
@@ -24,13 +24,13 @@ export class MatchTableModal {
         this.close();
 
         const overlay = document.createElement('div');
-        overlay.className = 'match-table-overlay';
+        overlay.className = 'overview-table-overlay';
 
         const modal = document.createElement('div');
-        modal.className = 'match-table-modal';
+        modal.className = 'overview-table-modal';
 
         const table = document.createElement('table');
-        table.className = 'match-table';
+        table.className = 'overview-table';
 
         const headerHtml = headers
             .map(header => `<th>${escapeHtml(header)}</th>`)
@@ -79,7 +79,7 @@ export class MatchTableModal {
             if (thead) {
                 const headHeight = thead.getBoundingClientRect().height;
                 if (headHeight) {
-                    table.style.setProperty('--match-table-head-offset', `${headHeight}px`);
+                    table.style.setProperty('--overview-table-head-offset', `${headHeight}px`);
                 }
             }
 
