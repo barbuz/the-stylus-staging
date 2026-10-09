@@ -31,6 +31,8 @@ export class AppState {
         this.numDiscrepancies = 0;
         this.deckNotesMap = new Map();
         this.deckNotesColumnMap = {};
+        this.deckNotesValues = null;
+        this.deckNotesEntries = [];
         this.columnIndex = emptyColumnIndex();
         this.hub = null;
     }
@@ -79,6 +81,12 @@ export class AppState {
     setDeckNotes(deckNotesMap, columnMap) {
         this.deckNotesMap = deckNotesMap;
         this.deckNotesColumnMap = columnMap;
+    }
+
+    /** Store the grouped deck-notes entries and the raw values they came from. */
+    setDeckNotesEntries(entries, values) {
+        this.deckNotesEntries = entries;
+        this.deckNotesValues = values;
     }
 
     /** Store a resolved column index; a null parse leaves the previous one. */

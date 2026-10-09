@@ -23,6 +23,13 @@ import {
 } from '../domain/guruColor.js';
 import { logger } from '../utils/log.js';
 
+// The deck-info field names used by the edit buttons -> deckNotes columnMap keys.
+const DECK_INFO_COLUMNS = {
+    clock: 'goldfishClock',
+    notes: 'notes',
+    additionalNotes: 'additionalNotes'
+};
+
 export class AnalysisActions {
     constructor(host) {
         this.host = host;
@@ -282,14 +289,18 @@ export class AnalysisActions {
         }
     }
 
-    async saveDeckInfoField(deckString, type, currentValue, newValue, span) {
+    async saveDeckInfoField(deckString, type, currentValue, newValue, span, entry = null) {
         const host = this.host;
         const state = this.state;
         host.uiController.showStatus(`Saving ${type} changes...`, 'loading');
-        const deckInfo = state.deckNotesMap.get(deckString) || {};
-        const row = deckInfo.row;
+
+        const grouped = entry
+            || (state.deckNotesEntries || []).find(item => item.deckString === deckString)
+            || null;
+        const deckInfo = grouped?.deckInfo || state.deckNotesMap.get(deckString) || {};
+        const rows = grouped?.rows || [deckInfo.row];
         const colMap = state.deckNotesColumnMap;
-        const col = colMap[type];
+        const col = colMap[DECK_INFO_COLUMNS[type] ?? type];
         const deckNotesSheet = state.sheetData.sheets.find(sheet =>
             sheet.title && sheet.title.toLowerCase().includes('deck notes')
         );
@@ -297,34 +308,79 @@ export class AnalysisActions {
         const result = await host.writer.saveDeckField({
             spreadsheetId: state.spreadsheetId,
             sheet: deckNotesSheet,
-            row,
+            rows,
             col,
             value: newValue,
             expectedValue: currentValue
         });
 
         if (result && result.skippedCells == 0) {
-            if (type === 'notes') deckInfo.notes = newValue;
-            else if (type === 'additionalNotes') deckInfo.additionalNotes = newValue;
-            else if (type === 'clock') {
-                deckInfo.goldfishClock = newValue;
-                if (colMap.goldfishSignature > -1) {
-                    host.writer.signGoldfishClock({
-                        spreadsheetId: state.spreadsheetId,
-                        sheet: deckNotesSheet,
-                        row,
-                        col: colMap.goldfishSignature,
-                        signature: state.signature
-                    });
-                    deckInfo.goldfishSignature = state.signature;
-                }
-            }
+            this.applyDeckInfoChange(deckInfo, type, newValue, colMap, deckNotesSheet, rows);
             state.deckNotesMap.set(deckString, { ...deckInfo });
             host.view.updateDeckInfoValue(span, newValue);
             host.uiController.showStatus(`${type.charAt(0).toUpperCase() + type.slice(1)} saved successfully!`, 'success');
         } else {
             host.uiController.showStatus(`Failed to save ${type} changes. The original data may have been modified.`, 'info');
             logger.warn(`Failed to save ${type} changes:`, result);
+        }
+    }
+
+    /**
+     * Mirror a saved deck-info edit into the local model: the info object, the
+     * raw sheet values (if held) and every grouped entry that shares the row.
+     * A clock edit also writes the goldfish signature to column C across all
+     * rows, matching the old single-row behaviour.
+     */
+    applyDeckInfoChange(deckInfo, type, newValue, colMap, deckNotesSheet, rows) {
+        const host = this.host;
+        const state = this.state;
+
+        if (type === 'notes') deckInfo.notes = newValue;
+        else if (type === 'additionalNotes') deckInfo.additionalNotes = newValue;
+        else if (type === 'clock') {
+            deckInfo.goldfishClock = newValue;
+            if (colMap.goldfishSignature > -1) {
+                host.writer.signGoldfishClock({
+                    spreadsheetId: state.spreadsheetId,
+                    sheet: deckNotesSheet,
+                    rows,
+                    col: colMap.goldfishSignature,
+                    signature: state.signature
+                });
+                deckInfo.goldfishSignature = state.signature;
+            }
+        }
+
+        for (const item of state.deckNotesEntries || []) {
+            if (item.deckInfo && rows.includes(item.deckInfo.row)) {
+                item.deckInfo = { ...item.deckInfo, ...deckInfo };
+                if (type === 'clock' && colMap.goldfishSignature > -1) {
+                    item.signatures = [state.signature];
+                }
+            }
+        }
+
+        this.writeDeckInfoToValues(deckInfo, type, newValue, colMap, rows);
+    }
+
+    /** Keep the raw Deck Notes values in step so a re-group sees the new data. */
+    writeDeckInfoToValues(deckInfo, type, newValue, colMap, rows) {
+        const values = this.state.deckNotesValues;
+        if (!values) {
+            return;
+        }
+        const col = type === 'clock' ? colMap.goldfishClock
+            : type === 'notes' ? colMap.notes
+                : colMap.additionalNotes;
+        if (col === undefined || col === -1) {
+            return;
+        }
+        for (const row of rows) {
+            if (!values[row]) values[row] = [];
+            values[row][col] = newValue;
+            if (type === 'clock' && colMap.goldfishSignature > -1) {
+                values[row][colMap.goldfishSignature] = this.state.signature;
+            }
         }
     }
 }

@@ -79,31 +79,38 @@ export class AnalysisWriter {
         });
     }
 
-    /** Checked update of a Deck Notes field (notes / additional notes / clock). */
-    async saveDeckField({ spreadsheetId, sheet, row, col, value, expectedValue }) {
+    /**
+     * Checked update of a Deck Notes field (notes / additional notes / clock).
+     * `rows` is every spreadsheet row the edit applies to: a grouped entry
+     * writes the same value to all of its rows in one call. A single `row` is
+     * still accepted for convenience.
+     */
+    async saveDeckField({ spreadsheetId, sheet, row, rows, col, value, expectedValue }) {
+        const targets = rows || [row];
         const updates = {
-            updates: [{
+            updates: targets.map(target => ({
                 sheetId: sheet.sheetId,
-                row: row + 1,
+                row: target + 1,
                 col: col + 1,
                 value,
                 expectedValue,
                 valueType: 'auto-detect'
-            }]
+            }))
         };
         return this.sheetsAPI.checkedUpdateSheetData(spreadsheetId, updates);
     }
 
-    /** Sign the goldfish clock with the guru signature. */
-    async signGoldfishClock({ spreadsheetId, sheet, row, col, signature }) {
+    /** Sign the goldfish clock with the guru signature across every row. */
+    async signGoldfishClock({ spreadsheetId, sheet, row, rows, col, signature }) {
+        const targets = rows || [row];
         await this.sheetsAPI.updateSheetData(spreadsheetId, {
-            updates: [{
+            updates: targets.map(target => ({
                 sheetId: sheet.sheetId,
-                row: row + 1,
+                row: target + 1,
                 col: col + 1,
                 value: signature,
                 valueType: 'string'
-            }]
+            }))
         });
     }
 }

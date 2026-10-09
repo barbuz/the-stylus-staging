@@ -318,8 +318,29 @@ export class AnalysisController {
 
     showDeckNotesEditor(notesData) {
         this.updateURL();
+        this._ensureDeckNotesEditor();
+        this.deckNotesEditor.show(notesData, { sheetTitle: this.state.sheetData.title });
+    }
+
+    /** Open the deck-notes screen from an active analysis session. */
+    openDeckNotes() {
+        const deckNotesSheet = this.state.sheetData.sheets.find(sheet =>
+            sheet.title && sheet.title.toLowerCase().includes('deck notes')
+        );
+        const notesData = {
+            title: deckNotesSheet?.title || 'Deck Notes',
+            sheetId: deckNotesSheet?.sheetId,
+            values: deckNotesSheet?.values || this.state.deckNotesValues || []
+        };
+        this._ensureDeckNotesEditor();
+        this.deckNotesEditor.show(notesData, {
+            sheetTitle: this.state.sheetData.title,
+            fromAnalysis: true
+        });
+    }
+
+    _ensureDeckNotesEditor() {
         if (!this.deckNotesEditor) {
-            // Create a new instance if it doesn't exist
             this.deckNotesEditor = new DeckNotesEditor({
                 analysisInterface: this,
                 uiController: this.uiController,
@@ -327,14 +348,13 @@ export class AnalysisController {
                 sheetsAPI: this.sheetsAPI,
                 spreadsheetId: this.state.spreadsheetId,
             });
-        } else {
-            // Update references in case they changed
-            this.deckNotesEditor.uiController = this.uiController;
-            this.deckNotesEditor.scryfallAPI = this.scryfallAPI;
-            this.deckNotesEditor.sheetsAPI = this.sheetsAPI;
-            this.deckNotesEditor.spreadsheetId = this.state.spreadsheetId;
+            return;
         }
-        this.deckNotesEditor.show(notesData, this.state.sheetData.title);
+        // Update references in case they changed
+        this.deckNotesEditor.uiController = this.uiController;
+        this.deckNotesEditor.scryfallAPI = this.scryfallAPI;
+        this.deckNotesEditor.sheetsAPI = this.sheetsAPI;
+        this.deckNotesEditor.spreadsheetId = this.state.spreadsheetId;
     }
 
     calculateColorStatistics(sheetData) {
@@ -381,8 +401,8 @@ export class AnalysisController {
         return this.rowRenderer.displayDeckInfo(playerId, deckString);
     }
 
-    async saveDeckInfoField(deckString, type, currentValue, newValue, span) {
-        return this.actions.saveDeckInfoField(deckString, type, currentValue, newValue, span);
+    async saveDeckInfoField(deckString, type, currentValue, newValue, span, entry = null) {
+        return this.actions.saveDeckInfoField(deckString, type, currentValue, newValue, span, entry);
     }
 
     // --- MATCH TABLE MODAL ---

@@ -21,6 +21,7 @@ import {
     describeOutcome
 } from '../domain/analyses.js';
 import { escapeHtml, getElement } from '../utils/domUtils.js';
+import { renderDeckInfo, updateDeckInfoValue } from './deckInfoView.js';
 
 function setDisplay(element, value) {
     if (element) {
@@ -370,78 +371,17 @@ export class AnalysisView {
 
     /** Render the deck info panel for a player, wiring the inline editors. */
     renderDeckInfo(playerId, deckString, deckInfo, { onSaveField }) {
-        const container = getElement(`${playerId}-deck-info`);
-        if (!container) {
-            return;
-        }
-
-        if (!deckInfo) {
-            container.innerHTML = '';
-            return;
-        }
-
-        container.innerHTML = [
-            `<span class="deck-clock">Clock: <span class="notes-value">${escapeHtml(deckInfo.goldfishClock || '')}</span> <button class="edit-deck-info-btn" data-type="clock" title="Edit Clock">✎</button></span>`,
-            `<span class="deck-notes"><span class="notes-value">${escapeHtml(deckInfo.notes || '')}</span> <button class="edit-deck-info-btn" data-type="notes" title="Edit Notes">✎</button></span>`,
-            '<hr class="deck-separator">',
-            `<span class="deck-additional"><span class="notes-value">${escapeHtml(deckInfo.additionalNotes || '')}</span> <button class="edit-deck-info-btn" data-type="additionalNotes" title="Edit Additional Notes">✎</button></span>`
-        ].join(' ');
-
-        const handleEditClick = (event) => {
-            const btn = event.target.closest('.edit-deck-info-btn');
-            if (!btn) {
-                return;
-            }
-            const type = btn.getAttribute('data-type');
-            const span = btn.closest('span');
-            if (!span) {
-                return;
-            }
-
-            const currentValue = span.querySelector('.notes-value').textContent || '';
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = currentValue;
-            input.className = 'deck-info-edit-input';
-            input.setAttribute('aria-label', 'Edit deck info');
-            input.style.width = '70%';
-
-            const originalHTML = span.innerHTML;
-            span.innerHTML = '';
-            span.appendChild(input);
-            input.focus();
-
-            const commit = async () => {
-                const newValue = input.value;
-                span.innerHTML = originalHTML;
-                span.querySelector('.edit-deck-info-btn').addEventListener('click', handleEditClick);
-                if (newValue !== currentValue) {
-                    await onSaveField(deckString, type, currentValue, newValue, span);
-                }
-            };
-
-            input.addEventListener('keydown', (ev) => {
-                if (ev.key === 'Enter') {
-                    input.blur();
-                } else if (ev.key === 'Escape') {
-                    input.value = currentValue;
-                    input.blur();
-                }
-            });
-            input.addEventListener('blur', commit);
-        };
-
-        container.querySelectorAll('.edit-deck-info-btn').forEach(btn => {
-            btn.addEventListener('click', handleEditClick);
+        renderDeckInfo(getElement(`${playerId}-deck-info`), {
+            deckString,
+            deckInfo,
+            onSaveField,
+            variant: 'compact'
         });
     }
 
     /** Update a single deck-info note value in place after a successful save. */
     updateDeckInfoValue(span, newValue) {
-        const value = span?.querySelector('.notes-value');
-        if (value) {
-            value.textContent = newValue;
-        }
+        updateDeckInfoValue(span, newValue);
     }
 
     /**

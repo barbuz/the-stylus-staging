@@ -121,7 +121,8 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
                                 const parsed = parseA1(range);
                                 const sheet = parsed && sheetByTitle(parsed.title);
                                 if (!sheet || parsed.endRow !== null) return { range, values: [] };
-                                const cell = sheet.cells[cellKey(parsed.startRow, parsed.startCol)];
+                                // Parsed columns are 0-based; cell keys are 1-based.
+                                const cell = sheet.cells[cellKey(parsed.startRow, parsed.startCol + 1)];
                                 return { range, values: cell === undefined || cell === '' ? [] : [[cell]] };
                             })
                         });
@@ -137,6 +138,17 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
                 batchUpdate: (params) => {
                     state.batchUpdates.push(params);
                     for (const request of params.resource.requests || []) {
+                        // Sheet property changes (e.g. unhideGuruSheets) must take
+                        // effect on the modelled sheet, or the gate cannot hand
+                        // off to analysis.
+                        if (request.updateSheetProperties) {
+                            const props = request.updateSheetProperties.properties || {};
+                            const sheet = sheetById(props.sheetId);
+                            if (sheet && typeof props.hidden === 'boolean') {
+                                sheet.hidden = props.hidden;
+                            }
+                            continue;
+                        }
                         const update = request.updateCells;
                         if (!update) continue;
                         const sheet = sheetById(update.start.sheetId);
@@ -308,7 +320,7 @@ export function sampleSpreadsheet() {
  * visible. The Deck Notes header is the real one ("Signature", not "Goldfish
  * Signature"), and the metadata sheet is headerless.
  */
-export function realPodSpreadsheet() {
+export function realPodSpreadsheet({ guruHidden = false } = {}) {
     return makeSpreadsheet({
         title: 'Novice I',
         sheets: [
@@ -317,9 +329,9 @@ export function realPodSpreadsheet() {
                 sheetId: REAL_POD_SHEET_IDS.deckNotes,
                 cells: cellsFromRows(realDeckNotesRows())
             },
-            { title: 'Red Gurus', sheetId: REAL_POD_SHEET_IDS.red, cells: realPodGuruCells('red') },
-            { title: 'Blue Gurus', sheetId: REAL_POD_SHEET_IDS.blue, cells: realPodGuruCells('blue') },
-            { title: 'Green Gurus', sheetId: REAL_POD_SHEET_IDS.green, cells: realPodGuruCells('green') },
+            { title: 'Red Gurus', sheetId: REAL_POD_SHEET_IDS.red, hidden: guruHidden, cells: realPodGuruCells('red') },
+            { title: 'Blue Gurus', sheetId: REAL_POD_SHEET_IDS.blue, hidden: guruHidden, cells: realPodGuruCells('blue') },
+            { title: 'Green Gurus', sheetId: REAL_POD_SHEET_IDS.green, hidden: guruHidden, cells: realPodGuruCells('green') },
             { title: 'metadata', sheetId: REAL_POD_SHEET_IDS.metadata, hidden: true, cells: cellsFromRows(realMetadataRows()) }
         ]
     });

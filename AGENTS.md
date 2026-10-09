@@ -53,8 +53,9 @@ onto one object.
 
 - `AppState` is the single source of truth for the open pod: `sheetData`
   (and its derived `spreadsheetId`), `rows`, `rowIndex`, `guruColor`,
-  `signature`, `numDiscrepancies`, the deck-notes map/column map, the resolved
-  per-colour `columnIndex` and the `hub`. Mutate it only through its setters;
+  `signature`, `numDiscrepancies`, the deck-notes map/column map, the grouped
+  `deckNotesEntries`/`deckNotesValues`, the resolved per-colour `columnIndex` and
+  the `hub`. Mutate it only through its setters;
   `reset()` clears the per-pod fields but deliberately keeps `signature`, which
   belongs to the session rather than the pod. `currentRowKey()` /
   `findRowIndexByKey()` give a stable row identity (tab id + original row index)
@@ -99,6 +100,35 @@ mostly immutable value rather than a live field.
   `REQUEST_GURU_SIGNATURE_CHANGE`. The old `GURU_SIGNATURE_LOADED` /
   `GURU_SIGNATURE_CHANGED` events were removed with the duality they carried.
 
+### The clocks & notes gate (`js/modules/deckNotesEditor.js`)
+
+While the guru sheets are hidden, the app shows the Deck Notes screen one deck
+at a time before guruing can start. It is a gate and a view at once:
+
+- `groupDeckNotes(values, columnMap)` in `js/domain/deckNotes.js` collapses each
+  run of consecutive rows with the same decklist **and** identical editable data
+  (clock + notes + additional notes) into one entry with `rows[]` write targets.
+  The goldfish signature is not part of the identity. Non-consecutive repeats
+  stay separate.
+- `allClocksFilled` is the gate predicate; `deckNotesProgress` feeds the
+  "X of M clocks filled" line. Gating is clocks-only (the signature is shown,
+  not required).
+- `DeckNotesView` (`js/ui/deckNotesView.js`) is DOM-only and reuses the analysis
+  shell (`match-details` + `content-sidebar`) so one deck's cards sit on the left
+  with the controls on the right, stacking under them on mobile.
+- The deck-info panel is shared with the analysis screen via
+  `js/ui/deckInfoView.js`; the gate passes `variant: 'prominent'` for larger,
+  full-width edit affordances. Hovering the clock shows its goldfish
+  signature(s) with the analysis screen's `.guru-signature-tooltip`.
+- Saves go through `AnalysisController.saveDeckInfoField` →
+  `AnalysisActions.saveDeckInfoField`, which resolves the grouped entry's
+  `rows[]` and writes them all in one call (a clock edit also signs column C on
+  every row). The gate therefore reuses the analysis write path rather than
+  owning one.
+- `AnalysisController.openDeckNotes()` opens the same screen from an active
+  session; the **Deck Notes** button in the analysis controls triggers it and the
+  screen offers **Back to analysis** instead of **Start guruing**.
+
 ## Characterization (intentional current quirks)
 
 `tests/unit/characterization.test.js` pins these. Each is labelled CONTRACT
@@ -130,7 +160,7 @@ the-stylus/
 │   │   └── events.js           # Local pub/sub + APP_EVENTS (login / logout / signature)
 │   ├── domain/                 # PURE: no DOM, no gapi, no fetch, no instance state
 │   │   ├── analyses.js         # outcome calc, normalize, labels, css class, correction string
-│   │   ├── deckNotes.js        # deck-notes parsing + per-colour statistics
+│   │   ├── deckNotes.js        # deck-notes parsing/grouping + per-colour statistics
 │   │   ├── diagnosticLog.js    # diagnostic-log formatting + redaction (buffer cap, filename)
 │   │   ├── guruColor.js        # colour registry: fields, sheet names, merged-column layout
 │   │   ├── inverseCheck.js     # inverse-error detection helpers
@@ -138,7 +168,7 @@ the-stylus/
 │   │   └── recentEntries.js    # recent-pod/hub record shape + legacy sheetId fallback
 │   ├── modules/                # ES6 class-based feature modules
 │   │   ├── authManager.js
-│   │   ├── deckNotesEditor.js
+│   │   ├── deckNotesEditor.js         # Deck Notes gate controller: grouping, index, poll, hand-off
 │   │   ├── googleSheetsAPI.js
 │   │   ├── guruSignature.js
 │   │   ├── hubManager.js
@@ -156,6 +186,8 @@ the-stylus/
 │   │   ├── analysisView.js            # All DOM rendering for the scoring screen
 │   │   ├── analysisWriter.js          # All spreadsheet writes for the scoring screen
 │   │   ├── cardPresenter.js           # Scryfall card loading + preloading
+│   │   ├── deckInfoView.js            # Shared deck-info panel (compact / prominent)
+│   │   ├── deckNotesView.js           # All DOM rendering for the one-deck gate screen
 │   │   ├── guruColorSelector.js       # Colour dropdown, owns its dismiss listeners
 │   │   ├── matchStatus.js             # Pure match-status descriptors/markup
 │   │   ├── matchTableModal.js         # Match table modal, open/close/destroy
