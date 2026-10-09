@@ -28,6 +28,7 @@ export class AnalysisEventBinder {
         addEventListenerSafe('discrepancy-btn', 'click', () => host.skipToNextDiscrepancy());
         addEventListenerSafe('mirror-match-btn', 'click', () => host.skipToMirrorMatch());
         addEventListenerSafe('next-deck-btn', 'click', () => host.skipToNextDeck());
+        addEventListenerSafe('deck-notes-btn', 'click', () => host.openDeckNotes());
 
         // Guru color selector (owns its own document-level dismiss listeners)
         host.guruColorSelector = new GuruColorSelector({

@@ -7,7 +7,7 @@
  * picks the first row to score. Returns false when the caller should stop.
  */
 import { HubManager } from '../modules/hubManager.js';
-import { processDeckNotes, calculateColorStatistics } from '../domain/deckNotes.js';
+import { processDeckNotes, calculateColorStatistics, groupDeckNotes } from '../domain/deckNotes.js';
 import { determineGuruColorFromSheet } from '../domain/guruColor.js';
 import { parsePodSheets } from '../domain/matchRows.js';
 import { logger } from '../utils/log.js';
@@ -61,6 +61,13 @@ export class AnalysisSessionLoader {
 
         const deckNotesResult = processDeckNotes(sheetData);
         state.setDeckNotes(deckNotesResult.deckNotesMap, deckNotesResult.columnMap);
+        const deckNotesValues = sheetData.sheets.find(sheet =>
+            sheet.title && sheet.title.toLowerCase().includes('deck notes')
+        )?.values || null;
+        state.setDeckNotesEntries(
+            groupDeckNotes(deckNotesValues, deckNotesResult.columnMap),
+            deckNotesValues
+        );
 
         const { rows, columnIndex, numDiscrepancies } = parsePodSheets(
             sheetData, state.guruColor, state.signature

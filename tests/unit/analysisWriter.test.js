@@ -116,3 +116,41 @@ test('saveDeckField and signGoldfishClock target the spreadsheet file id', async
     assert.equal(api.calls[1].spreadsheetId, SPREADSHEET_ID);
     assert.equal(api.calls[1].updates.updates[0].sheetId, 444);
 });
+
+test('saveDeckField writes every row of a grouped entry in one call', async () => {
+    const api = recordingAPI();
+    const writer = new AnalysisWriter(api);
+    const sheet = { sheetId: 444, title: 'Deck Notes' };
+
+    await writer.saveDeckField({
+        spreadsheetId: SPREADSHEET_ID,
+        sheet,
+        rows: [1, 2, 5],
+        col: 3,
+        value: 'note',
+        expectedValue: ''
+    });
+
+    const [call] = api.calls;
+    assert.equal(call.method, 'checkedUpdateSheetData');
+    assert.equal(call.spreadsheetId, SPREADSHEET_ID);
+    // Each spreadsheet row is written 1-indexed, still targeting the tab id.
+    assert.deepEqual(call.updates.updates.map(u => u.row), [2, 3, 6]);
+    assert.deepEqual(call.updates.updates.map(u => u.sheetId), [444, 444, 444]);
+    assert.ok(call.updates.updates.every(u => u.value === 'note' && u.expectedValue === ''));
+});
+
+test('signGoldfishClock signs every row of a grouped entry', async () => {
+    const api = recordingAPI();
+    const writer = new AnalysisWriter(api);
+    const sheet = { sheetId: 444, title: 'Deck Notes' };
+
+    await writer.signGoldfishClock({
+        spreadsheetId: SPREADSHEET_ID, sheet, rows: [1, 2], col: 2, signature: 'alice'
+    });
+
+    const [call] = api.calls;
+    assert.equal(call.spreadsheetId, SPREADSHEET_ID);
+    assert.deepEqual(call.updates.updates.map(u => u.row), [2, 3]);
+    assert.ok(call.updates.updates.every(u => u.value === 'alice' && u.valueType === 'string'));
+});

@@ -97,6 +97,102 @@ export function processDeckNotes(sheetData) {
 }
 
 /**
+ * Group the Deck Notes rows into one entry per run of consecutive identical
+ * decks, for the one-deck-at-a-time gate.
+ *
+ * A run collapses only when the decklist and the editable data (clock, notes,
+ * additional notes) are identical; the goldfish signature is deliberately not
+ * part of the identity, because it records who filled the clock rather than
+ * what the deck is. Differing rows stay as several single-row entries, and
+ * repeated decklists that are not consecutive are always separate entries.
+ *
+ * `rows` holds every spreadsheet row index (values-relative, matching
+ * `processDeckNotes`) that the entry's edits must be written to.
+ *
+ * @param {Array<Array<string>>} values the Deck Notes sheet values incl. header
+ * @param {object} columnMap resolved column indices from `processDeckNotes`
+ * @returns {Array<{deckString: string, row: number, rows: number[], deckInfo: object, signatures: string[]}>}
+ */
+export function groupDeckNotes(values, columnMap) {
+    const list = [];
+    if (!values || values.length < 2 || !columnMap || columnMap.decklists === -1) {
+        return list;
+    }
+
+    const cell = (row, index) =>
+        index !== undefined && index !== -1 ? (row[index] || '').toString().trim() : '';
+
+    for (let i = 1; i < values.length; i++) {
+        const row = values[i] || [];
+        const decklist = cell(row, columnMap.decklists);
+        if (!decklist) {
+            continue;
+        }
+
+        const clock = cell(row, columnMap.goldfishClock);
+        const notes = cell(row, columnMap.notes);
+        const additionalNotes = cell(row, columnMap.additionalNotes);
+        const signature = cell(row, columnMap.goldfishSignature);
+
+        const previous = list[list.length - 1];
+        if (previous &&
+            previous.deckString === decklist &&
+            previous._clock === clock &&
+            previous._notes === notes &&
+            previous._additionalNotes === additionalNotes) {
+            previous.rows.push(i);
+            if (signature && !previous._signatures.includes(signature)) {
+                previous._signatures.push(signature);
+            }
+            continue;
+        }
+
+        list.push({
+            deckString: decklist,
+            row: i,
+            rows: [i],
+            _clock: clock,
+            _notes: notes,
+            _additionalNotes: additionalNotes,
+            _signatures: signature ? [signature] : []
+        });
+    }
+
+    return list.map(entry => {
+        const deckInfo = { row: entry.row };
+        if (entry._clock) deckInfo.goldfishClock = entry._clock;
+        if (entry._signatures.length) deckInfo.goldfishSignature = entry._signatures[0];
+        if (entry._notes) deckInfo.notes = entry._notes;
+        if (entry._additionalNotes) deckInfo.additionalNotes = entry._additionalNotes;
+
+        return {
+            deckString: entry.deckString,
+            row: entry.row,
+            rows: entry.rows,
+            deckInfo,
+            signatures: entry._signatures
+        };
+    });
+}
+
+/** Whether every grouped deck has a goldfish clock. Missing clock column = pass. */
+export function allClocksFilled(list, columnMap) {
+    if (!columnMap || columnMap.goldfishClock === -1) {
+        return true;
+    }
+    return (list || []).every(entry => !!(entry.deckInfo && entry.deckInfo.goldfishClock));
+}
+
+/** How many of the grouped decks have a goldfish clock, for the gate progress. */
+export function deckNotesProgress(list) {
+    const entries = list || [];
+    return {
+        filled: entries.filter(entry => entry.deckInfo && entry.deckInfo.goldfishClock).length,
+        total: entries.length
+    };
+}
+
+/**
  * Per-colour claimed/total match counts from the merged guru sheet, used by the
  * colour-selection screen.
  */

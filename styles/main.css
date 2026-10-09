@@ -2282,160 +2282,150 @@ section h2, .login-section h2 {
     max-height: 100vh;
 }
 
-/* Deck Notes Editor */
-.deck-notes-editor h3 {
-  margin-top: 0;
-  font-size: 1.7em;
-  color: #2c3e50;
-  margin-bottom: 10px;
+/* Deck Notes gate (one deck at a time, mirrors the analysis shell) */
+.deck-notes-screen .deck-notes-interface {
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    gap: 0;
+    width: 100%;
 }
 
-.deck-notes-editor p {
-  color: #666;
-  margin-bottom: 22px;
-  font-size: 1.05em;
+.deck-notes-screen .match-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    background: white;
+    padding: 10px;
+    overflow-x: visible;
+    position: relative;
 }
 
-.deck-notes-editor-header {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  position: relative;
-  min-height: 3em;
+.deck-notes-screen .content-sidebar {
+    flex: 0 0 30%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 20px;
+    padding: 10px;
+    height: 100vh;
 }
 
-.deck-notes-editor-header h3 {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  margin: 0;
-  pointer-events: none;
-  width: max-content;
-  z-index: 1;
+.deck-notes-screen .editor-header {
+    background: white;
+    padding: 10px;
+    margin: 0;
+    border: 1px solid #e9ecef;
+    flex-shrink: 0;
+    order: 3;
+    margin-top: auto;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 20px));
 }
 
-.deck-notes-editor-controls {
-  flex: 0 0 auto;
-  z-index: 2;
+.deck-notes-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
 }
 
-
-.deck-notes-editor-publish{
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
+.deck-notes-controls .navigation-controls {
+    position: static;
+    width: 100%;
 }
 
-.deck-notes-table {
-  width: 100%;
-  min-width: 71em;
-  margin-bottom: 18px;
-  font-size: 1em;
-  border-radius: 12px;
-  overflow: hidden;
-  overflow-x: auto;
-  table-layout: fixed;
+.deck-notes-progress {
+    font-weight: bold;
+    color: #2c3e50;
+    margin: 0;
 }
 
-.deck-notes-table th:first-child {
-  border-top-left-radius: 12px;
+.deck-notes-clocks {
+    color: #666;
+    font-size: 0.9rem;
+    margin: 0;
 }
 
-.deck-notes-table th:last-child {
-  border-top-right-radius: 12px;
+#deck-notes-next-empty-btn,
+#deck-notes-start-btn,
+#deck-notes-back-btn {
+    width: 100%;
+    max-width: 260px;
 }
 
-.deck-notes-table tr:last-child td:first-child {
-  border-bottom-left-radius: 12px;
+#deck-notes-start-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
-.deck-notes-table tr:last-child td:last-child {
-  border-bottom-right-radius: 12px;
+.deck-notes-deck {
+    justify-content: flex-start;
+    padding-top: 10px;
 }
 
-.deck-notes-table .deck-cards-list {
-  background: #e8ecf2;
-  color: #2c3e50;
-  font-weight: 500;
+/* Prominent deck-info variant: larger, full-width edit affordances */
+.deck-info.prominent {
+    font-size: 1rem;
+    line-height: 1.5;
+    padding: 14px;
 }
 
-.deck-card-link{
-    text-decoration: none;
-    color: inherit;
+.deck-info.prominent .deck-clock {
+    font-size: 1.4rem;
+    margin-bottom: 12px;
 }
 
-.card-hover-preview {
-    position: fixed;
-    z-index: 9999;
-    pointer-events: none;
-    max-width: 320px;
-    max-height: 440px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
-    border-radius: 8px;
-    background: #fff;
+.deck-info.prominent .notes-value {
+    display: block;
 }
 
-.deck-notes-table th, .deck-notes-table td {
-  border-bottom: 1px solid #e0e0e0;
-  padding: 10px 14px;
+.deck-info.prominent .deck-info-edit-input {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 1rem;
+    padding: 6px 8px;
 }
 
-.deck-notes-table th {
-  background: #e8ecf2;
-  color: #2c3e50;
-  font-weight: 700;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  text-align: center;
+/* Clock signature tooltip (shared with the analysis guru-signature tooltip) */
+.deck-clock-signed {
+    position: relative;
+    text-decoration: underline dotted;
+    text-decoration-color: #6c757d;
+    cursor: help;
 }
 
-.deck-notes-table td {
-  background: white;
-  text-align: left;
+.deck-clock-signed:hover .guru-signature-tooltip,
+.deck-clock-signed:active .guru-signature-tooltip {
+    opacity: 1;
+    transform: translateY(0);
 }
 
-.deck-notes-table [header="decklists"] { /* Decklists */
-  width: 15em;
+@media (max-width: 768px) {
+    .deck-notes-screen .deck-notes-interface {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        overflow-y: visible;
+    }
+
+    .deck-notes-screen .content-sidebar {
+        flex: none;
+        order: 2;
+        height: auto;
+        padding: 10px;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 20px));
+    }
+
+    .deck-notes-screen .match-details {
+        flex: none;
+        order: 1;
+        height: auto;
+        min-height: 0;
+        margin-bottom: 10px;
+    }
 }
 
-.deck-notes-table [header="goldfish-clock"] { /* Clock */
-  text-align: center;
-  font-weight: bold;
-  width: 6em;
-}
-
-.deck-notes-table [header="notes"] { /* Notes */
-  min-width: 30em;
-}
-
-.deck-notes-table [header="additional-notes"] { /* Additional Notes */
-  width: 20em;
-}
-
-.deck-notes-table [header="signature"] {
-  width: min-content;
-}
-
-.deck-notes-table .editable:hover {
-  background: #e3f2fd;
-  outline: 1px solid #2c3e50;
-}
-
-.deck-notes-table .editable{
-  cursor: text;
-}
-
-.deck-notes-table .editable:focus {
-  outline: 2px solid #2c3e50;
-}
-
-.deck-notes-table .updated {
-  outline: 1px solid #f1575f;
-  background: #f5eaeb;
-}
 
 /* Color Selection Screen */
 .color-selection-screen h3 {

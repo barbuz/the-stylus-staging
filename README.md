@@ -24,18 +24,28 @@ and continue guruing!
 - The app will load and parse the pod data
 - Only matches assigned to your guru signature will be displayed
 
-### 4. **Analyse Matches**
+### 4. **Fill the Goldfish Clocks**
+- Before analysing, the app opens the Deck Notes screen one deck at a time
+- The deck's cards are shown large, with its clock and notes on the right
+  (under the cards on mobile)
+- Every deck's goldfish clock must be filled before "Start guruing" unlocks
+- Repeated consecutive decks are shown once; your edits apply to each of them
+- Hover a clock to see who filled it
+
+### 5. **Analyse Matches**
 - View card images for both players
 - Use Win/Tie/Loss buttons to score matches
 - Navigate between matches with Previous/Next buttons
+- Use the **Deck Notes** button in the controls to revisit the clocks and notes
+  screen, then **Back to analysis** to return
 - Changes are saved automatically to the Google Sheet
 
-### 5. **Track Progress**
+### 6. **Track Progress**
 - See current match number and total matches
 - View completion status
 - Restart analysis if needed
 
-### 6. **Reporting a Bug**
+### 7. **Reporting a Bug**
 - Click the small **Log** button in the footer, or in the analysis screen's
   top-right controls while a pod is open
 - This downloads `the-stylus-log-YYYYMMDD-HHMMSS.txt`, a plain-text diagnostic

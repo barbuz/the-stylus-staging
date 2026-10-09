@@ -21,6 +21,12 @@ import {
     describeOutcome
 } from '../domain/analyses.js';
 import { escapeHtml, getElement } from '../utils/domUtils.js';
+import { renderDeckInfo, updateDeckInfoValue } from './deckInfoView.js';
+import {
+    renderCardSlotsLoading,
+    renderCardSlots,
+    renderCardSlotsError
+} from './cardSlotsView.js';
 
 function setDisplay(element, value) {
     if (element) {
@@ -370,78 +376,17 @@ export class AnalysisView {
 
     /** Render the deck info panel for a player, wiring the inline editors. */
     renderDeckInfo(playerId, deckString, deckInfo, { onSaveField }) {
-        const container = getElement(`${playerId}-deck-info`);
-        if (!container) {
-            return;
-        }
-
-        if (!deckInfo) {
-            container.innerHTML = '';
-            return;
-        }
-
-        container.innerHTML = [
-            `<span class="deck-clock">Clock: <span class="notes-value">${escapeHtml(deckInfo.goldfishClock || '')}</span> <button class="edit-deck-info-btn" data-type="clock" title="Edit Clock">✎</button></span>`,
-            `<span class="deck-notes"><span class="notes-value">${escapeHtml(deckInfo.notes || '')}</span> <button class="edit-deck-info-btn" data-type="notes" title="Edit Notes">✎</button></span>`,
-            '<hr class="deck-separator">',
-            `<span class="deck-additional"><span class="notes-value">${escapeHtml(deckInfo.additionalNotes || '')}</span> <button class="edit-deck-info-btn" data-type="additionalNotes" title="Edit Additional Notes">✎</button></span>`
-        ].join(' ');
-
-        const handleEditClick = (event) => {
-            const btn = event.target.closest('.edit-deck-info-btn');
-            if (!btn) {
-                return;
-            }
-            const type = btn.getAttribute('data-type');
-            const span = btn.closest('span');
-            if (!span) {
-                return;
-            }
-
-            const currentValue = span.querySelector('.notes-value').textContent || '';
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = currentValue;
-            input.className = 'deck-info-edit-input';
-            input.setAttribute('aria-label', 'Edit deck info');
-            input.style.width = '70%';
-
-            const originalHTML = span.innerHTML;
-            span.innerHTML = '';
-            span.appendChild(input);
-            input.focus();
-
-            const commit = async () => {
-                const newValue = input.value;
-                span.innerHTML = originalHTML;
-                span.querySelector('.edit-deck-info-btn').addEventListener('click', handleEditClick);
-                if (newValue !== currentValue) {
-                    await onSaveField(deckString, type, currentValue, newValue, span);
-                }
-            };
-
-            input.addEventListener('keydown', (ev) => {
-                if (ev.key === 'Enter') {
-                    input.blur();
-                } else if (ev.key === 'Escape') {
-                    input.value = currentValue;
-                    input.blur();
-                }
-            });
-            input.addEventListener('blur', commit);
-        };
-
-        container.querySelectorAll('.edit-deck-info-btn').forEach(btn => {
-            btn.addEventListener('click', handleEditClick);
+        renderDeckInfo(getElement(`${playerId}-deck-info`), {
+            deckString,
+            deckInfo,
+            onSaveField,
+            variant: 'compact'
         });
     }
 
     /** Update a single deck-info note value in place after a successful save. */
     updateDeckInfoValue(span, newValue) {
-        const value = span?.querySelector('.notes-value');
-        if (value) {
-            value.textContent = newValue;
-        }
+        updateDeckInfoValue(span, newValue);
     }
 
     /**
@@ -449,54 +394,16 @@ export class AnalysisView {
      * Returns the slots so the caller can display the loaded images.
      */
     renderCardLoading(playerId, cardNames) {
-        const container = getElement(`${playerId}-cards`);
-        if (!container) {
-            return [];
-        }
-        const slots = container.querySelectorAll('.card-slot');
-        slots.forEach((slot, index) => {
-            slot.innerHTML = index < cardNames.length
-                ? `<div class="card-loading">${escapeHtml(cardNames[index])}</div>`
-                : '<div class="card-loading">Loading...</div>';
-        });
-        return slots;
+        return renderCardSlotsLoading(playerId, cardNames);
     }
 
     /** Display loaded card images (or fall back to names) in the slots. */
-    renderCards(slots, deckImages, { getCardUrl }) {
-        for (let i = 0; i < Math.min(deckImages.length, slots.length); i++) {
-            const cardData = deckImages[i];
-            const slot = slots[i];
-
-            if (cardData.image) {
-                const link = document.createElement('a');
-                link.href = getCardUrl(cardData.cardName);
-                link.target = '_blank';
-                link.rel = 'noopener noreferrer';
-                link.className = 'card-link';
-                link.title = `Click to view ${cardData.cardName} on Scryfall`;
-
-                const displayImage = cardData.image.cloneNode();
-                displayImage.alt = cardData.cardName;
-                link.appendChild(displayImage);
-                slot.replaceChildren(link);
-            } else {
-                const url = getCardUrl(cardData.cardName, false);
-                slot.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="card-link">
-                    <div class="card-error">${escapeHtml(cardData.cardName)}</div>
-                </a>`;
-            }
-        }
-
-        for (let i = deckImages.length; i < slots.length; i++) {
-            slots[i].innerHTML = '<div class="card-loading">-</div>';
-        }
+    renderCards(slots, deckImages, options) {
+        renderCardSlots(slots, deckImages, options);
     }
 
     renderCardError(slots) {
-        slots.forEach(slot => {
-            slot.innerHTML = '<div class="card-error">Failed to load</div>';
-        });
+        renderCardSlotsError(slots);
     }
 
     /** Replace the whole interface with the empty-state message. */
