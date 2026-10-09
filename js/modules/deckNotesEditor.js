@@ -22,6 +22,8 @@ import {
 import { getElement } from '../utils/domUtils.js';
 import { DeckNotesView } from '../ui/deckNotesView.js';
 import { CardPresenter } from '../ui/cardPresenter.js';
+import { MatchTableModal } from '../ui/matchTableModal.js';
+import { DeckTablePresenter } from '../ui/deckTablePresenter.js';
 import { isDeckInfoEditing } from '../ui/deckInfoView.js';
 
 export class DeckNotesEditor {
@@ -41,10 +43,14 @@ export class DeckNotesEditor {
         this.fromAnalysis = false;
         this._clockMessageShown = false;
 
+        this.deckTableModal = new MatchTableModal();
+        this.deckTablePresenter = new DeckTablePresenter(this.deckTableModal);
+
         this.view = new DeckNotesView({
             onPrev: () => this.previousDeck(),
             onNext: () => this.nextDeck(),
             onNextEmptyClock: () => this.nextWithoutClock(),
+            onShowDeckTable: () => this.showDeckTable(),
             onStart: () => this.startGuruing(),
             onBack: () => this.close(false),
             onExit: () => this.close(true)
@@ -57,8 +63,9 @@ export class DeckNotesEditor {
      * @param {object} options
      * @param {string} options.sheetTitle
      * @param {boolean} [options.fromAnalysis] opened from an active session
+     * @param {string} [options.startDeckString] decklist to open on, after grouping
      */
-    show(notesData, { sheetTitle = '', fromAnalysis = false } = {}) {
+    show(notesData, { sheetTitle = '', fromAnalysis = false, startDeckString = null } = {}) {
         this.notesData = notesData;
         this.spreadsheetId = this.analysisInterface.state.spreadsheetId || this.spreadsheetId;
         this.sheetTitle = sheetTitle;
@@ -78,7 +85,11 @@ export class DeckNotesEditor {
         this.values = values;
         this.analysisInterface.state.setDeckNotes(deckNotesMap, columnMap);
 
+        this.deckIndex = 0;
         this._regroup();
+        if (startDeckString) {
+            this.jumpToDeckString(startDeckString);
+        }
 
         if (!this.view.ensureScreen()) {
             this.uiController.showStatus('Could not open the deck notes screen.', 'error');
@@ -94,6 +105,31 @@ export class DeckNotesEditor {
                 this.pullUpdates();
             }
         }, 3000);
+    }
+
+    /** Jump to the entry for a Player 1 deck string, if present. */
+    jumpToDeckString(deckString) {
+        if (!deckString) {
+            return;
+        }
+        const index = this.entries.findIndex(entry => entry.deckString === deckString);
+        if (index >= 0) {
+            this.deckIndex = index;
+        }
+    }
+
+    /** Grouped deck list as a jump-to-deck table, opened from the header. */
+    async showDeckTable() {
+        await this.deckTablePresenter.open({
+            entries: this.entries,
+            currentRow: this.deckIndex,
+            onSelect: (idx) => {
+                if (idx >= 0 && idx < this.entries.length) {
+                    this.deckIndex = idx;
+                    this.renderCurrent();
+                }
+            }
+        });
     }
 
     /** Rebuild the grouped entries from the current values, keeping position. */
@@ -210,6 +246,7 @@ export class DeckNotesEditor {
 
     close(backToHome = false) {
         this.stopPeriodicUpdate();
+        this.deckTableModal.close();
         this.view.destroy();
 
         if (backToHome) {

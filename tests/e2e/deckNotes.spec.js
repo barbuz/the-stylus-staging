@@ -64,7 +64,8 @@ async function signInAndLoad(page) {
 
 /** Open the clock editor for the current deck and save a new value. */
 async function editClock(page, value) {
-    await page.locator('#deck-notes-deck-info .edit-deck-info-btn[data-type="clock"]').click();
+    // The whole field is the edit target; the pencil is only a hint.
+    await page.locator('#deck-notes-deck-info .deck-field[data-field-type="clock"]').click();
     const input = page.locator('#deck-notes-deck-info .deck-info-edit-input');
     await input.fill(value);
     await input.press('Enter');
@@ -146,8 +147,19 @@ test.describe('Deck notes gate', () => {
         await signInAndLoad(page);
 
         await expect(page.locator('#deck-notes-progress')).toHaveText('Deck 1 of 3');
+        await expect(page.locator('#deck-notes-next-empty-btn')).toBeVisible();
         await page.locator('#deck-notes-next-empty-btn').click();
         await expect(page.locator('#deck-notes-progress')).toHaveText('Deck 2 of 3');
+    });
+
+    test('next without clock disappears once every clock is filled', async ({ page }) => {
+        // The real fixture has every clock filled, so the empty-clock jump is moot.
+        await installBoot(page, realPodSpreadsheet({ guruHidden: true }));
+        await page.goto('/index.html');
+        await signInAndLoad(page);
+
+        await expect(page.locator('#deck-notes-start-btn')).toBeEnabled();
+        await expect(page.locator('#deck-notes-next-empty-btn')).toBeHidden();
     });
 
     test('start guruing is gated until every clock is filled, then enters analysis', async ({ page }) => {
@@ -170,6 +182,38 @@ test.describe('Deck notes gate', () => {
         // The guru sheets were unhidden and the analysis screen took over.
         await expect(page.locator('#deck-notes-screen')).toHaveCount(0);
         await expect(page.locator('#guru-analysis-interface')).toBeVisible();
+    });
+
+    test('opening from analysis lands on the open match\'s player 1 deck', async ({ page }) => {
+        await installBoot(page, realPodSpreadsheet());
+        await page.goto('/index.html');
+        await signInAndLoad(page);
+
+        // Match 2's player 1 is Admonition Angel, which is Deck 2 in the notes.
+        await page.locator('#next-btn').click();
+        await expect(page.locator('#current-row-info')).toContainText('Match 2 of');
+
+        await page.locator('#deck-notes-btn').click();
+        await expect(page.locator('#deck-notes-screen')).toBeVisible();
+        await expect(page.locator('#deck-notes-progress')).toHaveText('Deck 2 of 4');
+    });
+
+    test('the Deck N of M button opens a jump-to-deck table', async ({ page }) => {
+        await installBoot(page, realPodSpreadsheet({ guruHidden: true }));
+        await page.goto('/index.html');
+        await signInAndLoad(page);
+
+        await expect(page.locator('#deck-notes-progress')).toHaveText('Deck 1 of 4');
+        await page.locator('#deck-notes-progress').click();
+
+        const modal = page.locator('.match-table-modal');
+        await expect(modal).toBeVisible();
+        await expect(modal.locator('.deck-group-header-name')).toHaveCount(4);
+
+        // Jump to the third deck via its table row.
+        await modal.locator('tr[data-row="2"]').click();
+        await expect(page.locator('.match-table-modal')).toHaveCount(0);
+        await expect(page.locator('#deck-notes-progress')).toHaveText('Deck 3 of 4');
     });
 
     test('the deck notes screen can be opened from analysis and returned from', async ({ page }) => {

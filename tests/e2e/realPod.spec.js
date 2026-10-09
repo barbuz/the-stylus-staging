@@ -198,7 +198,8 @@ test.describe('The Stylus against a real exported pod', () => {
         // Match 1's player-1 deck (Abraded Bluffs) has a note in the real sheet.
         // Editing it to free text that starts with a number used to be coerced
         // to a number, writing "2" and discarding the rest of the note.
-        await page.locator('#player1-deck-info .edit-deck-info-btn[data-type="notes"]').click();
+        // The whole field is the edit target; the pencil is only a hint.
+        await page.locator('#player1-deck-info .deck-field[data-field-type="notes"]').click();
         const input = page.locator('#player1-deck-info .deck-info-edit-input');
         await input.fill('2 mana, wins on turn 5');
         await input.press('Enter');

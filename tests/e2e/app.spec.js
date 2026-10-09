@@ -110,6 +110,25 @@ test.describe('The Stylus (no Google, no network)', () => {
         await expect(page.locator('#win-btn')).toBeHidden();
     });
 
+    test('the Match N of M button opens the jump-to-match table', async ({ page }) => {
+        await bootApp(page);
+        await signIn(page);
+        await loadPod(page);
+
+        await page.locator('#current-row-info').click();
+
+        const modal = page.locator('.match-table-modal');
+        await expect(modal).toBeVisible();
+        // All four match rows are listed; P1 group headers add no data-row.
+        await expect(modal.locator('tr[data-row]')).toHaveCount(4);
+        await expect(modal.locator('tr.current-row')).toHaveAttribute('data-row', '0');
+
+        // Clicking match 4 jumps the analysis screen to it.
+        await modal.locator('tr[data-row="3"]').click();
+        await expect(page.locator('.match-table-modal')).toHaveCount(0);
+        await expect(page.locator('#current-row-info')).toHaveText('Match 4 of 4');
+    });
+
     test('rejects an invalid pod URL without contacting Google', async ({ page }) => {
         await bootApp(page);
         await signIn(page);

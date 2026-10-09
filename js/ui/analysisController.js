@@ -333,9 +333,11 @@ export class AnalysisController {
             values: deckNotesSheet?.values || this.state.deckNotesValues || []
         };
         this._ensureDeckNotesEditor();
+        // Land on the deck the open match is about (Player 1's deck).
         this.deckNotesEditor.show(notesData, {
             sheetTitle: this.state.sheetData.title,
-            fromAnalysis: true
+            fromAnalysis: true,
+            startDeckString: this.state.currentRow?.player1
         });
     }
 

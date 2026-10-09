@@ -10,6 +10,10 @@
  *  - 'compact'   analysed match panel (today's appearance)
  *  - 'prominent' deck-notes page: larger affordances and full-width inputs
  *
+ * Every field is wrapped in a `.deck-field` that is itself the edit target, so
+ * the whole value area is clickable. In the 'prominent' variant a visible frame
+ * makes that obvious; the small pencil remains as an affordance in both.
+ *
  * `clockSignature` is the goldfish signature(s) to show as a hover tooltip on
  * the clock value, reusing the analysis screen's `.guru-signature-tooltip`.
  */
@@ -65,15 +69,26 @@ export function renderDeckInfo(container, {
 
     container.classList.toggle('prominent', variant === 'prominent');
 
-    const editButton = (type, title) => editable
-        ? `<button class="edit-deck-info-btn" data-type="${type}" title="${title}">✎</button>`
-        : '';
+    // Only the clock shows a signature tooltip; data-attribute is the edit type.
+    // The compact variant keeps its original look: only the clock is labelled.
+    const field = (type, label, valueHtml, extraClass = '', alwaysLabel = false) => {
+        const title = `Edit ${label}`;
+        const button = editable
+            ? `<span class="edit-deck-info-btn" data-type="${type}" title="${title}" role="button" aria-label="${title}">✎</span>`
+            : '';
+        const labelHtml = (variant === 'prominent' || alwaysLabel)
+            ? `<span class="deck-field-label">${label}:</span> `
+            : '';
+        return `<span class="deck-field ${extraClass}" data-field-type="${type}">`
+            + labelHtml
+            + `${valueHtml} ${button}</span>`;
+    };
 
     container.innerHTML = [
-        `<span class="deck-clock">Clock: ${clockValueHtml(deckInfo.goldfishClock, clockSignature)} ${editButton('clock', 'Edit Clock')}</span>`,
-        `<span class="deck-notes"><span class="notes-value">${escapeHtml(deckInfo.notes || '')}</span> ${editButton('notes', 'Edit Notes')}</span>`,
+        field('clock', 'Clock', clockValueHtml(deckInfo.goldfishClock, clockSignature), 'deck-clock', true),
+        field('notes', 'Notes', `<span class="notes-value">${escapeHtml(deckInfo.notes || '')}</span>`, 'deck-notes'),
         '<hr class="deck-separator">',
-        `<span class="deck-additional"><span class="notes-value">${escapeHtml(deckInfo.additionalNotes || '')}</span> ${editButton('additionalNotes', 'Edit Additional Notes')}</span>`
+        field('additionalNotes', 'Additional Notes', `<span class="notes-value">${escapeHtml(deckInfo.additionalNotes || '')}</span>`, 'deck-additional')
     ].join(' ');
 
     if (!editable) {
@@ -81,15 +96,15 @@ export function renderDeckInfo(container, {
     }
 
     const handleEditClick = (event) => {
-        const btn = event.target.closest('.edit-deck-info-btn');
-        if (!btn) {
-            return;
-        }
-        const type = btn.getAttribute('data-type');
-        const span = btn.closest('span');
+        // The whole .deck-field is the edit target; the pencil is just a hint.
+        const span = event.target.closest('.deck-field');
         if (!span) {
             return;
         }
+        if (span.querySelector('.deck-info-edit-input')) {
+            return;
+        }
+        const type = span.getAttribute('data-field-type');
 
         const currentValue = span.querySelector('.notes-value').textContent || '';
         const input = document.createElement('input');
@@ -106,7 +121,6 @@ export function renderDeckInfo(container, {
         const commit = async () => {
             const newValue = input.value;
             span.innerHTML = originalHTML;
-            span.querySelector('.edit-deck-info-btn').addEventListener('click', handleEditClick);
             if (newValue !== currentValue) {
                 await onSaveField(deckString, type, currentValue, newValue, span);
             }
@@ -123,8 +137,8 @@ export function renderDeckInfo(container, {
         input.addEventListener('blur', commit);
     };
 
-    container.querySelectorAll('.edit-deck-info-btn').forEach(btn => {
-        btn.addEventListener('click', handleEditClick);
+    container.querySelectorAll('.deck-field').forEach(fieldEl => {
+        fieldEl.addEventListener('click', handleEditClick);
     });
 }
 

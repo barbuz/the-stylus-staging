@@ -1803,6 +1803,11 @@ section h2, .login-section h2 {
     margin-bottom: 8px;
 }
 
+.deck-field-label {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
 .deck-separator {
     border: none;
     border-top: 1px solid #78a9d1;
@@ -1819,6 +1824,15 @@ section h2, .login-section h2 {
 
 .edit-deck-info-btn:hover {
     color: #1a3d5d;
+}
+
+/* The whole field is the edit target; the pencil is only a hint. */
+.deck-field {
+    cursor: pointer;
+}
+
+.deck-field:hover {
+    background: rgba(144, 202, 249, 0.25);
 }
 
 .card-slot {
@@ -2339,6 +2353,15 @@ section h2, .login-section h2 {
     font-weight: bold;
     color: #2c3e50;
     margin: 0;
+    cursor: pointer;
+}
+
+#deck-notes-progress:hover,
+#deck-notes-progress:focus {
+    background: #e3f2fd;
+    border-color: #90caf9;
+    box-shadow: 0 2px 8px rgba(33, 150, 243, 0.08);
+    outline: none;
 }
 
 .deck-notes-clocks {
@@ -2376,8 +2399,35 @@ section h2, .login-section h2 {
     margin-bottom: 12px;
 }
 
+/* Visible frame around each clickable field, so the whole area reads as
+   an edit affordance rather than just the small pencil. */
+.deck-info.prominent .deck-field {
+    display: block;
+    border: 2px dashed #90caf9;
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 10px;
+    background: #f5faff;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.deck-info.prominent .deck-field:hover,
+.deck-info.prominent .deck-field:focus-within {
+    border-color: #2196f3;
+    background: #e3f2fd;
+}
+
+.deck-info.prominent .deck-field .edit-deck-info-btn {
+    float: right;
+    font-size: 1.1rem;
+}
+
 .deck-info.prominent .notes-value {
     display: block;
+}
+
+.deck-info.prominent .deck-clock .notes-value {
+    display: inline;
 }
 
 .deck-info.prominent .deck-info-edit-input {
