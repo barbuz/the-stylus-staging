@@ -22,6 +22,11 @@ import {
 } from '../domain/analyses.js';
 import { escapeHtml, getElement } from '../utils/domUtils.js';
 import { renderDeckInfo, updateDeckInfoValue } from './deckInfoView.js';
+import {
+    renderCardSlotsLoading,
+    renderCardSlots,
+    renderCardSlotsError
+} from './cardSlotsView.js';
 
 function setDisplay(element, value) {
     if (element) {
@@ -389,54 +394,16 @@ export class AnalysisView {
      * Returns the slots so the caller can display the loaded images.
      */
     renderCardLoading(playerId, cardNames) {
-        const container = getElement(`${playerId}-cards`);
-        if (!container) {
-            return [];
-        }
-        const slots = container.querySelectorAll('.card-slot');
-        slots.forEach((slot, index) => {
-            slot.innerHTML = index < cardNames.length
-                ? `<div class="card-loading">${escapeHtml(cardNames[index])}</div>`
-                : '<div class="card-loading">Loading...</div>';
-        });
-        return slots;
+        return renderCardSlotsLoading(playerId, cardNames);
     }
 
     /** Display loaded card images (or fall back to names) in the slots. */
-    renderCards(slots, deckImages, { getCardUrl }) {
-        for (let i = 0; i < Math.min(deckImages.length, slots.length); i++) {
-            const cardData = deckImages[i];
-            const slot = slots[i];
-
-            if (cardData.image) {
-                const link = document.createElement('a');
-                link.href = getCardUrl(cardData.cardName);
-                link.target = '_blank';
-                link.rel = 'noopener noreferrer';
-                link.className = 'card-link';
-                link.title = `Click to view ${cardData.cardName} on Scryfall`;
-
-                const displayImage = cardData.image.cloneNode();
-                displayImage.alt = cardData.cardName;
-                link.appendChild(displayImage);
-                slot.replaceChildren(link);
-            } else {
-                const url = getCardUrl(cardData.cardName, false);
-                slot.innerHTML = `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="card-link">
-                    <div class="card-error">${escapeHtml(cardData.cardName)}</div>
-                </a>`;
-            }
-        }
-
-        for (let i = deckImages.length; i < slots.length; i++) {
-            slots[i].innerHTML = '<div class="card-loading">-</div>';
-        }
+    renderCards(slots, deckImages, options) {
+        renderCardSlots(slots, deckImages, options);
     }
 
     renderCardError(slots) {
-        slots.forEach(slot => {
-            slot.innerHTML = '<div class="card-error">Failed to load</div>';
-        });
+        renderCardSlotsError(slots);
     }
 
     /** Replace the whole interface with the empty-state message. */

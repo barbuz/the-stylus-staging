@@ -19,9 +19,9 @@ import {
     allClocksFilled,
     deckNotesProgress
 } from '../domain/deckNotes.js';
-import { logger } from '../utils/log.js';
 import { getElement } from '../utils/domUtils.js';
 import { DeckNotesView } from '../ui/deckNotesView.js';
+import { CardPresenter } from '../ui/cardPresenter.js';
 import { isDeckInfoEditing } from '../ui/deckInfoView.js';
 
 export class DeckNotesEditor {
@@ -49,6 +49,7 @@ export class DeckNotesEditor {
             onBack: () => this.close(false),
             onExit: () => this.close(true)
         });
+        this.cards = new CardPresenter(scryfallAPI, this.view);
     }
 
     /**
@@ -165,19 +166,9 @@ export class DeckNotesEditor {
     }
 
     async _renderCards(deckString) {
-        const cardNames = this.scryfallAPI.parseDeckString(deckString);
-        const slots = this.view.renderCardLoading('deck-notes-cards', cardNames);
         this.scryfallAPI.preloadCards(deckString);
-
-        try {
-            const deckImages = await this.scryfallAPI.getDeckImages(deckString);
-            this.view.renderCards(slots, deckImages, {
-                getCardUrl: (name, exact) => this.scryfallAPI.getCardUrl(name, exact)
-            });
-        } catch (error) {
-            logger.error(`Error loading cards for deck "${deckString}":`, error);
-            this.view.renderCardError(slots);
-        }
+        // The view's card container is #deck-notes-cards, i.e. playerId 'deck-notes'.
+        await this.cards.loadPlayerCards('deck-notes', deckString);
     }
 
     async previousDeck() {

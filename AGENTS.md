@@ -120,6 +120,11 @@ at a time before guruing can start. It is a gate and a view at once:
   `js/ui/deckInfoView.js`; the gate passes `variant: 'prominent'` for larger,
   full-width edit affordances. Hovering the clock shows its goldfish
   signature(s) with the analysis screen's `.guru-signature-tooltip`.
+- Card slots are shared too: `js/ui/cardSlotsView.js` holds the three
+  `renderCardSlots*` helpers, and both `AnalysisView` and `DeckNotesView`
+  delegate to them. Card *loading* goes through one `CardPresenter` in each
+  screen, whose `loadPlayerCards(playerId, deck)` contract is
+  `<playerId>-cards` (the gate uses `playerId: 'deck-notes'`).
 - Saves go through `AnalysisController.saveDeckInfoField` →
   `AnalysisActions.saveDeckInfoField`, which resolves the grouped entry's
   `rows[]` and writes them all in one call (a clock edit also signs column C on
@@ -186,6 +191,7 @@ the-stylus/
 │   │   ├── analysisView.js            # All DOM rendering for the scoring screen
 │   │   ├── analysisWriter.js          # All spreadsheet writes for the scoring screen
 │   │   ├── cardPresenter.js           # Scryfall card loading + preloading
+│   │   ├── cardSlotsView.js           # Shared card-slot renderers (both screens)
 │   │   ├── deckInfoView.js            # Shared deck-info panel (compact / prominent)
 │   │   ├── deckNotesView.js           # All DOM rendering for the one-deck gate screen
 │   │   ├── guruColorSelector.js       # Colour dropdown, owns its dismiss listeners

@@ -369,9 +369,7 @@ export class AnalysisActions {
         if (!values) {
             return;
         }
-        const col = type === 'clock' ? colMap.goldfishClock
-            : type === 'notes' ? colMap.notes
-                : colMap.additionalNotes;
+        const col = colMap[DECK_INFO_COLUMNS[type] ?? type];
         if (col === undefined || col === -1) {
             return;
         }
