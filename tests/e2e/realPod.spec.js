@@ -191,6 +191,24 @@ test.describe('The Stylus against a real exported pod', () => {
         expect(errors).toEqual([]);
     });
 
+    test('saves a deck note that begins with a number without truncating it', async ({ page }) => {
+        await bootRealPod(page);
+        await signInAndLoad(page);
+
+        // Match 1's player-1 deck (Abraded Bluffs) has a note in the real sheet.
+        // Editing it to free text that starts with a number used to be coerced
+        // to a number, writing "2" and discarding the rest of the note.
+        await page.locator('#player1-deck-info .edit-deck-info-btn[data-type="notes"]').click();
+        const input = page.locator('#player1-deck-info .deck-info-edit-input');
+        await input.fill('2 mana, wins on turn 5');
+        await input.press('Enter');
+
+        // Deck Notes columns are A:E, so Notes is column 4 and match 1 is row 2.
+        await expect.poll(
+            () => page.evaluate(() => window.__stylus.getCell('Deck Notes', 2, 4))
+        ).toBe('2 mana, wins on turn 5');
+    });
+
     test('a mirrored row shows the same decks with the players swapped', async ({ page }) => {
         await bootRealPod(page);
         await signInAndLoad(page);

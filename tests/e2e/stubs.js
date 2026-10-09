@@ -121,7 +121,7 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
                                 const parsed = parseA1(range);
                                 const sheet = parsed && sheetByTitle(parsed.title);
                                 if (!sheet || parsed.endRow !== null) return { range, values: [] };
-                                const cell = sheet.cells[cellKey(parsed.startRow, parsed.startCol)];
+                                const cell = sheet.cells[cellKey(parsed.startRow, parsed.startCol + 1)];
                                 return { range, values: cell === undefined || cell === '' ? [] : [[cell]] };
                             })
                         });
@@ -130,7 +130,7 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
                         state.requests.push({ kind: 'values.clear', params });
                         const parsed = parseA1(params.range);
                         const sheet = parsed && sheetByTitle(parsed.title);
-                        if (sheet) delete sheet.cells[cellKey(parsed.startRow, parsed.startCol)];
+                        if (sheet) delete sheet.cells[cellKey(parsed.startRow, parsed.startCol + 1)];
                         return ok({ clearedRange: params.range });
                     }
                 },
