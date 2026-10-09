@@ -10,6 +10,38 @@ import {
 } from '../domain/guruColor.js';
 import { logger } from '../utils/log.js';
 
+/**
+ * Build a Sheets `userEnteredValue` for a cell.
+ *
+ * Auto-detection only treats a value as numeric when the *whole* trimmed string
+ * is a number. `parseFloat` alone would accept a leading number and discard the
+ * rest, so a free-text note like "2 mana, wins on turn 5" would be written as
+ * `2`. An empty value is written as an empty string rather than NaN.
+ */
+const NUMERIC_PATTERN = /^[+-]?(\d+(\.\d*)?|\.\d+)([eE][+-]?\d+)?$/;
+
+function buildUserEnteredValue(valueType, value) {
+    switch (valueType) {
+        case 'number':
+            return { numberValue: parseFloat(value) };
+        case 'string':
+            return { stringValue: value.toString() };
+        case 'formula':
+            return { formulaValue: value.toString() };
+        case 'boolean':
+            return { boolValue: value === 'true' || value === true };
+        default: {
+            // Auto-detection: only a value that is entirely a number is numeric.
+            const str = value == null ? '' : value.toString();
+            const trimmed = str.trim();
+            if (trimmed !== '' && NUMERIC_PATTERN.test(trimmed)) {
+                return { numberValue: parseFloat(trimmed) };
+            }
+            return { stringValue: str };
+        }
+    }
+}
+
 export class GoogleSheetsAPI {
     constructor(authManager) {
         this.authManager = authManager;
@@ -361,31 +393,7 @@ export class GoogleSheetsAPI {
                 targetSheetId = resolved.targetSheetId;
                 targetCol = resolved.targetCol;
 
-                // Use the explicitly specified value type
-                let userEnteredValue;
-
-                switch (update.valueType) {
-                    case 'number':
-                        userEnteredValue = { numberValue: parseFloat(update.value) };
-                        break;
-                    case 'string':
-                        userEnteredValue = { stringValue: update.value.toString() };
-                        break;
-                    case 'formula':
-                        userEnteredValue = { formulaValue: update.value.toString() };
-                        break;
-                    case 'boolean':
-                        userEnteredValue = { boolValue: Boolean(update.value) };
-                        break;
-                    default:
-                        // Fallback to auto-detection if type not specified
-                        const numValue = parseFloat(update.value);
-                        if (!isNaN(numValue) && isFinite(numValue)) {
-                            userEnteredValue = { numberValue: numValue };
-                        } else {
-                            userEnteredValue = { stringValue: update.value.toString() };
-                        }
-                }
+                const userEnteredValue = buildUserEnteredValue(update.valueType, update.value);
 
                 return {
                     updateCells: {
@@ -513,22 +521,7 @@ export class GoogleSheetsAPI {
             // Proceed with the update using the existing updateSheetData logic for passing updates only
             const updateRequests = passedChecks.map(result => {
                 const update = result.update;
-                let userEnteredValue;
-                if (update.valueType === 'number') {
-                    userEnteredValue = { numberValue: parseFloat(update.value) };
-                } else if (update.valueType === 'boolean') {
-                    userEnteredValue = { boolValue: update.value === 'true' || update.value === true };
-                } else if (update.valueType === 'string') {
-                    userEnteredValue = { stringValue: update.value.toString() };
-                } else {
-                    // Fallback to auto-detection if type not specified
-                    const numValue = parseFloat(update.value);
-                    if (!isNaN(numValue) && isFinite(numValue)) {
-                        userEnteredValue = { numberValue: numValue };
-                    } else {
-                        userEnteredValue = { stringValue: update.value.toString() };
-                    }
-                }
+                const userEnteredValue = buildUserEnteredValue(update.valueType, update.value);
                 return {
                     updateCells: {
                         start: {

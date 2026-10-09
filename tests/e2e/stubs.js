@@ -131,7 +131,7 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
                         state.requests.push({ kind: 'values.clear', params });
                         const parsed = parseA1(params.range);
                         const sheet = parsed && sheetByTitle(parsed.title);
-                        if (sheet) delete sheet.cells[cellKey(parsed.startRow, parsed.startCol)];
+                        if (sheet) delete sheet.cells[cellKey(parsed.startRow, parsed.startCol + 1)];
                         return ok({ clearedRange: params.range });
                     }
                 },
