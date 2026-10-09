@@ -144,8 +144,16 @@ at a time before guruing can start. It is a gate and a view at once:
   opens `DeckTablePresenter` (`js/ui/deckTablePresenter.js`) over the shared
   `OverviewTableModal`, so the gate gets a jump-to-deck table shaped like the
   analysis screen's match table. The modal is generic: a caller passes `headers`
-  and `bodyHtml`; the analysis `MatchTablePresenter` now builds its rows the
-  same way.
+  and `bodyHtml`; the analysis `MatchTablePresenter` builds its rows the same
+  way.
+  - The deck table is flat — one row per deck, **no** `deck-group-header`
+    rows (a grouped entry is a single deck, so grouping would be redundant).
+    Unlike the match table, the P1 deck is a normal column.
+  - The clock column shows the clock's **value**, not a checkmark. The
+    signature and both notes columns are tagged `overview-table-optional` and
+    hidden below 1000px, reusing the match table's breakpoint.
+  - A deck whose goldfish signature matches `state.signature` gets the same
+    `current-guru-row` highlight as the match table.
 
 ## Characterization (intentional current quirks)
 

@@ -208,12 +208,41 @@ test.describe('Deck notes gate', () => {
 
         const modal = page.locator('.overview-table-modal');
         await expect(modal).toBeVisible();
-        await expect(modal.locator('.deck-group-header-name')).toHaveCount(4);
+        // One row per deck, no group headers (each entry is a single deck).
+        await expect(modal.locator('tr[data-row]')).toHaveCount(4);
+        await expect(modal.locator('.deck-group-header')).toHaveCount(0);
+
+        // The clock column shows the value, not a checkmark.
+        await expect(modal.locator('tr[data-row="0"] .deck-overview-clock')).toHaveText('8.0');
+
+        // With room, the signature and both notes columns are shown too.
+        const headerText = await modal.locator('thead').innerText();
+        expect(headerText).toContain('Signature');
+        expect(headerText).toContain('Notes');
+        expect(headerText).toContain('Additional Notes');
+        await expect(modal.locator('tr[data-row="0"]')).toContainText('Kamatana');
+        await expect(modal.locator('tr[data-row="0"]')).toContainText('Can Erode');
 
         // Jump to the third deck via its table row.
         await modal.locator('tr[data-row="2"]').click();
         await expect(page.locator('.overview-table-modal')).toHaveCount(0);
         await expect(page.locator('#deck-notes-progress')).toHaveText('Deck 3 of 4');
+    });
+
+    test('a deck filled by the current guru is highlighted in the deck table', async ({ page }) => {
+        await installBoot(page, gateSpreadsheet([
+            ['A | Card | Card', '5.0', SIGNATURE, 'note A', ''],
+            ['B | Card | Card', '7.0', 'someone else', '', '']
+        ]));
+        await page.goto('/index.html');
+        await signInAndLoad(page);
+
+        await page.locator('#deck-notes-progress').click();
+        const modal = page.locator('.overview-table-modal');
+
+        await expect(modal.locator('tr.current-guru-row')).toHaveCount(1);
+        await expect(modal.locator('tr.current-guru-row')).toHaveAttribute('data-row', '0');
+        await expect(modal.locator('tr.current-row')).toHaveAttribute('data-row', '0');
     });
 
     test('the deck notes screen can be opened from analysis and returned from', async ({ page }) => {

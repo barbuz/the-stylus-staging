@@ -16,11 +16,14 @@ export class OverviewTableModal {
     /**
      * @param {object} options
      * @param {Array<string>} options.headers column header labels
+     * @param {number} [options.optionalFromIndex] columns at/after this index are
+     *   tagged `overview-table-optional`; callers also tag the matching body
+     *   cells and CSS hides them on narrow screens.
      * @param {string} options.bodyHtml trusted tbody markup; rows use data-row
      * @param {number} options.currentRowIndex
      * @param {Function} options.onSelect called with the chosen row index
      */
-    async open({ headers = [], bodyHtml = '', currentRowIndex, onSelect }) {
+    async open({ headers = [], optionalFromIndex = Infinity, bodyHtml = '', currentRowIndex, onSelect }) {
         this.close();
 
         const overlay = document.createElement('div');
@@ -33,7 +36,10 @@ export class OverviewTableModal {
         table.className = 'overview-table';
 
         const headerHtml = headers
-            .map(header => `<th>${escapeHtml(header)}</th>`)
+            .map((header, idx) => {
+                const optional = idx >= optionalFromIndex ? ' overview-table-optional' : '';
+                return `<th class="${optional.trim()}">${escapeHtml(header)}</th>`;
+            })
             .join('');
 
         table.innerHTML = `
