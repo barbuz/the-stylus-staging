@@ -65,6 +65,10 @@ onto one object.
   `analysisNavigation`, `analysisSessionLoader`) read it via `host.state`.
 - `reload({ preservePosition })` in `analysisActions.js` is the only reload
   path. A failed refresh is non-fatal by design: the screen keeps its data.
+  Concurrent reloads coalesce rather than racing: a refresh already in flight
+  re-runs with the latest requested position, and it resolves that position
+  *after* the fetch lands, so a user who clicks Next while the write-triggered
+  refresh is in flight is not yanked back to the match they just solved.
 - `EventBus` / `APP_EVENTS` replace the `window` CustomEvents that used to carry
   the login / logout / signature flow. `main.js` subscribes in
   `setupEventSubscriptions()`; `AuthManager` and `GuruSignature` emit and
