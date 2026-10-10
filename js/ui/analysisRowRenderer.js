@@ -72,28 +72,46 @@ export class AnalysisRowRenderer {
         this.displayDeckInfo('player1', currentRow.player1);
         this.displayDeckInfo('player2', currentRow.player2);
 
-        host.view.renderOutcome(currentRow.outcomeValue);
+        await this.renderRowOutputs(currentRow);
 
+        await cards1Loaded;
+        await cards2Loaded;
+
+        host.cards.preloadRows(state.rows, this.rowsToPreload());
+    }
+
+    /**
+     * Re-render the current row's local outputs in place, without the card or
+     * URL work a full render does. Used after a score/clear mutates the row so
+     * the ownership button, analysis list, outcome and discrepancy tally update
+     * immediately rather than after the background reload() re-fetch returns.
+     */
+    async refreshCurrentRow() {
+        const { state } = this.host;
+        if (state.rowIndex < 0 || state.rowIndex >= state.rows.length) return;
+        await this.renderRowOutputs(state.rows[state.rowIndex]);
+    }
+
+    /** Everything derived purely from the current row object. */
+    async renderRowOutputs(currentRow) {
+        const host = this.host;
+        const { state } = host;
+
+        host.view.renderOutcome(currentRow.outcomeValue);
         await this.renderAnalysisDisplay(currentRow);
 
         const currentAnalysis = host.getCurrentColorAnalysis(currentRow);
-        const currentAnalysisValue = currentAnalysis ? parseFloat(currentAnalysis) : null;
         host.view.renderButtons({
             row: currentRow,
             colour: state.guruColor,
             signature: state.signature,
-            analysisValue: currentAnalysisValue,
+            analysisValue: currentAnalysis ? parseFloat(currentAnalysis) : null,
             deckStats: host.getDeckStats()
         });
 
         host.view.renderNavigation(state.rowIndex, state.rows.length);
         host.view.renderDiscrepancyButton(state.numDiscrepancies);
         host.updateInverseResultDisplay();
-
-        await cards1Loaded;
-        await cards2Loaded;
-
-        host.cards.preloadRows(state.rows, this.rowsToPreload());
     }
 
     /** Build the analysis list, fetching its Discord thread link if any. */

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { AnalysisActions } from '../../js/ui/analysisActions.js';
 import { AppState } from '../../js/app/appState.js';
-import { parsePodSheets } from '../../js/domain/matchRows.js';
+import { parsePodSheets, countMyDiscrepancies } from '../../js/domain/matchRows.js';
 import { makeSheetData } from '../fixtures/sheetData.js';
 
 /**
@@ -23,9 +23,9 @@ function makeHost({ sheetData, refetched, guruColor = 'red', signature = 'alice'
         },
         uiController: { showStatus() {} },
         parseSheets(fresh) {
-            const { rows, numDiscrepancies } = parsePodSheets(fresh, this.state.guruColor, this.state.signature);
+            const { rows } = parsePodSheets(fresh);
             this.state.setRows(rows);
-            this.state.setNumDiscrepancies(numDiscrepancies);
+            this.state.setNumDiscrepancies(countMyDiscrepancies(rows, this.state.guruColor, this.state.signature));
         },
         async showCurrentRow() {
             this.rendered++;
@@ -115,6 +115,37 @@ test('reload with preservePosition false returns to the first row', async () => 
     await new AnalysisActions(host).reload({ preservePosition: false });
 
     assert.equal(host.state.rowIndex, 0);
+});
+
+test('a refresh in flight does not snap back after the user moves to the next row', async () => {
+    const sheetData = makeSheetData({ guruRows: [
+        ['1', 'Deck A', 'Deck B', '1', 'alice', '1', 'bob', '1', 'carol'],
+        ['2', 'Deck D', 'Deck E', '', '', '', '', '', ''],
+        ['3', 'Deck F', 'Deck G', '', '', '', '', '', '']
+    ] });
+
+    const host = makeHost({ sheetData, refetched: sheetData });
+    host.parseSheets(sheetData);
+    host.state.setRowIndex(0);
+
+    // Hold the re-fetch open so we can move the user while it is in flight.
+    let releaseFetch;
+    const fetchGate = new Promise(resolve => { releaseFetch = resolve; });
+    host.sheetsAPI.getSheetData = async () => {
+        await fetchGate;
+        return sheetData;
+    };
+
+    const actions = new AnalysisActions(host);
+    const reloading = actions.reload();
+
+    // The user scores and hits Next before the refresh lands.
+    host.state.setRowIndex(1);
+    releaseFetch();
+    await reloading;
+
+    assert.equal(host.state.rowIndex, 1, 'refresh must not pull the user back to the solved row');
+    assert.equal(host.state.currentRow.player1, 'Deck D');
 });
 
 test('a failed re-fetch is non-fatal and keeps the current data', async () => {

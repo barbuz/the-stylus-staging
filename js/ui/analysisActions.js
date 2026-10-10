@@ -33,6 +33,11 @@ const DECK_INFO_COLUMNS = {
 export class AnalysisActions {
     constructor(host) {
         this.host = host;
+        // Coalesce concurrent reloads: a fetch already in flight must not win a
+        // race with the user, and only the last requested position should land.
+        this._reloadInFlight = null;
+        this._reloadRequested = false;
+        this._reloadPreservePosition = true;
     }
 
     get state() {
@@ -68,7 +73,9 @@ export class AnalysisActions {
             currentRow.outcomeValue = calculateOutcomeFromAnalyses(...getGuruAnalysisValues(currentRow));
 
             host.view.highlightAnalysisButton(value);
-            await host.renderAnalysisDisplay(currentRow);
+            // Update the row's outputs from local state now; reload() would only
+            // do it once its re-fetch returns, a visible delay after a score.
+            await host.refreshCurrentRow();
 
             host.uiController.showStatus(`Analysis saved: ${getAnalysisLabel(value)}`, 'success');
 
@@ -193,22 +200,12 @@ export class AnalysisActions {
             });
 
             setColourAnalysis(currentRow, state.guruColor, '');
-
-            const oldOutcome = currentRow.outcomeValue;
             currentRow.outcomeValue = calculateOutcomeFromAnalyses(...getGuruAnalysisValues(currentRow));
-
-            if (oldOutcome === 'discrepancy' && currentRow.outcomeValue !== 'discrepancy') {
-                state.setNumDiscrepancies(state.numDiscrepancies - 1);
-            } else if (oldOutcome !== 'discrepancy' && currentRow.outcomeValue === 'discrepancy') {
-                state.setNumDiscrepancies(state.numDiscrepancies + 1);
-            }
 
             host.reload();
             host.uiController.showStatus('Your analysis was cleared.', 'success');
 
-            if (clearButton) clearButton.style.display = 'none';
-
-            await host.showCurrentRow();
+            await host.refreshCurrentRow();
         } catch (error) {
             logger.error('Error clearing analysis:', error);
             host.view.endSpinner(clearButton);
@@ -273,20 +270,45 @@ export class AnalysisActions {
      */
     async reload({ preservePosition = true } = {}) {
         const host = this.host;
-        const state = this.state;
-        try {
-            const key = preservePosition ? state.currentRowKey() : null;
-            const freshSheetData = await host.sheetsAPI.getSheetData(state.spreadsheetId);
 
-            state.setSheetData(freshSheetData);
-            host.parseSheets(freshSheetData);
-
-            const newRowIndex = state.findRowIndexByKey(key);
-            state.setRowIndex(newRowIndex >= 0 ? newRowIndex : 0);
-            await host.showCurrentRow();
-        } catch (error) {
-            logger.warn('Background data refresh failed:', error);
+        // If a refresh is already running, mark that another is wanted and let
+        // the in-flight one re-run; starting a second fetch would let an older
+        // response land after a newer one.
+        this._reloadRequested = true;
+        this._reloadPreservePosition = preservePosition;
+        if (this._reloadInFlight) {
+            return this._reloadInFlight;
         }
+
+        this._reloadInFlight = (async () => {
+            try {
+                while (this._reloadRequested) {
+                    this._reloadRequested = false;
+                    const state = this.state;
+                    const freshSheetData = await host.sheetsAPI.getSheetData(state.spreadsheetId);
+
+                    // Resolve the position only once the fetch has landed. The
+                    // user may have clicked Next (or another row) while it was in
+                    // flight, so read the key now rather than before the fetch —
+                    // otherwise the refresh would yank them back to the match
+                    // they had already moved on from.
+                    const key = this._reloadPreservePosition ? state.currentRowKey() : null;
+
+                    state.setSheetData(freshSheetData);
+                    host.parseSheets(freshSheetData);
+
+                    const newRowIndex = state.findRowIndexByKey(key);
+                    state.setRowIndex(newRowIndex >= 0 ? newRowIndex : 0);
+                    await host.showCurrentRow();
+                }
+            } catch (error) {
+                logger.warn('Background data refresh failed:', error);
+            } finally {
+                this._reloadInFlight = null;
+            }
+        })();
+
+        return this._reloadInFlight;
     }
 
     async saveDeckInfoField(deckString, type, currentValue, newValue, span, entry = null) {

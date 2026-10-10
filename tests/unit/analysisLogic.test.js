@@ -40,6 +40,7 @@ import {
     hasCurrentColorResult,
     rowHasDiscrepancy,
     rowHasMyDiscrepancy,
+    countMyDiscrepancies,
     allGurusHaveMatchingResults,
     isMatchAvailableForAnalysis,
     isCurrentMatchAvailableForAnalysis,
@@ -144,7 +145,7 @@ test('buildMatchRows maps columns and computes outcomes', () => {
         ['2', 'Deck A', 'Deck C', '0', 'alice', '', '', '', '']
     ]);
 
-    const { rows, columnIndices } = buildMatchRows(sheet, 0, 'red', '');
+    const { rows, columnIndices } = buildMatchRows(sheet, 0);
 
     assert.equal(rows.length, 2);
     assert.equal(columnIndices.redAnalysis, 3);
@@ -174,7 +175,7 @@ test('buildMatchRows skips rows with no player data', () => {
         ['2', 'Deck A', 'Deck B', '1', '', '1', '', '1', '']
     ]);
 
-    const { rows } = buildMatchRows(sheet, 0, 'red', '');
+    const { rows } = buildMatchRows(sheet, 0);
 
     assert.equal(rows.length, 1);
     assert.equal(rows[0].player1, 'Deck A');
@@ -183,10 +184,10 @@ test('buildMatchRows skips rows with no player data', () => {
 test('buildMatchRows throws a helpful error when columns are missing', () => {
     const sheet = { title: 'Merged Gurus', sheetId: 1, values: [['ID', 'Player 1']] };
 
-    assert.throws(() => buildMatchRows(sheet, 0, 'red', ''), /required columns are missing/);
+    assert.throws(() => buildMatchRows(sheet, 0), /required columns are missing/);
 });
 
-test('buildMatchRows counts my discrepancies only for claimed rows', () => {
+test('countMyDiscrepancies counts only rows I have claimed and scored', () => {
     const sheet = makeMergedGuruSheet([
         // Discrepancy on a row alice has claimed and scored.
         ['1', 'Deck A', 'Deck B', '1', 'alice', '0', 'bob', '0', 'carol'],
@@ -196,9 +197,9 @@ test('buildMatchRows counts my discrepancies only for claimed rows', () => {
         ['3', 'Deck E', 'Deck F', '1', 'alice', '1', 'bob', '1', 'carol']
     ]);
 
-    const { numDiscrepancies } = buildMatchRows(sheet, 0, 'red', 'alice');
+    const { rows } = buildMatchRows(sheet, 0);
 
-    assert.equal(numDiscrepancies, 1);
+    assert.equal(countMyDiscrepancies(rows, 'red', 'alice'), 1);
 });
 
 // --- Deck notes parsing ------------------------------------------------------
@@ -225,6 +226,25 @@ test('processDeckNotes builds a map keyed by decklist', () => {
         additionalNotes: 'more notes'
     });
     assert.deepEqual(result.deckNotesMap.get('Deck C'), { row: 2 });
+});
+
+test('recomputeNumDiscrepancies re-derives the tally from the live rows', () => {
+    const instance = logic();
+    instance.state = new AppState();
+    instance.state.setGuruColor('red');
+    instance.state.setSignature('alice');
+    instance.state.setRows([
+        { redAnalysis: '1', redSignature: 'alice', blueAnalysis: '0', greenAnalysis: '0' },
+        { redAnalysis: '1', redSignature: 'alice', blueAnalysis: '1', greenAnalysis: '1' }
+    ]);
+
+    instance.recomputeNumDiscrepancies();
+    assert.equal(instance.state.numDiscrepancies, 1);
+
+    // A local re-score that removes the disagreement updates the tally.
+    instance.state.rows[0].redAnalysis = '0';
+    instance.recomputeNumDiscrepancies();
+    assert.equal(instance.state.numDiscrepancies, 0);
 });
 
 // --- Row predicates ----------------------------------------------------------

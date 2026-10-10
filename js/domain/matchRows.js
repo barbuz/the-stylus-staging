@@ -28,12 +28,11 @@ export function findColumnIndex(headerRow, possibleNames) {
 /**
  * Build the row model from a merged guru sheet.
  *
- * Returns the rows that carry player data, the resolved column indices, and the
- * count of the current guru's discrepancies. Rows without player data still
- * count toward `numDiscrepancies` but are not returned, matching the original
- * single-pass behaviour.
+ * Returns the rows that carry player data and the resolved column indices.
+ * Discrepancy counting lives in `countMyDiscrepancies` and is applied by
+ * `parsePodSheets`.
  */
-export function buildMatchRows(sheet, sheetIndex, colour, signature) {
+export function buildMatchRows(sheet, sheetIndex) {
     const headerRow = sheet.values[0];
 
     // Expected columns: ID, Player1, Player2, Red Analysis, Red Signature,
@@ -56,7 +55,6 @@ export function buildMatchRows(sheet, sheetIndex, colour, signature) {
     }
 
     const rows = [];
-    let discrepancies = 0;
 
     // Process data rows (skip header)
     for (let rowIndex = 1; rowIndex < sheet.values.length; rowIndex++) {
@@ -94,18 +92,13 @@ export function buildMatchRows(sheet, sheetIndex, colour, signature) {
             originalRowIndex // Use the original row index from unfiltered data
         };
 
-        // Check for discrepancies for the current guru
-        if (rowHasMyDiscrepancy(newRow, colour, signature)) {
-            discrepancies++;
-        }
-
         // Only include rows that have player data
         if (player1.trim() || player2.trim()) {
             rows.push(newRow);
         }
     }
 
-    return { rows, columnIndices, numDiscrepancies: discrepancies };
+    return { rows, columnIndices };
 }
 
 // --- Row predicates ----------------------------------------------------------
@@ -164,6 +157,15 @@ export function rowHasDiscrepancy(row) {
 /** A discrepancy on a row the current guru has claimed and scored. */
 export function rowHasMyDiscrepancy(row, colour, signature) {
     return rowHasDiscrepancy(row) && rowHasCurrentGuruSignature(row, signature) && hasCurrentColorResult(row, colour);
+}
+
+/**
+ * Count the current guru's discrepancies across a row model. The single source
+ * of truth for the tally: load (parsePodSheets) and the local post-score
+ * recompute both derive it here, so the two cannot drift.
+ */
+export function countMyDiscrepancies(rows, colour, signature) {
+    return rows.filter(row => rowHasMyDiscrepancy(row, colour, signature)).length;
 }
 
 /** All three gurus have scored and agree. */
@@ -364,30 +366,29 @@ export function hasDiscordThreadForRow(threadMap, row, fallbackIndex) {
  * Parse every guru sheet in a pod into one row model.
  *
  * The merged-guru sheet is the only analysis sheet; other sheets are skipped.
- * Returns the combined rows, the resolved column index for the current colour,
- * and the discrepancy count. Extracted from the controller so loading is a pure
- * data transformation.
+ * Returns the combined rows and the resolved column index for the current
+ * colour. The discrepancy tally is not a parse output: callers derive it from
+ * the rows with `countMyDiscrepancies`, so loading and a local post-score
+ * recompute agree by construction.
  */
-export function parsePodSheets(sheetData, colour, signature) {
+export function parsePodSheets(sheetData) {
     const rows = [];
     let columnIndex = null;
-    let numDiscrepancies = 0;
 
     if (!sheetData.sheets || !Array.isArray(sheetData.sheets)) {
-        return { rows, columnIndex, numDiscrepancies };
+        return { rows, columnIndex };
     }
 
     sheetData.sheets.forEach((sheet, sheetIndex) => {
         if (sheet.title !== 'Merged Gurus' || !sheet.values || sheet.values.length <= 1) {
             return;
         }
-        const parsed = buildMatchRows(sheet, sheetIndex, colour, signature);
+        const parsed = buildMatchRows(sheet, sheetIndex);
         rows.push(...parsed.rows);
         columnIndex = buildColumnIndex(parsed.columnIndices);
-        numDiscrepancies = parsed.numDiscrepancies;
     });
 
-    return { rows, columnIndex, numDiscrepancies };
+    return { rows, columnIndex };
 }
 
 /** Match counts for the current row's Player 1 deck. */
