@@ -197,6 +197,11 @@ export class AnalysisController {
         return this.rowRenderer.render();
     }
 
+    /** Re-render the claim/unclaim/clear buttons from the current row model. */
+    renderCurrentButtons() {
+        return this.rowRenderer.renderCurrentButtons();
+    }
+
     /** Build the analysis list, fetching its Discord thread link if any. */
     async renderAnalysisDisplay(currentRow) {
         return this.rowRenderer.renderAnalysisDisplay(currentRow);

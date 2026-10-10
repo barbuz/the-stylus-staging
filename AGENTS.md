@@ -69,6 +69,9 @@ onto one object.
   re-runs with the latest requested position, and it resolves that position
   *after* the fetch lands, so a user who clicks Next while the write-triggered
   refresh is in flight is not yanked back to the match they just solved.
+  The ownership buttons are not left to `reload()` alone: a score calls
+  `renderCurrentButtons()` straight away so Unclaim flips to Clear My Result
+  from the local model, rather than after the reload re-fetch returns.
 - `EventBus` / `APP_EVENTS` replace the `window` CustomEvents that used to carry
   the login / logout / signature flow. `main.js` subscribes in
   `setupEventSubscriptions()`; `AuthManager` and `GuruSignature` emit and

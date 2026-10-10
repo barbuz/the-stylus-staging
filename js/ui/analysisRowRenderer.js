@@ -76,15 +76,7 @@ export class AnalysisRowRenderer {
 
         await this.renderAnalysisDisplay(currentRow);
 
-        const currentAnalysis = host.getCurrentColorAnalysis(currentRow);
-        const currentAnalysisValue = currentAnalysis ? parseFloat(currentAnalysis) : null;
-        host.view.renderButtons({
-            row: currentRow,
-            colour: state.guruColor,
-            signature: state.signature,
-            analysisValue: currentAnalysisValue,
-            deckStats: host.getDeckStats()
-        });
+        this.renderCurrentButtons();
 
         host.view.renderNavigation(state.rowIndex, state.rows.length);
         host.view.renderDiscrepancyButton(state.numDiscrepancies);
@@ -94,6 +86,28 @@ export class AnalysisRowRenderer {
         await cards2Loaded;
 
         host.cards.preloadRows(state.rows, this.rowsToPreload());
+    }
+
+    /**
+     * Re-render only the claim/unclaim/clear buttons from the current model.
+     * Used after a score/clear mutates the row locally, so the ownership button
+     * flips immediately instead of waiting for the background re-fetch in
+     * reload() to come back.
+     */
+    renderCurrentButtons() {
+        const host = this.host;
+        const { state } = host;
+        if (state.rowIndex < 0 || state.rowIndex >= state.rows.length) return;
+
+        const currentRow = state.rows[state.rowIndex];
+        const currentAnalysis = host.getCurrentColorAnalysis(currentRow);
+        host.view.renderButtons({
+            row: currentRow,
+            colour: state.guruColor,
+            signature: state.signature,
+            analysisValue: currentAnalysis ? parseFloat(currentAnalysis) : null,
+            deckStats: host.getDeckStats()
+        });
     }
 
     /** Build the analysis list, fetching its Discord thread link if any. */

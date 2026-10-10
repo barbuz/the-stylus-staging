@@ -73,6 +73,9 @@ export class AnalysisActions {
             currentRow.outcomeValue = calculateOutcomeFromAnalyses(...getGuruAnalysisValues(currentRow));
 
             host.view.highlightAnalysisButton(value);
+            // Flip Unclaim -> Clear My Result now; reload() would only do it once
+            // its re-fetch returns, which is a visible delay after landing a score.
+            host.renderCurrentButtons();
             await host.renderAnalysisDisplay(currentRow);
 
             host.uiController.showStatus(`Analysis saved: ${getAnalysisLabel(value)}`, 'success');
