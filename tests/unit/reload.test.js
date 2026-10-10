@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { AnalysisActions } from '../../js/ui/analysisActions.js';
 import { AppState } from '../../js/app/appState.js';
-import { parsePodSheets } from '../../js/domain/matchRows.js';
+import { parsePodSheets, countMyDiscrepancies } from '../../js/domain/matchRows.js';
 import { makeSheetData } from '../fixtures/sheetData.js';
 
 /**
@@ -23,9 +23,9 @@ function makeHost({ sheetData, refetched, guruColor = 'red', signature = 'alice'
         },
         uiController: { showStatus() {} },
         parseSheets(fresh) {
-            const { rows, numDiscrepancies } = parsePodSheets(fresh, this.state.guruColor, this.state.signature);
+            const { rows } = parsePodSheets(fresh);
             this.state.setRows(rows);
-            this.state.setNumDiscrepancies(numDiscrepancies);
+            this.state.setNumDiscrepancies(countMyDiscrepancies(rows, this.state.guruColor, this.state.signature));
         },
         async showCurrentRow() {
             this.rendered++;

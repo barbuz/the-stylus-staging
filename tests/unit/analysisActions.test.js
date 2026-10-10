@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { AnalysisActions } from '../../js/ui/analysisActions.js';
 import { AppState } from '../../js/app/appState.js';
-import { parsePodSheets } from '../../js/domain/matchRows.js';
+import { parsePodSheets, countMyDiscrepancies } from '../../js/domain/matchRows.js';
 import { makeSheetData } from '../fixtures/sheetData.js';
 
 /**
@@ -36,13 +36,12 @@ function makeHost({ sheetData, holdReload = false } = {}) {
         getCurrentColorAnalysis(row) { return row.redAnalysis; },
         getDeckStats() { return { totalMatches: 1, unclaimedMatches: 0 }; },
         isAnalysisComplete() { return false; },
-        renderCurrentButtons() { events.push('renderCurrentButtons'); },
-        async renderAnalysisDisplay() { events.push('renderAnalysisDisplay'); },
+        async refreshCurrentRow() { events.push('refreshCurrentRow'); },
         reload() { events.push('reload'); },
         parseSheets(fresh) {
-            const { rows, numDiscrepancies } = parsePodSheets(fresh, this.state.guruColor, this.state.signature);
+            const { rows } = parsePodSheets(fresh);
             this.state.setRows(rows);
-            this.state.setNumDiscrepancies(numDiscrepancies);
+            this.state.setNumDiscrepancies(countMyDiscrepancies(rows, this.state.guruColor, this.state.signature));
         },
         async showCurrentRow() { events.push('showCurrentRow'); }
     };
@@ -52,13 +51,13 @@ function makeHost({ sheetData, holdReload = false } = {}) {
     return host;
 }
 
-test('a score flips the ownership button before the background reload returns', async () => {
+test('a score refreshes the row before the background reload returns', async () => {
     const sheetData = makeSheetData({ guruRows: [
         ['1', 'Deck A', 'Deck B', '', 'alice', '', '', '', '']
     ] });
 
-    // Reload's re-fetch never resolves: if the button refresh depended on it,
-    // 'renderCurrentButtons' would never appear in the event log.
+    // Reload's re-fetch never resolves: if the row refresh depended on it,
+    // 'refreshCurrentRow' would never appear in the event log.
     const host = makeHost({ sheetData, holdReload: true });
     host.parseSheets(sheetData);
     host.state.setRowIndex(0);
@@ -66,8 +65,8 @@ test('a score flips the ownership button before the background reload returns', 
     await new AnalysisActions(host).setAnalysis(1.0);
 
     assert.ok(
-        host.events.indexOf('renderCurrentButtons') < host.events.indexOf('reload'),
-        'buttons are re-rendered from local state before the reload runs'
+        host.events.indexOf('refreshCurrentRow') < host.events.indexOf('reload'),
+        'the row is re-rendered from local state before the reload runs'
     );
 });
 

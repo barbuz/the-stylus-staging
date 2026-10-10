@@ -69,12 +69,10 @@ export class AnalysisSessionLoader {
             deckNotesValues
         );
 
-        const { rows, columnIndex, numDiscrepancies } = parsePodSheets(
-            sheetData, state.guruColor, state.signature
-        );
+        const { rows, columnIndex } = parsePodSheets(sheetData);
         state.setRows(rows);
-        state.setNumDiscrepancies(numDiscrepancies);
         state.setColumnIndex(columnIndex);
+        host.recomputeNumDiscrepancies();
 
         if (state.rows.length === 0) {
             host.view.showNoDataMessage();

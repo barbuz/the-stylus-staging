@@ -32,7 +32,8 @@ import {
     findFirstEmptyAnalysis,
     findFirstDiscrepancy,
     findMirrorMatchIndex,
-    getDeckStats
+    getDeckStats,
+    countMyDiscrepancies
 } from '../domain/matchRows.js';
 import { isInverseErrorSuspected, describeInverseResult } from '../domain/inverseCheck.js';
 import { processDeckNotes, calculateColorStatistics } from '../domain/deckNotes.js';
@@ -150,14 +151,23 @@ export class AnalysisController {
         return processDeckNotes(sheetData);
     }
 
-    /** Build the row model and column index for the selected guru colour. */
+    /**
+     * Build the row model and column index for the selected guru colour. The
+     * discrepancy tally is recomputed here rather than taken from the parse, so
+     * a local post-score change to `state.rows` is honoured on reload.
+     */
     parseSheets(sheetData) {
-        const { rows, columnIndex, numDiscrepancies } = parsePodSheets(
-            sheetData, this.state.guruColor, this.state.signature
-        );
+        const { rows, columnIndex } = parsePodSheets(sheetData);
         this.state.setRows(rows);
-        this.state.setNumDiscrepancies(numDiscrepancies);
         this.state.setColumnIndex(columnIndex);
+        this.recomputeNumDiscrepancies();
+    }
+
+    /** Re-derive the discrepancy tally from the current row model. */
+    recomputeNumDiscrepancies() {
+        this.state.setNumDiscrepancies(countMyDiscrepancies(
+            this.state.rows, this.state.guruColor, this.state.signature
+        ));
     }
 
     // The methods below delegate to js/domain/. They are kept on the class so
@@ -197,9 +207,10 @@ export class AnalysisController {
         return this.rowRenderer.render();
     }
 
-    /** Re-render the claim/unclaim/clear buttons from the current row model. */
-    renderCurrentButtons() {
-        return this.rowRenderer.renderCurrentButtons();
+    /** Re-render the current row's local outputs (buttons, list, outcome, tally). */
+    refreshCurrentRow() {
+        this.recomputeNumDiscrepancies();
+        return this.rowRenderer.refreshCurrentRow();
     }
 
     /** Build the analysis list, fetching its Discord thread link if any. */

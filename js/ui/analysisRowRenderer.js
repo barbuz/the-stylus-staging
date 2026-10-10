@@ -72,15 +72,7 @@ export class AnalysisRowRenderer {
         this.displayDeckInfo('player1', currentRow.player1);
         this.displayDeckInfo('player2', currentRow.player2);
 
-        host.view.renderOutcome(currentRow.outcomeValue);
-
-        await this.renderAnalysisDisplay(currentRow);
-
-        this.renderCurrentButtons();
-
-        host.view.renderNavigation(state.rowIndex, state.rows.length);
-        host.view.renderDiscrepancyButton(state.numDiscrepancies);
-        host.updateInverseResultDisplay();
+        await this.renderRowOutputs(currentRow);
 
         await cards1Loaded;
         await cards2Loaded;
@@ -89,17 +81,25 @@ export class AnalysisRowRenderer {
     }
 
     /**
-     * Re-render only the claim/unclaim/clear buttons from the current model.
-     * Used after a score/clear mutates the row locally, so the ownership button
-     * flips immediately instead of waiting for the background re-fetch in
-     * reload() to come back.
+     * Re-render the current row's local outputs in place, without the card or
+     * URL work a full render does. Used after a score/clear mutates the row so
+     * the ownership button, analysis list, outcome and discrepancy tally update
+     * immediately rather than after the background reload() re-fetch returns.
      */
-    renderCurrentButtons() {
+    async refreshCurrentRow() {
+        const { state } = this.host;
+        if (state.rowIndex < 0 || state.rowIndex >= state.rows.length) return;
+        await this.renderRowOutputs(state.rows[state.rowIndex]);
+    }
+
+    /** Everything derived purely from the current row object. */
+    async renderRowOutputs(currentRow) {
         const host = this.host;
         const { state } = host;
-        if (state.rowIndex < 0 || state.rowIndex >= state.rows.length) return;
 
-        const currentRow = state.rows[state.rowIndex];
+        host.view.renderOutcome(currentRow.outcomeValue);
+        await this.renderAnalysisDisplay(currentRow);
+
         const currentAnalysis = host.getCurrentColorAnalysis(currentRow);
         host.view.renderButtons({
             row: currentRow,
@@ -108,6 +108,10 @@ export class AnalysisRowRenderer {
             analysisValue: currentAnalysis ? parseFloat(currentAnalysis) : null,
             deckStats: host.getDeckStats()
         });
+
+        host.view.renderNavigation(state.rowIndex, state.rows.length);
+        host.view.renderDiscrepancyButton(state.numDiscrepancies);
+        host.updateInverseResultDisplay();
     }
 
     /** Build the analysis list, fetching its Discord thread link if any. */
