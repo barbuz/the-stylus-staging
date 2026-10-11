@@ -11,7 +11,8 @@ import assert from 'node:assert/strict';
 import {
     groupDeckNotes,
     allClocksFilled,
-    deckNotesProgress
+    deckNotesProgress,
+    decksToPreload
 } from '../../js/domain/deckNotes.js';
 
 // Column indices as resolved from the real header
@@ -128,4 +129,43 @@ test('deckNotesProgress counts filled clocks', () => {
 
     assert.deepEqual(deckNotesProgress(list), { filled: 2, total: 3 });
     assert.deepEqual(deckNotesProgress([]), { filled: 0, total: 0 });
+});
+
+test('decksToPreload warms the adjacent decks', () => {
+    const list = group([
+        ['Deck A', '8.0', '', '', ''],
+        ['Deck B', '8.0', '', '', ''],
+        ['Deck C', '8.0', '', '', '']
+    ]);
+
+    // All clocks filled: only the immediate neighbours.
+    assert.deepEqual(decksToPreload(list, 1).sort(), ['Deck A', 'Deck C']);
+    // At the edges only the one existing neighbour remains.
+    assert.deepEqual(decksToPreload(list, 0), ['Deck B']);
+});
+
+test('decksToPreload includes the next clock-less deck, wrapping', () => {
+    const list = group([
+        ['Deck A', '8.0', '', '', ''],
+        ['Deck B', '8.0', '', '', ''],
+        ['Deck C', '', '', '', ''],
+        ['Deck D', '', '', '', '']
+    ]);
+
+    // From Deck A, the empty-clock target is Deck C, plus the adjacent Deck B.
+    assert.deepEqual(decksToPreload(list, 0).sort(), ['Deck B', 'Deck C']);
+    // From Deck D the search wraps to Deck C, and Deck C is adjacent anyway.
+    assert.deepEqual(decksToPreload(list, 3).sort(), ['Deck C']);
+});
+
+test('decksToPreload never returns the current deck or empties', () => {
+    const list = group([
+        ['Deck A', '', '', '', ''],
+        ['Deck B', '', '', '', '']
+    ]);
+
+    assert.ok(!decksToPreload(list, 0).includes('Deck A'));
+    assert.ok(!decksToPreload(list, 1).includes('Deck B'));
+    assert.deepEqual(decksToPreload([], 0), []);
+    assert.deepEqual(decksToPreload(null, 0), []);
 });

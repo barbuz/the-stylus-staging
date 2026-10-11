@@ -139,7 +139,14 @@ at a time before guruing can start. It is a gate and a view at once:
   `renderCardSlots*` helpers, and both `AnalysisView` and `DeckNotesView`
   delegate to them. Card *loading* goes through one `CardPresenter` in each
   screen, whose `loadPlayerCards(playerId, deck)` contract is
-  `<playerId>-cards` (the gate uses `playerId: 'deck-notes'`).
+  `<playerId>-cards` (the gate uses `playerId: 'deck-notes'`). Both screens
+  preload the *neighbours*, not the deck they are already fetching: the
+  analysis screen warms the next empty match plus the adjacent rows
+  (`rowsToPreload`), the gate warms the adjacent entries plus the next
+  clock-less deck (`decksToPreload` in `js/domain/deckNotes.js`, which mirrors
+  `nextWithoutClock`'s wrap). The one shared `ScryfallAPI` instance means those
+  images are already cached when the gate hands off to analysis, so the same
+  cards are not re-fetched.
 - Saves go through `AnalysisController.saveDeckInfoField` →
   `AnalysisActions.saveDeckInfoField`, which resolves the grouped entry's
   `rows[]` and writes them all in one call (a clock edit also signs column C on

@@ -193,6 +193,50 @@ export function deckNotesProgress(list) {
 }
 
 /**
+ * Deck strings worth warming while the current deck is shown.
+ *
+ * Mirrors the analysis screen's neighbour preload: the adjacent entries, plus
+ * the entry "next without clock" would jump to (the first deck after the
+ * current one whose clock is empty, wrapping like that button). Duplicates are
+ * collapsed and the current deck is excluded; a deck with an empty clock and no
+ * reachable empty-clock target (e.g. every clock filled) contributes only its
+ * neighbours.
+ *
+ * @param {Array} list grouped entries from `groupDeckNotes`
+ * @param {number} currentIndex index of the deck currently shown
+ * @returns {string[]} deck strings to preload
+ */
+export function decksToPreload(list, currentIndex) {
+    const entries = list || [];
+    if (!entries.length) {
+        return [];
+    }
+
+    const indices = new Set();
+    for (const offset of [1, -1]) {
+        const index = currentIndex + offset;
+        if (index >= 0 && index < entries.length) {
+            indices.add(index);
+        }
+    }
+
+    const count = entries.length;
+    for (let offset = 1; offset <= count; offset++) {
+        const index = (currentIndex + offset) % count;
+        if (!entries[index].deckInfo?.goldfishClock) {
+            indices.add(index);
+            break;
+        }
+    }
+
+    indices.delete(currentIndex);
+
+    return Array.from(indices)
+        .map(index => entries[index].deckString)
+        .filter(deckString => deckString && deckString.trim());
+}
+
+/**
  * Per-colour claimed/total match counts from the merged guru sheet, used by the
  * colour-selection screen.
  */

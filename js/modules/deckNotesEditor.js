@@ -17,7 +17,8 @@ import {
     processDeckNotes,
     groupDeckNotes,
     allClocksFilled,
-    deckNotesProgress
+    deckNotesProgress,
+    decksToPreload
 } from '../domain/deckNotes.js';
 import { getElement } from '../utils/domUtils.js';
 import { DeckNotesView } from '../ui/deckNotesView.js';
@@ -203,7 +204,15 @@ export class DeckNotesEditor {
     }
 
     async _renderCards(deckString) {
-        this.scryfallAPI.preloadCards(deckString);
+        // Warm the decks the guru is likely to open next (adjacent entries and
+        // the next clock-less deck) rather than the current one, which
+        // loadPlayerCards fetches directly. The ScryfallAPI cache is shared with
+        // the analysis screen, so these cards are already in cache when the
+        // session hands off.
+        const neighbours = decksToPreload(this.entries, this.deckIndex);
+        if (neighbours.length) {
+            this.scryfallAPI.preloadCards(neighbours, { delay: 300, silent: true });
+        }
         // The view's card container is #deck-notes-cards, i.e. playerId 'deck-notes'.
         await this.cards.loadPlayerCards('deck-notes', deckString);
     }
