@@ -1,0 +1,95 @@
+name: Release
+
+# Tag the release named by the top heading in CHANGELOG.md.
+#
+# The app has no build step and deploys by pushing to main, so there is nothing
+# to publish here: a release is just the identity of what is already live. This
+# workflow exists so that identity is a git tag rather than a value someone has
+# to remember to copy into sw.js.
+#
+# Idempotent by design: if the tag already exists it does nothing, so re-running
+# after a docs-only edit, or replaying a promotion, is safe.
+
+on:
+  push:
+    branches: [main]
+    paths: ['CHANGELOG.md']
+  # Escape hatch: lets the tag be created by hand if the push run was missed or
+  # failed. Takes no inputs; it re-reads CHANGELOG.md exactly like a push would.
+  workflow_dispatch:
+
+# Least privilege: read the repo, and write the tag/release. Nothing else.
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # scripts/release.js is the single reader of the changelog, shared with
+      # the unit tests, so the tag cannot drift from the heading.
+      - name: Resolve the release tag
+        id: version
+        run: |
+          tag="$(node scripts/release.js)"
+          if [ -z "$tag" ]; then
+            echo "No release heading in CHANGELOG.md; nothing to tag."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Resolved $tag"
+
+      - name: Skip when the tag already exists
+        if: steps.version.outputs.skip != 'true'
+        id: exists
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "$TAG already exists; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The notes are the changelog section for this version, so the release
+      # page and the changelog cannot say different things.
+      - name: Extract release notes
+        if: steps.version.outputs.skip != 'true' && steps.exists.outputs.skip != 'true'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          version="${TAG#v}"
+          awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "Release section for $TAG is empty." >&2
+            exit 1
+          fi
+
+      # gh creates the tag and the release together, so there is no window where
+      # a tag exists without a release.
+      - name: Create tag and release
+        if: steps.version.outputs.skip != 'true' && steps.exists.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "The Stylus $TAG" \
+            --notes-file release-notes.md

@@ -6,6 +6,12 @@ import { CONFIG } from '../config.js';
 import { logger } from '../utils/log.js';
 import { getItem, setItem, removeItem } from '../services/storage.js';
 
+// Shape of the persisted preferences object, independent of the app release
+// (see CHANGELOG.md / `APP_VERSION`). Production and preview share one appData
+// file, so bump this only for a change to the persisted shape, and only when
+// both deployments can still read what the other writes.
+const SCHEMA_VERSION = 1;
+
 export class UserPreferences {
     constructor() {
         this.preferencesFileName = 'the-stylus-preferences.json';
@@ -73,7 +79,7 @@ export class UserPreferences {
                 guruSignature: '',
                 recentPods: [],
                 recentHubs: [],
-                version: '1.0.0',
+                schemaVersion: SCHEMA_VERSION,
                 lastUpdated: new Date().toISOString()
             };
 
@@ -390,7 +396,7 @@ export class UserPreferences {
             guruSignature: guruSignature || '',
             recentPods: recentPodsStr ? JSON.parse(recentPodsStr) : [],
             recentHubs: recentHubsStr ? JSON.parse(recentHubsStr) : [],
-            version: '1.0.0',
+            schemaVersion: SCHEMA_VERSION,
             lastUpdated: new Date().toISOString()
         };
         logger.debug('📥 Loaded preferences from localStorage:', preferences);
@@ -423,7 +429,7 @@ export class UserPreferences {
                     guruSignature: '',
                     recentPods: [],
                     recentHubs: [],
-                    version: '1.0.0',
+                    schemaVersion: SCHEMA_VERSION,
                     lastUpdated: new Date().toISOString()
                 };
 

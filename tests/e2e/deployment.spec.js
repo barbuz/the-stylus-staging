@@ -100,6 +100,20 @@ test.describe('Deployment preference routing', () => {
         await expect(page.locator('.deployment-switch-btn')).toHaveText('Switch to Production');
     });
 
+    test('production offers a working switch into preview', async ({ page }) => {
+        await bootDeployment(page, '/the-stylus/index.html');
+
+        await page.getByRole('button', { name: /sign in with google/i }).click();
+        await expect(page.locator('#app-content')).toBeVisible();
+
+        const button = page.locator('.deployment-switch-btn');
+        await expect(button).toHaveText('Switch to Preview');
+        await button.click();
+
+        await expect(page).toHaveURL(/\/the-stylus-staging\/(index\.html)?$/);
+        await expect(page).toHaveTitle('The Stylus - Preview');
+    });
+
     test('merely opening a deployment does not change the stored preference', async ({ page }) => {
         await bootDeployment(page, '/the-stylus/index.html', { preference: 'preview' });
 

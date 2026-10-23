@@ -100,6 +100,21 @@ The app version is managed in `sw.js` at the top of the file. When making change
 3. The version is fetched and parsed by `main.js` and displayed in the app footer
 4. Service worker will activate on page reload with updated cache
 
+`APP_VERSION` is a cache token, not a release name. The same value can appear
+on more than one commit, and it does not identify what shipped.
+
+### Releases
+
+Releases are named by CalVer (`YYYY.MM`, or `YYYY.MM.PATCH` for a fix between
+monthly releases) and listed in [`CHANGELOG.md`](CHANGELOG.md).
+
+To cut a release, add a `## [YYYY.MM] - YYYY-MM-DD` section to the top of
+`CHANGELOG.md` and merge it to `main`. The [Release workflow](.github/workflows/release.yml)
+then creates the `vYYYY.MM` git tag and a GitHub Release whose notes are that
+changelog section. Nothing else is needed: the app has no build step, so the tag
+records what is already deployed. Re-running is safe — an existing tag is left
+alone.
+
 ### Production and preview versions
 
 There are two live versions of the app, on the same GitHub Pages origin:

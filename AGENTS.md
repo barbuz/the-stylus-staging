@@ -257,9 +257,14 @@ the-stylus/
 │   ├── unit/                   # node:test suites (node --test)
 │   ├── e2e/                    # Playwright specs + in-browser Google/Scryfall stubs
 │   └── fixtures/               # Shared sheet-data fixtures and fake gapi
+├── CHANGELOG.md                # Release notes; top heading names the release
+├── scripts/
+│   └── release.js              # Reads the release version from CHANGELOG.md
 ├── playwright.config.js        # Playwright config (dev-only; serves files statically)
 ├── .github/
-│   └── workflows/tests.yml     # CI: runs unit + e2e on push/PR to main
+│   ├── workflows/
+│   │   ├── tests.yml           # CI: runs unit + e2e on push/PR to main
+│   │   └── release.yml         # Tags the release named by CHANGELOG.md
 └── package.json                # Metadata + dev-only test scripts (no runtime deps)
 ```
 
@@ -401,13 +406,56 @@ put real match data in a downloadable artifact.
 Keep `runs-on: ubuntu-latest` (a standard runner) and the browser cache stays
 under the separate 10 GB-per-repository cache allowance.
 
+`release.yml` is the other workflow and is deliberately tiny: it runs only on a
+push to `main` that touches `CHANGELOG.md`, takes no artifact, and uploads
+nothing, so it costs a couple of minutes at most. It is the only workflow that
+needs `contents: write` (to create the tag), and it is granted exactly that and
+nothing else. Keep it that way — a release job that can also write packages or
+deploy is a needless privilege.
+
 ### Updating the service worker cache
 
 When you add, remove, or rename a file under `js/`, `styles/`, `images/`, or `favicons/`, you must keep the precache list in `sw.js` (`urlsToCache`) in sync, or the file will be missing offline.
 
 ### Bumping the version
 
-`APP_VERSION` at the top of `sw.js` (format `vYYYYMMDD`) drives service worker updates. Bump it for any user-visible change so installed clients pick it up. `main.js` parses this value for the footer.
+`APP_VERSION` at the top of `sw.js` (format `vYYYYMMDD`) is a **service-worker
+cache token, not a release name**. Bump it for any user-visible change so
+installed clients pick it up; `main.js` parses this value for the footer. A
+refactor that changes no user-visible behaviour need not bump it, which is why
+the same value can legitimately appear on more than one commit. Do not try to
+read a release out of this string.
+
+### Release identity and tagging
+
+A **release** is named by CalVer `YYYY.MM` (`YYYY.MM.PATCH` for a fix between
+monthly releases) and identified by an annotated git tag `vYYYY.MM`.
+
+- The single source of truth is the top release heading in `CHANGELOG.md`
+  (`## [2026.10] - 2026-10-23`). A `## [Unreleased]` heading above it is ignored.
+- `scripts/release.js` is the only reader of that heading, and the release
+  workflow and the unit tests share it, so the tag cannot drift from the text.
+- `.github/workflows/release.yml` runs on a push to `main` that touches
+  `CHANGELOG.md`, and creates the tag and a GitHub Release whose notes are that
+  changelog section. It is idempotent: an existing tag means no-op, so a
+  re-run, a docs-only edit or a replayed promotion is safe. `workflow_dispatch`
+  is the escape hatch if a push run was missed.
+- **To cut a release:** add a `## [YYYY.MM] - YYYY-MM-DD` section to the top of
+  `CHANGELOG.md` and merge it to `main`. That is the whole manual step.
+
+Because the app has no build step and deploys by pushing to `main`, the tag
+records what is *already live* rather than triggering a deploy.
+
+Do not confuse the three version-like values:
+
+| Value | Meaning | Bumped when |
+| --- | --- | --- |
+| `APP_VERSION` (`sw.js`) | Service-worker cache token | Any user-visible change |
+| `vYYYY.MM` (git tag) | Release identity | Monthly, from `CHANGELOG.md` |
+| `SCHEMA_VERSION` (`userPreferences.js`) | Persisted-data shape | The appData shape changes |
+
+`package.json`'s `version` is unused and deliberately left alone; it is not
+published, so aligning it would only create a third source of truth.
 
 ### Work happens in staging first, always
 
@@ -470,21 +518,58 @@ two, so it would need revisiting.
 
 The leftover copy must not keep testers or automation away from the preview.
 Leaving both deployments at the same `APP_VERSION` is fine, because the caches
-are namespaced. Deploying preview actually looks like:
+are namespaced.
 
-1. Merge `preview-deployment-switch` (and anything else that should be testable)
-   into `phase2-consolidate-guru-colour` — or whichever branch is the candidate —
-   on the **production** repo. The two are siblings off `8837792`, not stacked.
-2. In the staging repo, create a PR from that branch into `main` and merge it.
+### Promoting staging to production (the monthly merge)
+
+The two repositories are **independent copies that share no history beyond
+`8837792`**. Both sides have changed the same files since, so a plain
+`git merge staging/main` into production is *not* clean: it conflicts in
+`AGENTS.md`, `index.html`, `js/config.js`, `js/main.js`, `sw.js` and
+`tests/e2e/deployment.spec.js`, plus a modify/delete on the removed
+`js/modules/guruAnalysisInterface.js`. Do not resolve those by hand — the result
+is neither tree, and it has to be redone from scratch next month.
+
+**Promote by syncing content, not by merging histories.** Staging is the source
+of truth for the app, so the production tree is replaced with the staging tree,
+and the two histories are connected so that every later month is a fast-forward.
+Run this in a clone of the **production** repo, with the staging repo added as a
+remote named `staging`:
+
+```bash
+git fetch origin main && git fetch staging main
+
+git checkout -B release/sync origin/main
+git merge -s ours --no-commit staging/main        # record staging as a parent
+git read-tree -u --reset staging/main             # take staging's tree verbatim
+git commit -m "Release 2026.10: sync from staging"
+```
+
+`merge -s ours` makes staging a parent without taking its content; `read-tree`
+then makes the tree exactly staging's. The result verifies equal to
+`staging/main`'s tree, including the deleted file. **After the first sync this
+way, later months are an ordinary clean merge**, because production's history
+now contains staging's.
+
+Two things to check before pushing:
+
+1. **Re-add anything production had and staging lacks.** At the first sync this
+   is `907cf9ce` ("Cover the production-to-preview switch in e2e"), a test that
+   exists only on production. Replay it on staging *before* the sync — this is a
+   content-sync, so anything absent from staging is deleted from production.
+2. **Compare the trees**, and only then open a PR into production's `main`.
    Pushing `main` is the deploy; Pages rebuilds by itself.
-3. Open `https://barbuz.github.io/the-stylus-staging/?pod=<POD_ID>` and test.
+
+Then add the matching `## [YYYY.MM]` section to `CHANGELOG.md` on production so
+the release is tagged there too, and verify on
+`https://barbuz.github.io/the-stylus/?pod=<POD_ID>`.
 
 **The preview repository is a manual copy.** It has never existed as a fork
 (GitHub cannot fork a repository into the same owner account), no git remote
-links it to production, and pushing to production does not update it. Whenever
-`main` moves on production, staging drifts until someone repeats step 2. If a
+links it to production, and pushing to production does not update it. If a
 preview-only fix becomes permanent, it is a change to the staging copy only and
-must be replayed on production by hand.
+must be replayed on production by hand. Whenever `main` moves on production,
+staging drifts until the next sync.
 
 ### The deployment switch lives in the footer
 
@@ -528,6 +613,8 @@ After code changes:
 1. Update the Repository Structure above if files were added/removed/renamed.
 2. Update `README.md` if user-facing behaviour or usage changed.
 3. Bump `APP_VERSION` in `sw.js` if the change is user-visible.
+4. Add a bullet to the top `## [YYYY.MM]` section of `CHANGELOG.md` for a
+   user-visible change; the release workflow tags from that heading.
 
 This file is the single source of repo guidance; do not reintroduce a second
 copy. `.github/copilot-instructions.md` existed for the same purpose and was
