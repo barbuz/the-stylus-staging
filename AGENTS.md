@@ -258,8 +258,6 @@ the-stylus/
 │   ├── e2e/                    # Playwright specs + in-browser Google/Scryfall stubs
 │   └── fixtures/               # Shared sheet-data fixtures and fake gapi
 ├── CHANGELOG.md                # Release notes; top heading names the release
-├── scripts/
-│   └── release.js              # Reads the release version from CHANGELOG.md
 ├── playwright.config.js        # Playwright config (dev-only; serves files statically)
 ├── .github/
 │   ├── workflows/
@@ -433,8 +431,9 @@ monthly releases) and identified by an annotated git tag `vYYYY.MM`.
 
 - The single source of truth is the top release heading in `CHANGELOG.md`
   (`## [2026.10] - 2026-10-23`). A `## [Unreleased]` heading above it is ignored.
-- `scripts/release.js` is the only reader of that heading, and the release
-  workflow and the unit tests share it, so the tag cannot drift from the text.
+- The workflow matches the first `## [YYYY.MM]` heading itself, in one step, so
+  the tag and the release notes come from the same line and cannot disagree.
+  There is no helper module to keep in sync.
 - `.github/workflows/release.yml` runs on a push to `main` that touches
   `CHANGELOG.md`, and creates the tag and a GitHub Release whose notes are that
   changelog section. It is idempotent: an existing tag means no-op, so a
@@ -442,6 +441,10 @@ monthly releases) and identified by an annotated git tag `vYYYY.MM`.
   is the escape hatch if a push run was missed.
 - **To cut a release:** add a `## [YYYY.MM] - YYYY-MM-DD` section to the top of
   `CHANGELOG.md` and merge it to `main`. That is the whole manual step.
+
+The heading must be exactly `## [YYYY.MM]` — the bracket content is the version,
+so `## [v2026.10]` is not a release and is skipped rather than tagged with a
+doubled `v`.
 
 Because the app has no build step and deploys by pushing to `main`, the tag
 records what is *already live* rather than triggering a deploy.

@@ -3,10 +3,9 @@
 The Stylus is versioned by CalVer: `YYYY.MM`, with `YYYY.MM.PATCH` for a fix
 shipped between monthly releases.
 
-The top release heading is the release identity. `scripts/release.js` reads it,
-and the release workflow tags that commit `v<version>`. Add a new `## [YYYY.MM]`
-section when cutting a release; `## [Unreleased]` may sit above it and is
-ignored.
+The top release heading is the release identity. The release workflow reads it
+and tags that commit `v<version>`. Add a new `## [YYYY.MM]` section when cutting
+a release; `## [Unreleased]` may sit above it and is ignored.
 
 Each release lists what changed for a guru, with the PR number that carried it.
 Compare this file between the two deployments to see what production is missing.
