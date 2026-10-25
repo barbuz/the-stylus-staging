@@ -12,9 +12,10 @@ import { REAL_MATCH_ROWS, REAL_POD_SHEET_IDS, clearAnalysisLikeRealSheet } from 
  *  - Guru sheets are 13 columns wide (A:M), not 6. The app reads A:C and E:F,
  *    so this proves genuine sheets work and makes any range drift visible.
  *  - The pod is *finished*: all 450 rows carry agreeing analyses from all three
- *    gurus. The synthetic fixture is mid-analysis, so the "everything is done"
- *    path was previously untested. Where a test needs a row to score, it
- *    deliberately blanks one cell, which reproduces the real mid-analysis state.
+ *    gurus. The synthetic fixture is mid-analysis, so this is the only fixture
+ *    that reaches the "everything is done" path. Where a test needs a row to
+ *    score, it deliberately blanks one cell, reproducing the real mid-analysis
+ *    state.
  */
 
 const POD_ID = 'REAL_POD_ID';
@@ -196,8 +197,8 @@ test.describe('The Stylus against a real exported pod', () => {
         await signInAndLoad(page);
 
         // Match 1's player-1 deck (Abraded Bluffs) has a note in the real sheet.
-        // Editing it to free text that starts with a number used to be coerced
-        // to a number, writing "2" and discarding the rest of the note.
+        // Free text that starts with a number must not be coerced to a number,
+        // which would write "2" and discard the rest of the note.
         // The whole field is the edit target; the pencil is only a hint.
         await page.locator('#player1-deck-info .deck-field[data-field-type="notes"]').click();
         const input = page.locator('#player1-deck-info .deck-info-edit-input');

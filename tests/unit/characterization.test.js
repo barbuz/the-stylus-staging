@@ -8,7 +8,7 @@
  *   CONTRACT - part of the scoring/format spec. Must not change.
  *   ACCIDENT - an artefact of the implementation. Free to fix in a later phase.
  *
- * Phase 0 of the refactor epic (#18) added this file; see AGENTS.md.
+ * See AGENTS.md for the full list and the reasoning behind each.
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

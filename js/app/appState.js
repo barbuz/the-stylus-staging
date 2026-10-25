@@ -6,10 +6,8 @@
  * current row and guru colour, the discrepancy count, the deck-notes lookup and
  * the resolved per-colour column index.
  *
- * Extracted from the scattered fields that used to be duplicated between
- * AnalysisController's constructor and reset() (phase 4 of #18). Everything that
- * used to copy those fields now reads them from here, so there is one place for
- * them to drift from instead of two.
+ * Keeping these on one object gives them a single place to be mutated, instead
+ * of copies scattered between AnalysisController's constructor and reset().
  *
  * `signature` is deliberately not cleared by `reset()`: it is the signed-in
  * guru's identity for the whole session, not per-pod state.

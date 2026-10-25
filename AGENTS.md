@@ -48,8 +48,7 @@ colour is actually added. Do not add a colour without deciding that policy.
 
 ## App Shell (`js/app/`)
 
-Phase 4 of #18 moved the analysis session's mutable state off the controller and
-onto one object.
+The analysis session's mutable state lives on one object, not on the controller.
 
 - `AppState` is the single source of truth for the open pod: `sheetData`
   (and its derived `spreadsheetId`), `rows`, `rowIndex`, `guruColor`,
@@ -77,14 +76,13 @@ onto one object.
   `refreshCurrentRow()` share `renderRowOutputs()` so the two cannot drift, and
   `parseSheets` derives its count from the live rows via `countMyDiscrepancies`
   rather than trusting the fetch.
-- `EventBus` / `APP_EVENTS` replace the `window` CustomEvents that used to carry
-  the login / logout / signature flow. `main.js` subscribes in
-  `setupEventSubscriptions()`; `AuthManager` and `GuruSignature` emit and
-  subscribe through the bus they are handed. Handler registration in `main.js`
-  is guarded by `_domBound` / `_signatureHandlersBound` so it is idempotent
-  without the old reset-on-logout flags.
+- `EventBus` / `APP_EVENTS` carry the login / logout / signature flow.
+  `main.js` subscribes in `setupEventSubscriptions()`; `AuthManager` and
+  `GuruSignature` emit and subscribe through the bus they are handed. Handler
+  registration in `main.js` is guarded by `_domBound` / `_signatureHandlersBound`
+  so it is idempotent.
 
-### The guru signature (phase 5 of #18)
+### The guru signature
 
 The guru signature is session identity, not reactive state. It is set once,
 persisted, and only changes in exceptional circumstances, so it is modelled as a
@@ -108,9 +106,9 @@ mostly immutable value rather than a live field.
   is the header's `#guru-signature-display`, and the header is hidden while a pod
   is open (`#sheet-editor` fullscreen). To change it a guru leaves the pod first;
   the next `loadSheet` resolves the colour and rows against the new value.
-- `APP_EVENTS` only needs `USER_LOGGED_IN`, `USER_LOGGED_OUT` and
-  `REQUEST_GURU_SIGNATURE_CHANGE`. The old `GURU_SIGNATURE_LOADED` /
-  `GURU_SIGNATURE_CHANGED` events were removed with the duality they carried.
+- `APP_EVENTS` needs only `USER_LOGGED_IN`, `USER_LOGGED_OUT` and
+  `REQUEST_GURU_SIGNATURE_CHANGE`. Do not add per-value signature events: the
+  owner object makes them unnecessary.
 
 ### The clocks & notes gate (`js/modules/deckNotesEditor.js`)
 
@@ -221,7 +219,7 @@ the-stylus/
 │   │   ├── scryfallAPI.js
 │   │   ├── uiController.js            # Centralised event handling / status UI
 │   │   └── userPreferences.js
-│   ├── ui/                     # View / controller split (phase 3 of #18); state lives in js/app/
+│   ├── ui/                     # View / controller split; state lives in js/app/
 │   │   ├── analysisController.js      # Slim orchestrator: state + service calls + view.render
 │   │   ├── analysisActions.js         # Write/score workflows (set, claim, clear, reload)
 │   │   ├── analysisNavigation.js      # Row movement: next/prev, skips, mirror, next deck
@@ -301,8 +299,8 @@ npm run test:e2e               # Playwright only
 - `AnalysisController` UI-flow methods (e.g. `processDeckNotes`) are tested via
   `Object.create(AnalysisController.prototype)` and an explicit fake `this`. The
   constructor calls `bindEvents()` and needs a DOM, so do not `new` it in unit
-  tests. Since Phase 1 and Phase 3 moved the scoring/row logic into
-  `js/domain/`, only a few UI-flow methods still need this scaffolding.
+  tests. Most scoring and row logic lives in `js/domain/` and is imported
+  directly, so only a few UI-flow methods still need this scaffolding.
 - `GoogleSheetsAPI` is tested against a fake global `gapi` (`tests/fixtures/fakeGapi.js`)
   that records requests. Tests assert on the requests and the transformations.
   Change the module to read `gapi` lazily; do not capture it at import time.
@@ -659,5 +657,5 @@ was removed as a stale duplicate.
 - **`gapi is not defined` / `ERR_BLOCKED_BY_CLIENT`:** expected in sandboxed or offline environments where Google APIs cannot load. These are not app bugs; focus on whether the page structure and modules loaded.
 - **Module fails to load:** check the exact path and casing of the import.
 - **Stale behaviour after editing:** the service worker may be serving a cached build. Bump `APP_VERSION` and hard-reload, or unregister the worker in devtools.
-- **Sheet fails to parse:** inspect the URL handling in `js/utils/urlUtils.js`; Discord-pasted links can carry trailing characters (previously handled by trimming extra `),`).
+- **Sheet fails to parse:** inspect the URL handling in `js/utils/urlUtils.js`; Discord-pasted links can carry trailing characters, which `sanitizeUrlParam` strips.
 - **Syntax check:** `node -c <filename>`.

@@ -59,10 +59,9 @@ import { makeMergedGuruSheet, makeSheetData } from '../fixtures/sheetData.js';
 
 /**
  * These tests exercise the pure domain layer directly. Only processDeckNotes is
- * still reached through AnalysisController, because it was not part of the
- * Phase 1 extraction; that scaffolding borrows the prototype rather than
- * constructing an instance, since the constructor calls bindEvents() and needs
- * a DOM.
+ * still reached through AnalysisController; that scaffolding borrows the
+ * prototype rather than constructing an instance, since the constructor calls
+ * bindEvents() and needs a DOM.
  */
 function logic() {
     return Object.create(AnalysisController.prototype);
@@ -572,8 +571,8 @@ test('getDeckStats is safe with no selection', () => {
 
 // --- Discrepancy display -----------------------------------------------------
 //
-// buildDiscrepancyDisplay was confirmed unused (no callers) and removed in
-// phase 3. The discrepancy *data* is still exercised by rowHasDiscrepancy /
+// There is no `buildDiscrepancyDisplay` to test: it had no callers and was
+// removed. The discrepancy *data* is exercised by rowHasDiscrepancy /
 // rowHasMyDiscrepancy above.
 
 // --- Colour registry: sheet naming and merged layout -------------------------

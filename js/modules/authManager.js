@@ -8,10 +8,10 @@ import { getItem, setItem, removeItem } from '../services/storage.js';
 export class AuthManager {
     constructor(events, guruSignature = null) {
         // Optional event bus. When present the login / signature flow is routed
-        // through it instead of `window` CustomEvents (phase 4 of #18).
+        // through it.
         this.events = events || null;
-        // The single owner of the current signature (phase 5 of #18). AuthManager
-        // deliberately keeps no copy: it delegates reads/writes here.
+        // The single owner of the current signature. AuthManager deliberately
+        // keeps no copy: it delegates reads/writes here.
         this.guruSignature = guruSignature;
         this.user = null;
         this.isAuthenticated = false;

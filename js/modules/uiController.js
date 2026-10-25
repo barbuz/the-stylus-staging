@@ -79,8 +79,7 @@ export class UIController {
 
     clearURLParameters() {
         // Clear every deep-link parameter the app reads (pod / guru / hub /
-        // match) when returning to home. `match` is the row parameter; there is
-        // no `row` parameter (phase 4 of #18).
+        // match) when returning to home. `match` is the row parameter.
         const newUrl = new URL(window.location);
         newUrl.searchParams.delete('pod');
         newUrl.searchParams.delete('guru');
