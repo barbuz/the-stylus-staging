@@ -418,36 +418,30 @@ When you add, remove, or rename a file under `js/`, `styles/`, `images/`, or `fa
 ### Bumping the version
 
 `APP_VERSION` at the top of `sw.js` (format `vYYYYMMDD`) is a **service-worker
-cache token, not a release name**. Bump it for any user-visible change so
-installed clients pick it up; `main.js` parses this value for the footer. A
-refactor that changes no user-visible behaviour need not bump it, which is why
-the same value can legitimately appear on more than one commit. Do not try to
-read a release out of this string.
+cache token, not a release name**, and `main.js` parses it for the footer.
+`README.md` covers when to bump it. The constraint that matters here: do not
+read a release out of this string, and do not try to keep it in step with the
+tag — a refactor with no user-visible effect legitimately leaves the same value
+on more than one commit.
 
 ### Release identity and tagging
 
 A **release** is named by CalVer `YYYY.MM` (`YYYY.MM.PATCH` for a fix between
-monthly releases) and identified by an annotated git tag `vYYYY.MM`.
+monthly releases) and identified by an annotated git tag `vYYYY.MM`. The
+human-facing procedure lives in `README.md`; this section records the mechanism
+and its constraints.
 
 - The single source of truth is the top release heading in `CHANGELOG.md`
   (`## [2026.10] - 2026-10-23`). A `## [Unreleased]` heading above it is ignored.
 - The workflow matches the first `## [YYYY.MM]` heading itself, in one step, so
   the tag and the release notes come from the same line and cannot disagree.
   There is no helper module to keep in sync.
-- `.github/workflows/release.yml` runs on a push to `main` that touches
-  `CHANGELOG.md`, and creates the tag and a GitHub Release whose notes are that
-  changelog section. It is idempotent: an existing tag means no-op, so a
-  re-run, a docs-only edit or a replayed promotion is safe. `workflow_dispatch`
-  is the escape hatch if a push run was missed.
-- **To cut a release:** add a `## [YYYY.MM] - YYYY-MM-DD` section to the top of
-  `CHANGELOG.md` and merge it to `main`. That is the whole manual step.
+- It is idempotent: an existing tag means no-op, so a re-run, a docs-only edit
+  or a replayed promotion is safe. `workflow_dispatch` is the escape hatch if a
+  push run was missed. (The workflow itself is described under CI billing.)
 
-The heading must be exactly `## [YYYY.MM]` — the bracket content is the version,
-so `## [v2026.10]` is not a release and is skipped rather than tagged with a
-doubled `v`.
-
-Because the app has no build step and deploys by pushing to `main`, the tag
-records what is *already live* rather than triggering a deploy.
+The heading format is load-bearing, not cosmetic — see `README.md` for the
+rule. An agent editing `CHANGELOG.md` must preserve it exactly.
 
 Do not confuse the three version-like values:
 
@@ -487,13 +481,10 @@ and merge themselves.
 
 ### Production and preview deployments
 
-The app ships from two GitHub Pages project sites. Both live on the same origin
-(`barbuz.github.io`) and differ only by path, which is deliberate: they share
-`localStorage` and the Google appData preferences file, so a user keeps their
-session, guru signature and recent pods across a switch.
-
-- Production: `https://barbuz.github.io/the-stylus/`
-- Preview: `https://barbuz.github.io/the-stylus-staging/`
+The app ships from two GitHub Pages project sites on the same origin
+(`barbuz.github.io`), differing only by path. `README.md` lists them and
+describes what a user sees; this section records why they are built that way and
+what must not change.
 
 Both use GitHub's *legacy* Pages build ("Deploy from a branch", `main` / root),
 matching the app's no-build-step design: pushing to `main` is the deploy. Do not
@@ -502,9 +493,10 @@ in `tests.yml` is the only workflow the project needs.
 
 `DEPLOYMENTS` in `js/config.js` is the source of truth for the paths and display
 names; **if a path here is wrong, deep-link routing and the switch button break
-silently**.
+silently**. It must agree with the two paths in `README.md`.
 
-Because the two share an origin:
+Sharing an origin is deliberate — it is what lets a user keep their session,
+guru signature and recent pods across a switch — and it has consequences:
 
 - The service-worker app-shell cache is namespaced by base path
   (`DEPLOYMENT_ID` in `sw.js`). Without that, one deployment's `activate` step
@@ -522,7 +514,8 @@ returns early when it redirects. Adding a third deployment means extending
 `DEPLOYMENTS`; `alternateDeploymentUrl()` only knows how to flip between exactly
 two, so it would need revisiting.
 
-The leftover copy must not keep testers or automation away from the preview.
+The preview deployment must stay reachable: do not gate it, and do not let
+automation or a stale `preferred_deployment` strand a tester on production.
 Leaving both deployments at the same `APP_VERSION` is fine, because the caches
 are namespaced.
 
@@ -641,6 +634,14 @@ only flips between exactly two.
 
 ## Keeping Docs in Sync
 
+**One owner per fact.** `README.md` is written for humans — gurus and
+contributors — and owns how to use the app, how to run it, how to cut a release
+and what the two deployments are. This file is written for agents and owns the
+constraints: what must not change, and why. Where the two overlap, README states
+it plainly for a human and this file states the rule; neither restates the
+other's version. Add the detail to whichever file owns it and leave the other
+alone, rather than updating both.
+
 After code changes:
 
 1. Update the Repository Structure above if files were added/removed/renamed.
@@ -649,9 +650,9 @@ After code changes:
 4. Add a bullet to the top `## [YYYY.MM]` section of `CHANGELOG.md` for a
    user-visible change; the release workflow tags from that heading.
 
-This file is the single source of repo guidance; do not reintroduce a second
-copy. `.github/copilot-instructions.md` existed for the same purpose and was
-removed as a stale duplicate.
+This file is the single source of repo guidance for agents; do not reintroduce a
+second copy. `.github/copilot-instructions.md` existed for the same purpose and
+was removed as a stale duplicate.
 
 ## Troubleshooting
 
