@@ -21,13 +21,12 @@ import { getItem, setItem, removeItem } from './services/storage.js';
 
 class ThreeCardBlindGuruTool {
     constructor() {
-        // One local bus for the login / logout / signature flow, replacing the
-        // window CustomEvents and the boolean guard flags (phase 4 of #18).
+        // One local bus for the login / logout / signature flow.
         this.events = new EventBus();
         this.authManager = new AuthManager(this.events);
         this.guruSignature = new GuruSignature(this.authManager, this.events);
         // Hand the owner to the components that need it, so nothing else keeps
-        // a copy of the signature (phase 5 of #18).
+        // a copy of the signature.
         this.authManager.guruSignature = this.guruSignature;
         this.sheetsAPI = new GoogleSheetsAPI(this.authManager);
         this.uiController = new UIController(this.guruSignature);
@@ -440,7 +439,7 @@ class ThreeCardBlindGuruTool {
             // Load data into the analysis interface
             if (!this.analysisInterface) {
                 // The signature is a snapshot taken at load: it cannot change
-                // while a pod is open (phase 5 of #18).
+                // while a pod is open.
                 this.analysisInterface = new AnalysisController(
                     this.sheetsAPI, this.uiController, this.guruSignature.getSignature()
                 );

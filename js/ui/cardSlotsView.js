@@ -3,8 +3,8 @@
  *
  * The analysis screen and the deck-notes gate both draw three Scryfall card
  * slots inside a `<playerId>-cards` container. Keeping the three renderers here
- * stops the two screens drifting apart (the deck-notes gate used to carry a
- * verbatim copy). Pure DOM work; all user-derived strings are escaped.
+ * stops the two screens drifting apart. Pure DOM work; all user-derived strings
+ * are escaped.
  */
 import { escapeHtml, getElement } from '../utils/domUtils.js';
 

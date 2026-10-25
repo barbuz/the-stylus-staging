@@ -93,15 +93,17 @@ This is an open-source project. Contributions are welcome!
 
 ### Version Management
 
-The app version is managed in `sw.js` at the top of the file. When making changes that should trigger a service worker update:
+`APP_VERSION` at the top of `sw.js` is a **service-worker cache token, not a
+release name**. Bump it when a change should reach installed clients:
 
 1. Update the `APP_VERSION` constant in `sw.js`
 2. This changes the service worker file, causing the browser to detect a new version
 3. The version is fetched and parsed by `main.js` and displayed in the app footer
 4. Service worker will activate on page reload with updated cache
 
-`APP_VERSION` is a cache token, not a release name. The same value can appear
-on more than one commit, and it does not identify what shipped.
+A refactor with no user-visible effect need not bump it, so the same value can
+legitimately appear on more than one commit. It does not identify what shipped;
+the release tag does that (see below).
 
 ### Releases
 
@@ -114,6 +116,9 @@ then creates the `vYYYY.MM` git tag and a GitHub Release whose notes are that
 changelog section. Nothing else is needed: the app has no build step, so the tag
 records what is already deployed. Re-running is safe — an existing tag is left
 alone.
+
+The heading must be exactly `## [YYYY.MM]`: the bracket content is the version,
+so `## [v2026.10]` is skipped rather than tagged with a doubled `v`.
 
 ### Production and preview versions
 

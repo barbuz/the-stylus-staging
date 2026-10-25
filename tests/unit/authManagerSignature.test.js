@@ -4,9 +4,9 @@ import assert from 'node:assert/strict';
 import { AuthManager } from '../../js/modules/authManager.js';
 
 /**
- * Phase 5 of #18: AuthManager must not keep its own copy of the signature. It
- * delegates to the single owner (the GuruSignature instance) and exposes the
- * current value through getGuruSignature().
+ * AuthManager must not keep its own copy of the signature. It delegates to the
+ * single owner (the GuruSignature instance) and exposes the current value
+ * through getGuruSignature().
  */
 function makeSignatureOwner(signature = null) {
     return {

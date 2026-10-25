@@ -6,9 +6,6 @@
  * contains no DOM construction: rendering is delegated to AnalysisView, modals
  * to OverviewTableModal / ThreadModal, the colour dropdown to GuruColorSelector,
  * and pure logic to js/domain/.
- *
- * Extracted from the former guruAnalysisInterface.js god class (phase 3 of #18);
- * its loose fields were consolidated into AppState in phase 4.
  */
 import { ScryfallAPI } from '../modules/scryfallAPI.js';
 import { DeckNotesEditor } from '../modules/deckNotesEditor.js';
@@ -56,7 +53,7 @@ export class AnalysisController {
     constructor(sheetsAPI, uiController, guruSignature) {
         this.sheetsAPI = sheetsAPI;
         this.uiController = uiController;
-        // All session state lives on one object (phase 4 of #18).
+        // All session state lives on one object.
         this.state = new AppState();
         this.state.setSignature(guruSignature);
         this.scryfallAPI = new ScryfallAPI();
@@ -96,7 +93,7 @@ export class AnalysisController {
 
     /**
      * The guru signature this session was opened with. A snapshot taken at load;
-     * it does not change while a pod is open (phase 5 of #18).
+     * it does not change while a pod is open.
      */
     get guruSignature() {
         return this.state.signature;
@@ -255,8 +252,7 @@ export class AnalysisController {
 
     /**
      * Re-fetch the pod and rebuild the row model, staying on the current match
-     * unless `preservePosition` is false. The single reload implementation; the
-     * former background refresh is a thin wrapper over it.
+     * unless `preservePosition` is false. The single reload implementation.
      */
     async reload({ preservePosition = true } = {}) {
         return this.actions.reload({ preservePosition });

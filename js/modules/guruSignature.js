@@ -15,7 +15,7 @@ export class GuruSignature {
         this.authManager = authManager;
         this.events = events;
         // The one place the current value lives. Persistence is delegated to
-        // UserPreferences; nothing else keeps a copy (phase 5 of #18).
+        // UserPreferences; nothing else keeps a copy.
         this.userPreferences = authManager?.userPreferences || null;
         this.callbacks = {
             onSignatureSet: []

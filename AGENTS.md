@@ -25,8 +25,7 @@ A 3 Card Blind match is between two players, each with a 3-card deck. The outcom
 
 Pure functions only: no DOM, no `gapi`, no `fetch`, no instance state. Everything
 takes the data it needs (row, colour, signature, column indices) as arguments.
-`GuruAnalysisInterface` keeps thin delegating methods so its rendering and event
-call sites are unchanged; new pure logic belongs here, not in the class.
+New pure logic belongs here, not in a UI class.
 
 ### The colour registry
 
@@ -48,8 +47,7 @@ colour is actually added. Do not add a colour without deciding that policy.
 
 ## App Shell (`js/app/`)
 
-Phase 4 of #18 moved the analysis session's mutable state off the controller and
-onto one object.
+The analysis session's mutable state lives on one object, not on the controller.
 
 - `AppState` is the single source of truth for the open pod: `sheetData`
   (and its derived `spreadsheetId`), `rows`, `rowIndex`, `guruColor`,
@@ -61,7 +59,7 @@ onto one object.
   `findRowIndexByKey()` give a stable row identity (tab id + original row index)
   so a reload does not depend on the player names.
 - `AnalysisController.state` is that object; the views (`analysisView`,
-  `analysisRowRenderer`, ...) and the extracted services (`analysisActions`,
+  `analysisRowRenderer`, ...) and the services (`analysisActions`,
   `analysisNavigation`, `analysisSessionLoader`) read it via `host.state`.
 - `reload({ preservePosition })` in `analysisActions.js` is the only reload
   path. A failed refresh is non-fatal by design: the screen keeps its data.
@@ -77,14 +75,13 @@ onto one object.
   `refreshCurrentRow()` share `renderRowOutputs()` so the two cannot drift, and
   `parseSheets` derives its count from the live rows via `countMyDiscrepancies`
   rather than trusting the fetch.
-- `EventBus` / `APP_EVENTS` replace the `window` CustomEvents that used to carry
-  the login / logout / signature flow. `main.js` subscribes in
-  `setupEventSubscriptions()`; `AuthManager` and `GuruSignature` emit and
-  subscribe through the bus they are handed. Handler registration in `main.js`
-  is guarded by `_domBound` / `_signatureHandlersBound` so it is idempotent
-  without the old reset-on-logout flags.
+- `EventBus` / `APP_EVENTS` carry the login / logout / signature flow.
+  `main.js` subscribes in `setupEventSubscriptions()`; `AuthManager` and
+  `GuruSignature` emit and subscribe through the bus they are handed. Handler
+  registration in `main.js` is guarded by `_domBound` / `_signatureHandlersBound`
+  so it is idempotent.
 
-### The guru signature (phase 5 of #18)
+### The guru signature
 
 The guru signature is session identity, not reactive state. It is set once,
 persisted, and only changes in exceptional circumstances, so it is modelled as a
@@ -108,9 +105,9 @@ mostly immutable value rather than a live field.
   is the header's `#guru-signature-display`, and the header is hidden while a pod
   is open (`#sheet-editor` fullscreen). To change it a guru leaves the pod first;
   the next `loadSheet` resolves the colour and rows against the new value.
-- `APP_EVENTS` only needs `USER_LOGGED_IN`, `USER_LOGGED_OUT` and
-  `REQUEST_GURU_SIGNATURE_CHANGE`. The old `GURU_SIGNATURE_LOADED` /
-  `GURU_SIGNATURE_CHANGED` events were removed with the duality they carried.
+- `APP_EVENTS` needs only `USER_LOGGED_IN`, `USER_LOGGED_OUT` and
+  `REQUEST_GURU_SIGNATURE_CHANGE`. Do not add per-value signature events: the
+  owner object makes them unnecessary.
 
 ### The clocks & notes gate (`js/modules/deckNotesEditor.js`)
 
@@ -221,7 +218,7 @@ the-stylus/
 │   │   ├── scryfallAPI.js
 │   │   ├── uiController.js            # Centralised event handling / status UI
 │   │   └── userPreferences.js
-│   ├── ui/                     # View / controller split (phase 3 of #18); state lives in js/app/
+│   ├── ui/                     # View / controller split; state lives in js/app/
 │   │   ├── analysisController.js      # Slim orchestrator: state + service calls + view.render
 │   │   ├── analysisActions.js         # Write/score workflows (set, claim, clear, reload)
 │   │   ├── analysisNavigation.js      # Row movement: next/prev, skips, mirror, next deck
@@ -301,8 +298,8 @@ npm run test:e2e               # Playwright only
 - `AnalysisController` UI-flow methods (e.g. `processDeckNotes`) are tested via
   `Object.create(AnalysisController.prototype)` and an explicit fake `this`. The
   constructor calls `bindEvents()` and needs a DOM, so do not `new` it in unit
-  tests. Since Phase 1 and Phase 3 moved the scoring/row logic into
-  `js/domain/`, only a few UI-flow methods still need this scaffolding.
+  tests. Most scoring and row logic lives in `js/domain/` and is imported
+  directly, so only a few UI-flow methods still need this scaffolding.
 - `GoogleSheetsAPI` is tested against a fake global `gapi` (`tests/fixtures/fakeGapi.js`)
   that records requests. Tests assert on the requests and the transformations.
   Change the module to read `gapi` lazily; do not capture it at import time.
@@ -369,8 +366,8 @@ pin down, each of which a synthetic fixture had wrong or absent:
   reference, not derived.
 - The app never reads D or K: it fetches only `A1:C1000` and `E1:F1000` and
   recomputes the outcome locally via `calculateOutcomeFromAnalyses`. The
-  modelled K values in the fixture are `1 - mirror outcome` (only row 1's real
-  K was observed) and exist purely so blanking stays honest. Do not write tests
+  fixture's K values are modelled as `1 - mirror outcome` — they are not real
+  sheet data, and exist purely so blanking stays honest. Do not write tests
   asserting that D or K affect the app — the app cannot see them.
 - On write, the stub does not recompute D/K the way the real sheet would, so
   post-write assertions should target E/F (the columns the app actually writes).
@@ -418,36 +415,30 @@ When you add, remove, or rename a file under `js/`, `styles/`, `images/`, or `fa
 ### Bumping the version
 
 `APP_VERSION` at the top of `sw.js` (format `vYYYYMMDD`) is a **service-worker
-cache token, not a release name**. Bump it for any user-visible change so
-installed clients pick it up; `main.js` parses this value for the footer. A
-refactor that changes no user-visible behaviour need not bump it, which is why
-the same value can legitimately appear on more than one commit. Do not try to
-read a release out of this string.
+cache token, not a release name**, and `main.js` parses it for the footer.
+`README.md` covers when to bump it. The constraint that matters here: do not
+read a release out of this string, and do not try to keep it in step with the
+tag — a refactor with no user-visible effect legitimately leaves the same value
+on more than one commit.
 
 ### Release identity and tagging
 
 A **release** is named by CalVer `YYYY.MM` (`YYYY.MM.PATCH` for a fix between
-monthly releases) and identified by an annotated git tag `vYYYY.MM`.
+monthly releases) and identified by an annotated git tag `vYYYY.MM`. The
+human-facing procedure lives in `README.md`; this section records the mechanism
+and its constraints.
 
 - The single source of truth is the top release heading in `CHANGELOG.md`
   (`## [2026.10] - 2026-10-23`). A `## [Unreleased]` heading above it is ignored.
 - The workflow matches the first `## [YYYY.MM]` heading itself, in one step, so
   the tag and the release notes come from the same line and cannot disagree.
   There is no helper module to keep in sync.
-- `.github/workflows/release.yml` runs on a push to `main` that touches
-  `CHANGELOG.md`, and creates the tag and a GitHub Release whose notes are that
-  changelog section. It is idempotent: an existing tag means no-op, so a
-  re-run, a docs-only edit or a replayed promotion is safe. `workflow_dispatch`
-  is the escape hatch if a push run was missed.
-- **To cut a release:** add a `## [YYYY.MM] - YYYY-MM-DD` section to the top of
-  `CHANGELOG.md` and merge it to `main`. That is the whole manual step.
+- It is idempotent: an existing tag means no-op, so a re-run, a docs-only edit
+  or a replayed promotion is safe. `workflow_dispatch` is the escape hatch if a
+  push run was missed. (The workflow itself is described under CI billing.)
 
-The heading must be exactly `## [YYYY.MM]` — the bracket content is the version,
-so `## [v2026.10]` is not a release and is skipped rather than tagged with a
-doubled `v`.
-
-Because the app has no build step and deploys by pushing to `main`, the tag
-records what is *already live* rather than triggering a deploy.
+The heading format is load-bearing, not cosmetic — see `README.md` for the
+rule. An agent editing `CHANGELOG.md` must preserve it exactly.
 
 Do not confuse the three version-like values:
 
@@ -469,8 +460,11 @@ per-task choice:
 
 1. Branch, implement and test in `the-stylus-staging`.
 2. Merge to the staging `main` and let it deploy to the preview site.
-3. Once the change has been verified on the preview, replay the same commits on
-   the production repo (`barbuz/the-stylus`) and merge to its `main` to deploy.
+3. Once the change has been verified on the preview, promote it to the
+   production repo (`barbuz/the-stylus`) with the monthly merge described under
+   "Promoting staging to production" below. Changes accumulate in staging and
+   cross over together; do not hand-replay individual commits onto production
+   unless something is urgent enough to skip the monthly cadence.
 
 Do not open PRs against or push to the production repo until the staging copy has
 been tested. The two repositories are independent copies (see below), so a change
@@ -484,13 +478,10 @@ and merge themselves.
 
 ### Production and preview deployments
 
-The app ships from two GitHub Pages project sites. Both live on the same origin
-(`barbuz.github.io`) and differ only by path, which is deliberate: they share
-`localStorage` and the Google appData preferences file, so a user keeps their
-session, guru signature and recent pods across a switch.
-
-- Production: `https://barbuz.github.io/the-stylus/`
-- Preview: `https://barbuz.github.io/the-stylus-staging/`
+The app ships from two GitHub Pages project sites on the same origin
+(`barbuz.github.io`), differing only by path. `README.md` lists them and
+describes what a user sees; this section records why they are built that way and
+what must not change.
 
 Both use GitHub's *legacy* Pages build ("Deploy from a branch", `main` / root),
 matching the app's no-build-step design: pushing to `main` is the deploy. Do not
@@ -499,9 +490,10 @@ in `tests.yml` is the only workflow the project needs.
 
 `DEPLOYMENTS` in `js/config.js` is the source of truth for the paths and display
 names; **if a path here is wrong, deep-link routing and the switch button break
-silently**.
+silently**. It must agree with the two paths in `README.md`.
 
-Because the two share an origin:
+Sharing an origin is deliberate — it is what lets a user keep their session,
+guru signature and recent pods across a switch — and it has consequences:
 
 - The service-worker app-shell cache is namespaced by base path
   (`DEPLOYMENT_ID` in `sw.js`). Without that, one deployment's `activate` step
@@ -519,60 +511,75 @@ returns early when it redirects. Adding a third deployment means extending
 `DEPLOYMENTS`; `alternateDeploymentUrl()` only knows how to flip between exactly
 two, so it would need revisiting.
 
-The leftover copy must not keep testers or automation away from the preview.
+The preview deployment must stay reachable: do not gate it, and do not let
+automation or a stale `preferred_deployment` strand a tester on production.
 Leaving both deployments at the same `APP_VERSION` is fine, because the caches
 are namespaced.
 
 ### Promoting staging to production (the monthly merge)
 
-The two repositories are **independent copies that share no history beyond
-`8837792`**. Both sides have changed the same files since, so a plain
-`git merge staging/main` into production is *not* clean: it conflicts in
-`AGENTS.md`, `index.html`, `js/config.js`, `js/main.js`, `sw.js` and
-`tests/e2e/deployment.spec.js`, plus a modify/delete on the removed
-`js/modules/guruAnalysisInterface.js`. Do not resolve those by hand — the result
-is neither tree, and it has to be redone from scratch next month.
-
-**Promote by syncing content, not by merging histories.** Staging is the source
-of truth for the app, so the production tree is replaced with the staging tree,
-and the two histories are connected so that every later month is a fast-forward.
-Run this in a clone of the **production** repo, with the staging repo added as a
-remote named `staging`:
+The repositories are **independent copies**, but their histories are connected,
+so a promotion is an **ordinary merge** — do not reach for
+`--allow-unrelated-histories`. Do it in a clone of the **production** repo, with
+staging added as a remote named `staging`:
 
 ```bash
 git fetch origin main && git fetch staging main
 
 git checkout -B release/sync origin/main
-git merge -s ours --no-commit staging/main        # record staging as a parent
-git read-tree -u --reset staging/main             # take staging's tree verbatim
-git commit -m "Release 2026.10: sync from staging"
+git merge staging/main
 ```
 
-`merge -s ours` makes staging a parent without taking its content; `read-tree`
-then makes the tree exactly staging's. The result verifies equal to
-`staging/main`'s tree, including the deleted file. **After the first sync this
-way, later months are an ordinary clean merge**, because production's history
-now contains staging's.
+That is the whole procedure. Merge it into `main` (a **merge commit** — see
+below), and pushing `main` is the deploy; Pages rebuilds by itself. Staging is
+the source of truth for the app.
 
-Two things to check before pushing:
+**Merge commits, never squash or rebase.** The parent link is the mechanism: it
+is what makes the next month an ordinary merge. A squash produces the right
+*tree* but loses the link, resetting the merge base to the pre-sync commit, so
+every later month conflicts on edits that are not really in conflict (production
+touching one region, staging another). It also strands the promotion back on a
+`read-tree` path that replaces production's tree wholesale and silently destroys
+any production-only hotfix. Rebase is not available anyway: the branch carries
+merge commits, so GitHub reports `rebaseable: false`.
 
-1. **Re-add anything production had and staging lacks.** At the first sync this
-   is `907cf9ce` ("Cover the production-to-preview switch in e2e"), a test that
-   exists only on production. Replay it on staging *before* the sync — this is a
-   content-sync, so anything absent from staging is deleted from production.
-2. **Compare the trees**, and only then open a PR into production's `main`.
-   Pushing `main` is the deploy; Pages rebuilds by itself.
+Two things to check before opening the PR:
 
-Then add the matching `## [YYYY.MM]` section to `CHANGELOG.md` on production so
-the release is tagged there too, and verify on
+1. **That the merge is clean.** A plain merge should report no conflicts. If it
+   conflicts, something was changed on production without being replayed on
+   staging — resolve it on staging first, not in the merge, so the next month
+   stays clean.
+2. **Compare the trees** before opening a PR into production's `main`.
+
+The full monthly sequence is therefore:
+
+1. On **staging**, add the `## [YYYY.MM] - YYYY-MM-DD` section to `CHANGELOG.md`
+   and merge it to staging `main`. That tags and releases `vYYYY.MM` in staging
+   and deploys the preview.
+2. Test on `https://barbuz.github.io/the-stylus-staging/?pod=<POD_ID>`.
+3. On **production**, run the merge above and open the PR. Merging it tags and
+   releases `vYYYY.MM` in production too, because the promotion carries the
+   changelog entry that `release.yml` reads.
+
+`CHANGELOG.md` needs no separate production commit: the promotion carries it,
+which touches it, which triggers `release.yml`. Verify the tag and the release
+appear in production, then check
 `https://barbuz.github.io/the-stylus/?pod=<POD_ID>`.
 
-**The preview repository is a manual copy.** It has never existed as a fork
-(GitHub cannot fork a repository into the same owner account), no git remote
-links it to production, and pushing to production does not update it. If a
-preview-only fix becomes permanent, it is a change to the staging copy only and
-must be replayed on production by hand. Whenever `main` moves on production,
-staging drifts until the next sync.
+`release.yml` requests `contents: write` to create the tag, so **Settings →
+Actions → General → Workflow permissions** must be write in both repositories.
+If a promotion fails with a 403 on the tag step, that setting is the first thing
+to check.
+
+**The preview repository is a manual copy.** GitHub cannot fork a repository into
+the same owner account, so no git remote links it to production and pushing to
+production does not update it. If a preview-only fix becomes permanent, it is a
+change to the staging copy only and must be replayed on production by hand.
+
+A promotion adds a production commit that staging does not have (the merge), so
+production runs ahead of staging until the next promotion brings staging's work
+across again. That is normal and is what the next month's merge resolves; it is
+not a reason to push production's history back into staging.
 
 ### The deployment switch lives in the footer
 
@@ -611,6 +618,19 @@ only flips between exactly two.
 
 ## Keeping Docs in Sync
 
+**One owner per fact.** `README.md` is written for humans — gurus and
+contributors — and owns how to use the app, how to run it, how to cut a release
+and what the two deployments are. This file is written for agents and owns the
+constraints: what must not change, and why. Where the two overlap, README states
+it plainly for a human and this file states the rule; neither restates the
+other's version. Add the detail to whichever file owns it and leave the other
+alone, rather than updating both.
+
+Write constraints, not history. A rule earns its place by changing what a future
+change does — "never squash a promotion" does; "we deleted X last month" does
+not. When a file or feature is removed, drop the text that described it rather
+than leaving a tombstone behind.
+
 After code changes:
 
 1. Update the Repository Structure above if files were added/removed/renamed.
@@ -619,14 +639,10 @@ After code changes:
 4. Add a bullet to the top `## [YYYY.MM]` section of `CHANGELOG.md` for a
    user-visible change; the release workflow tags from that heading.
 
-This file is the single source of repo guidance; do not reintroduce a second
-copy. `.github/copilot-instructions.md` existed for the same purpose and was
-removed as a stale duplicate.
-
 ## Troubleshooting
 
 - **`gapi is not defined` / `ERR_BLOCKED_BY_CLIENT`:** expected in sandboxed or offline environments where Google APIs cannot load. These are not app bugs; focus on whether the page structure and modules loaded.
 - **Module fails to load:** check the exact path and casing of the import.
 - **Stale behaviour after editing:** the service worker may be serving a cached build. Bump `APP_VERSION` and hard-reload, or unregister the worker in devtools.
-- **Sheet fails to parse:** inspect the URL handling in `js/utils/urlUtils.js`; Discord-pasted links can carry trailing characters (previously handled by trimming extra `),`).
+- **Sheet fails to parse:** inspect the URL handling in `js/utils/urlUtils.js`; Discord-pasted links can carry trailing characters, which `sanitizeUrlParam` strips.
 - **Syntax check:** `node -c <filename>`.

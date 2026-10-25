@@ -1,10 +1,9 @@
 /**
  * Tiny application event bus.
  *
- * Replaces the `window` CustomEvents that used to carry the login / logout /
- * signature flow (phase 4 of #18). A plain object keeps the events local to the
- * app instead of leaking them onto the global window, and lets subscriptions be
- * set up once and torn down predictably.
+ * Carries the login / logout / signature flow. A plain object keeps the events
+ * local to the app instead of leaking them onto the global window, and lets
+ * subscriptions be set up once and torn down predictably.
  *
  * `emit` never lets one failing listener break the others.
  */
