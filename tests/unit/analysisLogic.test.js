@@ -569,12 +569,6 @@ test('getDeckStats is safe with no selection', () => {
     assert.deepEqual(getDeckStats([{ player1: 'Deck A' }], 'red', -1), { totalMatches: 0, unclaimedMatches: 0 });
 });
 
-// --- Discrepancy display -----------------------------------------------------
-//
-// There is no `buildDiscrepancyDisplay` to test: it had no callers and was
-// removed. The discrepancy *data* is exercised by rowHasDiscrepancy /
-// rowHasMyDiscrepancy above.
-
 // --- Colour registry: sheet naming and merged layout -------------------------
 //
 // These pin the derivation, not just the current values: the point of the

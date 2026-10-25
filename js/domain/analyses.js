@@ -2,8 +2,7 @@
  * Pure analysis helpers.
  *
  * No DOM, no gapi, no fetch, no instance state: every function takes the data
- * it needs as arguments. GuruAnalysisInterface keeps thin delegators so its
- * call sites are unchanged.
+ * it needs as arguments.
  */
 import { GURU_COLORS, getCurrentColorAnalysis } from './guruColor.js';
 

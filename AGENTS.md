@@ -25,8 +25,7 @@ A 3 Card Blind match is between two players, each with a 3-card deck. The outcom
 
 Pure functions only: no DOM, no `gapi`, no `fetch`, no instance state. Everything
 takes the data it needs (row, colour, signature, column indices) as arguments.
-`GuruAnalysisInterface` keeps thin delegating methods so its rendering and event
-call sites are unchanged; new pure logic belongs here, not in the class.
+New pure logic belongs here, not in a UI class.
 
 ### The colour registry
 
@@ -627,6 +626,11 @@ it plainly for a human and this file states the rule; neither restates the
 other's version. Add the detail to whichever file owns it and leave the other
 alone, rather than updating both.
 
+Write constraints, not history. A rule earns its place by changing what a future
+change does — "never squash a promotion" does; "we deleted X last month" does
+not. When a file or feature is removed, drop the text that described it rather
+than leaving a tombstone behind.
+
 After code changes:
 
 1. Update the Repository Structure above if files were added/removed/renamed.
@@ -634,10 +638,6 @@ After code changes:
 3. Bump `APP_VERSION` in `sw.js` if the change is user-visible.
 4. Add a bullet to the top `## [YYYY.MM]` section of `CHANGELOG.md` for a
    user-visible change; the release workflow tags from that heading.
-
-This file is the single source of repo guidance for agents. Do not add a second
-copy — a `.github/copilot-instructions.md` or similar must not come back, because
-two guidance files drift apart.
 
 ## Troubleshooting
 
