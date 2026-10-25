@@ -60,7 +60,7 @@ The analysis session's mutable state lives on one object, not on the controller.
   `findRowIndexByKey()` give a stable row identity (tab id + original row index)
   so a reload does not depend on the player names.
 - `AnalysisController.state` is that object; the views (`analysisView`,
-  `analysisRowRenderer`, ...) and the extracted services (`analysisActions`,
+  `analysisRowRenderer`, ...) and the services (`analysisActions`,
   `analysisNavigation`, `analysisSessionLoader`) read it via `host.state`.
 - `reload({ preservePosition })` in `analysisActions.js` is the only reload
   path. A failed refresh is non-fatal by design: the screen keeps its data.
@@ -367,8 +367,8 @@ pin down, each of which a synthetic fixture had wrong or absent:
   reference, not derived.
 - The app never reads D or K: it fetches only `A1:C1000` and `E1:F1000` and
   recomputes the outcome locally via `calculateOutcomeFromAnalyses`. The
-  modelled K values in the fixture are `1 - mirror outcome` (only row 1's real
-  K was observed) and exist purely so blanking stays honest. Do not write tests
+  fixture's K values are modelled as `1 - mirror outcome` — they are not real
+  sheet data, and exist purely so blanking stays honest. Do not write tests
   asserting that D or K affect the app — the app cannot see them.
 - On write, the stub does not recompute D/K the way the real sheet would, so
   post-write assertions should target E/F (the columns the app actually writes).
@@ -519,10 +519,10 @@ are namespaced.
 
 ### Promoting staging to production (the monthly merge)
 
-The repositories are **independent copies**. They shared no history until the
-first sync in 2026.10, which connected them: production's history now contains
-staging's, so a promotion is an **ordinary merge**. Do it in a clone of the
-**production** repo, with staging added as a remote named `staging`:
+The repositories are **independent copies**, but their histories are connected,
+so a promotion is an **ordinary merge** — do not reach for
+`--allow-unrelated-histories`. Do it in a clone of the **production** repo, with
+staging added as a remote named `staging`:
 
 ```bash
 git fetch origin main && git fetch staging main
@@ -535,32 +535,21 @@ That is the whole procedure. Merge it into `main` (a **merge commit** — see
 below), and pushing `main` is the deploy; Pages rebuilds by itself. Staging is
 the source of truth for the app.
 
-**The first sync used a content-sync recipe instead**, and it is recorded here
-only because it explains why the tree is what it is: `merge -s ours` recorded
-staging as a parent without taking its content, then `read-tree -u --reset`
-made the tree exactly staging's. That was needed because the two histories had
-diverged and a plain merge conflicted in `AGENTS.md`, `README.md`, `index.html`,
-`js/config.js`, `js/main.js` and `sw.js`, plus a modify/delete on the removed
-`js/modules/guruAnalysisInterface.js`. **Do not repeat it** — from the
-second sync on, a plain merge is correct and is what keeps production-only work
-alive.
-
 **Merge commits, never squash or rebase.** The parent link is the mechanism: it
 is what makes the next month an ordinary merge. A squash produces the right
 *tree* but loses the link, resetting the merge base to the pre-sync commit, so
 every later month conflicts on edits that are not really in conflict (production
-touching one region, staging another). It also strands the promotion back on the
-destructive `read-tree` path, which replaces production's tree wholesale and
-silently destroys any production-only hotfix. Rebase is not available anyway:
-the branch carries merge commits, so GitHub reports `rebaseable: false`.
+touching one region, staging another). It also strands the promotion back on a
+`read-tree` path that replaces production's tree wholesale and silently destroys
+any production-only hotfix. Rebase is not available anyway: the branch carries
+merge commits, so GitHub reports `rebaseable: false`.
 
 Two things to check before opening the PR:
 
 1. **That the merge is clean.** A plain merge should report no conflicts. If it
    conflicts, something was changed on production without being replayed on
    staging — resolve it on staging first, not in the merge, so the next month
-   stays clean. (This is the opposite of the first sync, where a plain merge
-   could not work at all.)
+   stays clean.
 2. **Compare the trees** before opening a PR into production's `main`.
 
 The full monthly sequence is therefore:
@@ -578,17 +567,15 @@ which touches it, which triggers `release.yml`. Verify the tag and the release
 appear in production, then check
 `https://barbuz.github.io/the-stylus/?pod=<POD_ID>`.
 
-Production's workflow permissions are confirmed: `release.yml` ran on the first
-promotion and created `v2026.10`, so **Settings → Actions → General → Workflow
-permissions** is write in both repositories. `release.yml` requests
-`contents: write`; if a future promotion fails with a 403 on the tag step, that
-setting is the first thing to check.
+`release.yml` requests `contents: write` to create the tag, so **Settings →
+Actions → General → Workflow permissions** must be write in both repositories.
+If a promotion fails with a 403 on the tag step, that setting is the first thing
+to check.
 
-**The preview repository is a manual copy.** It has never existed as a fork
-(GitHub cannot fork a repository into the same owner account), no git remote
-links it to production, and pushing to production does not update it. If a
-preview-only fix becomes permanent, it is a change to the staging copy only and
-must be replayed on production by hand.
+**The preview repository is a manual copy.** GitHub cannot fork a repository into
+the same owner account, so no git remote links it to production and pushing to
+production does not update it. If a preview-only fix becomes permanent, it is a
+change to the staging copy only and must be replayed on production by hand.
 
 A promotion adds a production commit that staging does not have (the merge), so
 production runs ahead of staging until the next promotion brings staging's work
@@ -648,9 +635,9 @@ After code changes:
 4. Add a bullet to the top `## [YYYY.MM]` section of `CHANGELOG.md` for a
    user-visible change; the release workflow tags from that heading.
 
-This file is the single source of repo guidance for agents; do not reintroduce a
-second copy. `.github/copilot-instructions.md` existed for the same purpose and
-was removed as a stale duplicate.
+This file is the single source of repo guidance for agents. Do not add a second
+copy — a `.github/copilot-instructions.md` or similar must not come back, because
+two guidance files drift apart.
 
 ## Troubleshooting
 
