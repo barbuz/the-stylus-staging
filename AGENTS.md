@@ -469,8 +469,11 @@ per-task choice:
 
 1. Branch, implement and test in `the-stylus-staging`.
 2. Merge to the staging `main` and let it deploy to the preview site.
-3. Once the change has been verified on the preview, replay the same commits on
-   the production repo (`barbuz/the-stylus`) and merge to its `main` to deploy.
+3. Once the change has been verified on the preview, promote it to the
+   production repo (`barbuz/the-stylus`) with the monthly merge described under
+   "Promoting staging to production" below. Changes accumulate in staging and
+   cross over together; do not hand-replay individual commits onto production
+   unless something is urgent enough to skip the monthly cadence.
 
 Do not open PRs against or push to the production repo until the staging copy has
 been tested. The two repositories are independent copies (see below), so a change
@@ -525,54 +528,81 @@ are namespaced.
 
 ### Promoting staging to production (the monthly merge)
 
-The two repositories are **independent copies that share no history beyond
-`8837792`**. Both sides have changed the same files since, so a plain
-`git merge staging/main` into production is *not* clean: it conflicts in
-`AGENTS.md`, `index.html`, `js/config.js`, `js/main.js`, `sw.js` and
-`tests/e2e/deployment.spec.js`, plus a modify/delete on the removed
-`js/modules/guruAnalysisInterface.js`. Do not resolve those by hand — the result
-is neither tree, and it has to be redone from scratch next month.
-
-**Promote by syncing content, not by merging histories.** Staging is the source
-of truth for the app, so the production tree is replaced with the staging tree,
-and the two histories are connected so that every later month is a fast-forward.
-Run this in a clone of the **production** repo, with the staging repo added as a
-remote named `staging`:
+The repositories are **independent copies**. They shared no history until the
+first sync in 2026.10, which connected them: production's history now contains
+staging's, so a promotion is an **ordinary merge**. Do it in a clone of the
+**production** repo, with staging added as a remote named `staging`:
 
 ```bash
 git fetch origin main && git fetch staging main
 
 git checkout -B release/sync origin/main
-git merge -s ours --no-commit staging/main        # record staging as a parent
-git read-tree -u --reset staging/main             # take staging's tree verbatim
-git commit -m "Release 2026.10: sync from staging"
+git merge staging/main
 ```
 
-`merge -s ours` makes staging a parent without taking its content; `read-tree`
-then makes the tree exactly staging's. The result verifies equal to
-`staging/main`'s tree, including the deleted file. **After the first sync this
-way, later months are an ordinary clean merge**, because production's history
-now contains staging's.
+That is the whole procedure. Merge it into `main` (a **merge commit** — see
+below), and pushing `main` is the deploy; Pages rebuilds by itself. Staging is
+the source of truth for the app.
 
-Two things to check before pushing:
+**The first sync used a content-sync recipe instead**, and it is recorded here
+only because it explains why the tree is what it is: `merge -s ours` recorded
+staging as a parent without taking its content, then `read-tree -u --reset`
+made the tree exactly staging's. That was needed because the two histories had
+diverged and a plain merge conflicted in `AGENTS.md`, `README.md`, `index.html`,
+`js/config.js`, `js/main.js` and `sw.js`, plus a modify/delete on the removed
+`js/modules/guruAnalysisInterface.js`. **Do not repeat it** — from the
+second sync on, a plain merge is correct and is what keeps production-only work
+alive.
 
-1. **Re-add anything production had and staging lacks.** At the first sync this
-   is `907cf9ce` ("Cover the production-to-preview switch in e2e"), a test that
-   exists only on production. Replay it on staging *before* the sync — this is a
-   content-sync, so anything absent from staging is deleted from production.
-2. **Compare the trees**, and only then open a PR into production's `main`.
-   Pushing `main` is the deploy; Pages rebuilds by itself.
+**Merge commits, never squash or rebase.** The parent link is the mechanism: it
+is what makes the next month an ordinary merge. A squash produces the right
+*tree* but loses the link, resetting the merge base to the pre-sync commit, so
+every later month conflicts on edits that are not really in conflict (production
+touching one region, staging another). It also strands the promotion back on the
+destructive `read-tree` path, which replaces production's tree wholesale and
+silently destroys any production-only hotfix. Rebase is not available anyway:
+the branch carries merge commits, so GitHub reports `rebaseable: false`.
 
-Then add the matching `## [YYYY.MM]` section to `CHANGELOG.md` on production so
-the release is tagged there too, and verify on
+Two things to check before opening the PR:
+
+1. **That the merge is clean.** A plain merge should report no conflicts. If it
+   conflicts, something was changed on production without being replayed on
+   staging — resolve it on staging first, not in the merge, so the next month
+   stays clean. (This is the opposite of the first sync, where a plain merge
+   could not work at all.)
+2. **Compare the trees** before opening a PR into production's `main`.
+
+The full monthly sequence is therefore:
+
+1. On **staging**, add the `## [YYYY.MM] - YYYY-MM-DD` section to `CHANGELOG.md`
+   and merge it to staging `main`. That tags and releases `vYYYY.MM` in staging
+   and deploys the preview.
+2. Test on `https://barbuz.github.io/the-stylus-staging/?pod=<POD_ID>`.
+3. On **production**, run the merge above and open the PR. Merging it tags and
+   releases `vYYYY.MM` in production too, because the promotion carries the
+   changelog entry that `release.yml` reads.
+
+`CHANGELOG.md` needs no separate production commit: the promotion carries it,
+which touches it, which triggers `release.yml`. Verify the tag and the release
+appear in production, then check
 `https://barbuz.github.io/the-stylus/?pod=<POD_ID>`.
+
+Production's workflow permissions are confirmed: `release.yml` ran on the first
+promotion and created `v2026.10`, so **Settings → Actions → General → Workflow
+permissions** is write in both repositories. `release.yml` requests
+`contents: write`; if a future promotion fails with a 403 on the tag step, that
+setting is the first thing to check.
 
 **The preview repository is a manual copy.** It has never existed as a fork
 (GitHub cannot fork a repository into the same owner account), no git remote
 links it to production, and pushing to production does not update it. If a
 preview-only fix becomes permanent, it is a change to the staging copy only and
-must be replayed on production by hand. Whenever `main` moves on production,
-staging drifts until the next sync.
+must be replayed on production by hand.
+
+A promotion adds a production commit that staging does not have (the merge), so
+production runs ahead of staging until the next promotion brings staging's work
+across again. That is normal and is what the next month's merge resolves; it is
+not a reason to push production's history back into staging.
 
 ### The deployment switch lives in the footer
 
