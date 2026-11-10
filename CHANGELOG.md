@@ -10,7 +10,7 @@ a release; `## [Unreleased]` may sit above it and is ignored.
 Each release lists what changed for a guru, with the PR number that carried it.
 Compare this file between the two deployments to see what production is missing.
 
-## [Unreleased]
+## [2026.10.1] - 2026-11-10
 
 ### Fixed
 
