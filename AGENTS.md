@@ -75,6 +75,17 @@ The analysis session's mutable state lives on one object, not on the controller.
   `refreshCurrentRow()` share `renderRowOutputs()` so the two cannot drift, and
   `parseSheets` derives its count from the live rows via `countMyDiscrepancies`
   rather than trusting the fetch.
+- Rendering is asynchronous (the analysis list awaits its Discord thread link,
+  the card slots await Scryfall), so two renders can overlap — a score's
+  `refreshCurrentRow()` and a reload's `render()`, or a reload and a Next. A
+  slower older render must not paint its row over the newer one, or the screen
+  flashes between two matches. `AnalysisRowRenderer` therefore hands each render
+  a generation token (`_beginRender` / `_isCurrent`) and bails after every await
+  once a newer render has started; `CardPresenter` keeps the same per-player
+  guard so a stale image load cannot fill the slots. Any new awaited step inside
+  `render()` / `renderRowOutputs()` / `renderAnalysisDisplay()` must re-check the
+  token before writing, and the deck-notes gate shares `CardPresenter`, so keep
+  the guard inside it rather than at the call sites.
 - `EventBus` / `APP_EVENTS` carry the login / logout / signature flow.
   `main.js` subscribes in `setupEventSubscriptions()`; `AuthManager` and
   `GuruSignature` emit and subscribe through the bus they are handed. Handler

@@ -10,20 +10,29 @@ export class CardPresenter {
     constructor(scryfallAPI, view) {
         this.scryfallAPI = scryfallAPI;
         this.view = view;
+        // Per-player load generation. The image fetch is async, so a slow load
+        // for the previous row could otherwise paint its cards into the slots
+        // after a newer row's load has already filled them.
+        this._loadToken = new Map();
     }
 
     /** Render both players' cards for one row. */
     async loadPlayerCards(playerId, deckString) {
+        const token = (this._loadToken.get(playerId) || 0) + 1;
+        this._loadToken.set(playerId, token);
+
         const cardNames = this.scryfallAPI.parseDeckString(deckString);
         const slots = this.view.renderCardLoading(playerId, cardNames);
 
         try {
             const deckImages = await this.scryfallAPI.getDeckImages(deckString);
+            if (this._loadToken.get(playerId) !== token) return;
             this.view.renderCards(slots, deckImages, {
                 getCardUrl: (name, exact) => this.scryfallAPI.getCardUrl(name, exact)
             });
         } catch (error) {
             logger.error(`Error loading cards for ${playerId}:`, error);
+            if (this._loadToken.get(playerId) !== token) return;
             this.view.renderCardError(slots);
         }
     }
