@@ -110,6 +110,26 @@ test.describe('The Stylus (no Google, no network)', () => {
         await expect(page.locator('#win-btn')).toBeHidden();
     });
 
+    test('unclaiming every incomplete match releases only my unscored claims', async ({ page }) => {
+        await bootApp(page);
+        await signIn(page);
+        await loadPod(page);
+
+        // alice has claimed Match 1 (unscored) and Match 2/4 (scored). Only the
+        // unscored claim counts as incomplete.
+        const incompleteBtn = page.locator('#unclaim-incomplete-button');
+        await expect(incompleteBtn).toBeVisible();
+        await expect(incompleteBtn).toHaveText('Unclaim Incomplete (1)');
+
+        await incompleteBtn.click();
+        await expect(page.locator('#status-message')).toContainText('Unclaimed 1 incomplete matches');
+
+        // Match 1 is guru-sheet row 2; its signature (column F) is cleared...
+        await expect.poll(() => page.evaluate(() => window.__stylus.getCell('Red Gurus', 2, 6))).toBeNull();
+        // ...while the scored Match 2 (row 3) keeps alice's claim.
+        expect(await page.evaluate(() => window.__stylus.getCell('Red Gurus', 3, 6))).toBe('alice');
+    });
+
     test('the Match N of M button opens the jump-to-match table', async ({ page }) => {
         await bootApp(page);
         await signIn(page);

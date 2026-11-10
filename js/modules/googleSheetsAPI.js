@@ -718,4 +718,54 @@ export class GoogleSheetsAPI {
             throw new Error(error.message || 'Failed to clear cell');
         }
     }
+
+    /**
+     * Clear several cells in one request. `updates` is the same shape used by
+     * `clearCell`, one entry per cell. The ranges are resolved (merged-guru
+     * coordinates included) and sent as a single `values.batchClear`, so a bulk
+     * unclaim is one round trip rather than one per match.
+     */
+    async clearCells(spreadsheetId, updates) {
+        try {
+            if (!this.authManager.isLoggedIn()) {
+                throw new Error('User not authenticated');
+            }
+
+            if (!Array.isArray(updates) || updates.length === 0) {
+                throw new Error('clearCells requires at least one update');
+            }
+
+            for (const update of updates) {
+                if (!update || typeof update !== 'object' || !update.row) {
+                    throw new Error('Every clearCells update must include row');
+                }
+            }
+
+            const metadata = await this.getSheetMetadata(spreadsheetId);
+
+            const ranges = updates.map(update => {
+                const resolved = this.resolveTargetForMergedUpdate(update);
+                const targetSheet = metadata.sheets.find(s => s.sheetId === resolved.targetSheetId);
+                if (!targetSheet) {
+                    throw new Error(`Target sheet with ID ${resolved.targetSheetId} not found`);
+                }
+                const columnLetter = String.fromCharCode(65 + resolved.targetCol - 1);
+                return `'${targetSheet.title}'!${columnLetter}${update.row}`;
+            });
+
+            const response = await gapi.client.sheets.spreadsheets.values.batchClear({
+                spreadsheetId,
+                resource: { ranges }
+            });
+
+            return {
+                success: true,
+                ranges,
+                response: response.result
+            };
+        } catch (error) {
+            logger.error('API Error (clearCells):', error);
+            throw new Error(error.message || 'Failed to clear cells');
+        }
+    }
 }

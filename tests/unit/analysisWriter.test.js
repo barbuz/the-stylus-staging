@@ -24,6 +24,10 @@ function recordingAPI() {
         async clearCell(spreadsheetId, update) {
             calls.push({ method: 'clearCell', spreadsheetId, update });
             return { success: true };
+        },
+        async clearCells(spreadsheetId, updates) {
+            calls.push({ method: 'clearCells', spreadsheetId, updates });
+            return { success: true };
         }
     };
 }
@@ -97,6 +101,24 @@ test('clearCell targets the spreadsheet file id, not the tab id', async () => {
     assert.equal(call.spreadsheetId, SPREADSHEET_ID);
     assert.equal(call.update.sheetId, TAB_ID);
     assert.equal(call.update.row, 4);
+});
+
+test('unclaimRows clears every row in one request, targeting the file id', async () => {
+    const api = recordingAPI();
+    await new AnalysisWriter(api).unclaimRows({
+        spreadsheetId: SPREADSHEET_ID,
+        sheetId: TAB_ID,
+        rows: [1, 2, 5],
+        col: 5,
+        guruSheetIds: { red: TAB_ID }
+    });
+
+    const [call] = api.calls;
+    assert.equal(call.method, 'clearCells');
+    assert.equal(call.spreadsheetId, SPREADSHEET_ID);
+    // Each spreadsheet row is 1-indexed, still targeting the tab id.
+    assert.deepEqual(call.updates.map(u => u.row), [2, 3, 6]);
+    assert.ok(call.updates.every(u => u.sheetId === TAB_ID && u.isMergedGuruUpdate));
 });
 
 test('saveDeckField and signGoldfishClock target the spreadsheet file id', async () => {

@@ -21,6 +21,7 @@ import {
     setColourAnalysis,
     setColourSignature
 } from '../domain/guruColor.js';
+import { findMyIncompleteRows } from '../domain/matchRows.js';
 import { logger } from '../utils/log.js';
 
 // The deck-info field names used by the edit buttons -> deckNotes columnMap keys.
@@ -165,6 +166,44 @@ export class AnalysisActions {
             logger.error('Error unclaiming match:', error);
             host.view.endSpinner(unclaimButton);
             host.uiController.showStatus(`Error unclaiming match: ${error.message}`, 'error');
+        }
+    }
+
+    /**
+     * Release every match the current guru has claimed but not yet scored.
+     * Only the signature cell is cleared, so a guru can drop the matches they
+     * picked up but have not got to. Scored matches keep their claim.
+     */
+    async unclaimIncompleteRows() {
+        const host = this.host;
+        const state = this.state;
+
+        const rows = findMyIncompleteRows(state.rows, state.guruColor, state.signature);
+        if (rows.length === 0) {
+            host.uiController.showStatus('You have no incomplete matches to unclaim.', 'info');
+            return;
+        }
+
+        const unclaimButton = host.view.beginSpinner('unclaim-incomplete-button', 'Unclaiming...');
+
+        try {
+            host.uiController.showStatus(`Unclaiming ${rows.length} incomplete matches...`, 'loading');
+
+            await host.writer.unclaimRows({
+                spreadsheetId: state.spreadsheetId,
+                sheetId: rows[0].sheetId,
+                rows: rows.map(row => row.originalRowIndex),
+                col: host.getCurrentGuruColIndex('signature'),
+                guruSheetIds: this.mergedGuruSheetIds
+            });
+
+            rows.forEach(row => setColourSignature(row, state.guruColor, ''));
+            host.uiController.showStatus(`Unclaimed ${rows.length} incomplete matches.`, 'success');
+            await host.showCurrentRow();
+        } catch (error) {
+            logger.error('Error unclaiming incomplete matches:', error);
+            host.view.endSpinner(unclaimButton);
+            host.uiController.showStatus(`Error unclaiming incomplete matches: ${error.message}`, 'error');
         }
     }
 

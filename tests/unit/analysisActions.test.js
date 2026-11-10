@@ -18,7 +18,8 @@ function makeHost({ sheetData, holdReload = false } = {}) {
         state: new AppState(),
         writer: {
             async writeAnalysis() { events.push('write'); return { success: true }; },
-            async clearCell() { events.push('clear'); return { success: true }; }
+            async clearCell() { events.push('clear'); return { success: true }; },
+            async unclaimRows(args) { events.push('unclaimRows'); this.lastUnclaim = args; return { success: true }; }
         },
         sheetsAPI: {
             async getSheetData() {
@@ -83,4 +84,48 @@ test('clearing a result updates the row model before reload', async () => {
 
     assert.equal(host.state.currentRow.redAnalysis, '', 'analysis cleared locally');
     assert.ok(host.events.includes('clear'));
+});
+
+test('unclaimIncompleteRows clears only my claimed-but-unscored rows', async () => {
+    const sheetData = makeSheetData({ guruRows: [
+        // alice claimed, unscored -> unclaimed
+        ['1', 'Deck A', 'Deck B', '', 'alice', '', '', '', ''],
+        // alice claimed and scored -> kept
+        ['2', 'Deck A', 'Deck C', '1', 'alice', '', '', '', ''],
+        // unclaimed -> untouched
+        ['3', 'Deck C', 'Deck A', '', '', '', '', '', ''],
+        // bob's claim -> untouched
+        ['4', 'Deck D', 'Deck E', '', '', '1', 'bob', '', ''],
+        // alice claimed, unscored -> unclaimed
+        ['5', 'Deck D', 'Deck F', '', 'alice', '', '', '', '']
+    ] });
+
+    const host = makeHost({ sheetData });
+    host.parseSheets(sheetData);
+    host.state.setRowIndex(0);
+
+    await new AnalysisActions(host).unclaimIncompleteRows();
+
+    // Rows 0 and 4 carry originalRowIndex 1 and 5 (the first data row sits at
+    // sheet row 2, i.e. index 1).
+    assert.deepEqual(host.writer.lastUnclaim.rows, [1, 5]);
+    assert.equal(host.state.rows[0].redSignature, '', 'my incomplete row is released');
+    assert.equal(host.state.rows[1].redSignature, 'alice', 'my scored row keeps its claim');
+    assert.equal(host.state.rows[4].redSignature, '', 'my other incomplete row is released');
+    assert.equal(host.state.rows[3].blueSignature, 'bob', 'another guru\'s claim is untouched');
+});
+
+test('unclaimIncompleteRows writes nothing when there is nothing incomplete', async () => {
+    const sheetData = makeSheetData({ guruRows: [
+        ['1', 'Deck A', 'Deck B', '1', 'alice', '', '', '', '']
+    ] });
+
+    const host = makeHost({ sheetData });
+    host.parseSheets(sheetData);
+    host.state.setRowIndex(0);
+
+    await new AnalysisActions(host).unclaimIncompleteRows();
+
+    assert.ok(!host.events.includes('unclaimRows'), 'no write is attempted');
+    assert.equal(host.events.includes('showCurrentRow'), false, 'no re-render either');
 });

@@ -45,6 +45,8 @@ and continue guruing!
 - Use the **Deck Notes** button in the controls to revisit the clocks and notes
   screen, opening on the current match's first player deck, then
   **Back to analysis** to return
+- While a match you have claimed is open, **Unclaim Incomplete (N)** releases
+  every match you have claimed but not yet scored, in one action
 - Changes are saved automatically to the Google Sheet
 
 ### 6. **Track Progress**

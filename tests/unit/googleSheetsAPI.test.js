@@ -688,6 +688,36 @@ test('clearCell errors when the resolved target sheet is unknown', async () => {
     }
 });
 
+// --- clearCells --------------------------------------------------------------
+
+test('clearCells resolves every range and sends one batchClear', async () => {
+    const { fake, restore } = withFakeGapi({
+        sheets: [{ title: 'Red Gurus', sheetId: 11 }, { title: 'Blue Gurus', sheetId: 22 }]
+    });
+    try {
+        const api = new GoogleSheetsAPI(fakeAuthManager());
+        const result = await api.clearCells(SHEET_ID, [
+            { row: 4, col: 5, isMergedGuruUpdate: true, guruSheetIds: { red: 11, blue: 22 } },
+            { row: 6, col: 7, isMergedGuruUpdate: true, guruSheetIds: { red: 11, blue: 22 } }
+        ]);
+
+        assert.equal(result.success, true);
+        // Col 5 is Red Signature and col 7 is Blue Signature; both land in F.
+        assert.deepEqual(result.ranges, ["'Red Gurus'!F4", "'Blue Gurus'!F6"]);
+        const [call] = fake.callsTo('values.batchClear');
+        assert.equal(call.params.spreadsheetId, SHEET_ID);
+        assert.deepEqual(call.params.resource.ranges, ["'Red Gurus'!F4", "'Blue Gurus'!F6"]);
+    } finally {
+        restore();
+    }
+});
+
+test('clearCells rejects an empty list or a rowless update', async () => {
+    const api = new GoogleSheetsAPI(fakeAuthManager());
+    await assert.rejects(() => api.clearCells(SHEET_ID, []), /at least one update/);
+    await assert.rejects(() => api.clearCells(SHEET_ID, [{ col: 1, sheetId: 1 }]), /must include row/);
+});
+
 // --- getDeckNotes ------------------------------------------------------------
 
 test('getDeckNotes attaches the deck notes column mapping', async () => {
