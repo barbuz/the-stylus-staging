@@ -12,6 +12,12 @@ Compare this file between the two deployments to see what production is missing.
 
 ## [Unreleased]
 
+### Added
+
+- An **Unclaim Incomplete (N)** button, shown next to Unclaim Match while a
+  match you have claimed is open. It releases every match you have claimed but
+  not yet scored, in one action, so you can hand back claims you have not got to
+
 ### Fixed
 
 - Scoring a match no longer briefly flashes the match you were just on, and

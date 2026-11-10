@@ -40,6 +40,7 @@ export class AnalysisView {
      * @param {Function} handlers.onClaim
      * @param {Function} handlers.onClaimDeck
      * @param {Function} handlers.onUnclaim
+     * @param {Function} handlers.onUnclaimIncomplete
      * @param {Function} handlers.onClear
      */
     constructor(handlers = {}) {
@@ -50,6 +51,7 @@ export class AnalysisView {
     bindButtons() {
         getElement('claim-button')?.addEventListener('click', () => this.handlers.onClaim?.());
         getElement('unclaim-button')?.addEventListener('click', () => this.handlers.onUnclaim?.());
+        getElement('unclaim-incomplete-button')?.addEventListener('click', () => this.handlers.onUnclaimIncomplete?.());
         getElement('clear-result-button')?.addEventListener('click', () => this.handlers.onClear?.());
 
         const claimDeck = getElement('claim-deck-button');
@@ -233,8 +235,9 @@ export class AnalysisView {
      * @param {string} options.signature
      * @param {number|null} options.analysisValue parsed analysis to highlight
      * @param {object} options.deckStats { totalMatches, unclaimedMatches }
+     * @param {number} options.incompleteCount matches claimed by this guru but not yet scored
      */
-    renderButtons({ row, colour, signature, analysisValue, deckStats }) {
+    renderButtons({ row, colour, signature, analysisValue, deckStats, incompleteCount = 0 }) {
         const signatureValue = getCurrentColorSignature(row, colour);
         const claimedByAnother = signatureValue && signatureValue.trim() !== '' && signatureValue !== signature;
         const unclaimed = !signatureValue || signatureValue.trim() === '';
@@ -244,6 +247,7 @@ export class AnalysisView {
         const claimButton = getElement('claim-button');
         const claimDeckButton = getElement('claim-deck-button');
         const unclaimButton = getElement('unclaim-button');
+        const unclaimIncompleteButton = getElement('unclaim-incomplete-button');
         const clearButton = getElement('clear-result-button');
         const claimedMessage = getElement('claimed-message');
         const nextDeckBtn = getElement('next-deck-btn');
@@ -253,6 +257,7 @@ export class AnalysisView {
             setDisplay(claimButton, 'none');
             setDisplay(claimDeckButton, 'none');
             setDisplay(unclaimButton, 'none');
+            setDisplay(unclaimIncompleteButton, 'none');
             setDisplay(clearButton, 'none');
             setDisplay(nextDeckBtn, 'none');
 
@@ -268,6 +273,7 @@ export class AnalysisView {
             scoringButtons.forEach(btn => { btn.style.display = 'none'; });
             setDisplay(claimedMessage, 'none');
             setDisplay(unclaimButton, 'none');
+            setDisplay(unclaimIncompleteButton, 'none');
             setDisplay(clearButton, 'none');
             setDisplay(nextDeckBtn, 'inline-block');
 
@@ -295,9 +301,15 @@ export class AnalysisView {
                     unclaimButton.disabled = false;
                     unclaimButton.textContent = 'Unclaim Match';
                 }
+                if (unclaimIncompleteButton) {
+                    unclaimIncompleteButton.style.display = 'block';
+                    unclaimIncompleteButton.disabled = false;
+                    unclaimIncompleteButton.textContent = `Unclaim Incomplete (${incompleteCount})`;
+                }
                 setDisplay(clearButton, 'none');
             } else {
                 setDisplay(unclaimButton, 'none');
+                setDisplay(unclaimIncompleteButton, 'none');
                 if (clearButton) {
                     clearButton.style.display = 'block';
                     clearButton.disabled = false;

@@ -133,6 +133,16 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
                         const sheet = parsed && sheetByTitle(parsed.title);
                         if (sheet) delete sheet.cells[cellKey(parsed.startRow, parsed.startCol + 1)];
                         return ok({ clearedRange: params.range });
+                    },
+                    batchClear: (params) => {
+                        state.requests.push({ kind: 'values.batchClear', params });
+                        const ranges = params.resource.ranges || [];
+                        for (const range of ranges) {
+                            const parsed = parseA1(range);
+                            const sheet = parsed && sheetByTitle(parsed.title);
+                            if (sheet) delete sheet.cells[cellKey(parsed.startRow, parsed.startCol + 1)];
+                        }
+                        return ok({ clearedRanges: ranges });
                     }
                 },
                 batchUpdate: (params) => {

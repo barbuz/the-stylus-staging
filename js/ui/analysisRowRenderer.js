@@ -132,7 +132,8 @@ export class AnalysisRowRenderer {
             colour: state.guruColor,
             signature: state.signature,
             analysisValue: currentAnalysis ? parseFloat(currentAnalysis) : null,
-            deckStats: host.getDeckStats()
+            deckStats: host.getDeckStats(),
+            incompleteCount: host.getIncompleteCount()
         });
 
         host.view.renderNavigation(state.rowIndex, state.rows.length);

@@ -79,6 +79,17 @@ export class AnalysisWriter {
         });
     }
 
+    /** Clear the signature cell of every listed row in one request. */
+    async unclaimRows({ spreadsheetId, sheetId, rows, col, guruSheetIds }) {
+        return this.sheetsAPI.clearCells(spreadsheetId, rows.map(row => ({
+            sheetId,
+            row: row + 1,
+            col: col + 1,
+            isMergedGuruUpdate: true,
+            guruSheetIds
+        })));
+    }
+
     /**
      * Checked update of a Deck Notes field (notes / additional notes / clock).
      * `rows` is every spreadsheet row the edit applies to: a grouped entry

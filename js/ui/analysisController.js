@@ -30,7 +30,8 @@ import {
     findFirstDiscrepancy,
     findMirrorMatchIndex,
     getDeckStats,
-    countMyDiscrepancies
+    countMyDiscrepancies,
+    countMyIncomplete
 } from '../domain/matchRows.js';
 import { isInverseErrorSuspected, describeInverseResult } from '../domain/inverseCheck.js';
 import { processDeckNotes, calculateColorStatistics } from '../domain/deckNotes.js';
@@ -62,6 +63,7 @@ export class AnalysisController {
             onClaim: () => this.claimRow(),
             onClaimDeck: () => this.claimDeckRows(),
             onUnclaim: () => this.unclaimRow(),
+            onUnclaimIncomplete: () => this.unclaimIncompleteRows(),
             onClear: () => this.clearCurrentUserAnalysis()
         });
         this.writer = new AnalysisWriter(sheetsAPI);
@@ -241,6 +243,16 @@ export class AnalysisController {
 
     async unclaimRow() {
         return this.actions.unclaimRow();
+    }
+
+    /** Release every match the current guru has claimed but not yet scored. */
+    async unclaimIncompleteRows() {
+        return this.actions.unclaimIncompleteRows();
+    }
+
+    /** How many matches the current guru has claimed but not yet scored. */
+    getIncompleteCount() {
+        return countMyIncomplete(this.state.rows, this.state.guruColor, this.state.signature);
     }
 
     /**

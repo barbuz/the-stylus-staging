@@ -26,6 +26,7 @@ function makeRendererHost({ threadGate } = {}) {
         },
         getCurrentColorAnalysis(row) { return row.redAnalysis; },
         getDeckStats() { return { totalMatches: 1, unclaimedMatches: 1 }; },
+        getIncompleteCount() { return 0; },
         isMatchAvailableForAnalysis() { return true; },
         updateInverseResultDisplay() {}
     };

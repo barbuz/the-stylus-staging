@@ -44,6 +44,9 @@ export class FakeGapi {
             })),
             clear: (params) => this.#record('values.clear', params, () => ({
                 result: { clearedRange: params.range }
+            })),
+            batchClear: (params) => this.#record('values.batchClear', params, () => ({
+                result: { clearedRanges: (params.resource && params.resource.ranges) || [] }
             }))
         };
 

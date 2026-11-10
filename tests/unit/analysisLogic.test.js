@@ -41,6 +41,8 @@ import {
     rowHasDiscrepancy,
     rowHasMyDiscrepancy,
     countMyDiscrepancies,
+    findMyIncompleteRows,
+    countMyIncomplete,
     allGurusHaveMatchingResults,
     isMatchAvailableForAnalysis,
     isCurrentMatchAvailableForAnalysis,
@@ -199,6 +201,37 @@ test('countMyDiscrepancies counts only rows I have claimed and scored', () => {
     const { rows } = buildMatchRows(sheet, 0);
 
     assert.equal(countMyDiscrepancies(rows, 'red', 'alice'), 1);
+});
+
+test('findMyIncompleteRows returns my claims that are not yet scored', () => {
+    const sheet = makeMergedGuruSheet([
+        // alice claimed, not scored -> incomplete
+        ['1', 'Deck A', 'Deck B', '', 'alice', '', '', '', ''],
+        // alice claimed and scored -> not incomplete
+        ['2', 'Deck A', 'Deck C', '1', 'alice', '', '', '', ''],
+        // unclaimed -> not incomplete
+        ['3', 'Deck C', 'Deck A', '', '', '', '', '', ''],
+        // claimed by another guru -> not incomplete
+        ['4', 'Deck D', 'Deck E', '', '', '', 'bob', '', ''],
+        // claimed by alice in another colour, but alice is Red here -> not incomplete
+        ['5', 'Deck D', 'Deck F', '', '', '1', 'alice', '', '']
+    ]);
+
+    const { rows } = buildMatchRows(sheet, 0);
+    const incomplete = findMyIncompleteRows(rows, 'red', 'alice');
+
+    assert.deepEqual(incomplete.map(r => r.player2), ['Deck B']);
+    assert.equal(countMyIncomplete(rows, 'red', 'alice'), 1);
+});
+
+test('countMyIncomplete is zero when nothing is claimed', () => {
+    const sheet = makeMergedGuruSheet([
+        ['1', 'Deck A', 'Deck B', '', '', '', '', '', ''],
+        ['2', 'Deck A', 'Deck C', '', '', '', '', '', '']
+    ]);
+
+    const { rows } = buildMatchRows(sheet, 0);
+    assert.equal(countMyIncomplete(rows, 'red', 'alice'), 0);
 });
 
 // --- Deck notes parsing ------------------------------------------------------

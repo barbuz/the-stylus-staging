@@ -168,6 +168,24 @@ export function countMyDiscrepancies(rows, colour, signature) {
     return rows.filter(row => rowHasMyDiscrepancy(row, colour, signature)).length;
 }
 
+/**
+ * The rows the current guru has claimed in their colour but not yet scored.
+ * These are the claims the bulk "unclaim incomplete" action releases. A blank
+ * analysis is exactly what makes a row's outcome Incomplete, so every row here
+ * is one the guru still has to solve.
+ */
+export function findMyIncompleteRows(rows, colour, signature) {
+    return rows.filter(row =>
+        rowHasCurrentGuruSignatureInColor(row, colour, signature) &&
+        !hasCurrentColorResult(row, colour)
+    );
+}
+
+/** How many matches the current guru has claimed but not yet scored. */
+export function countMyIncomplete(rows, colour, signature) {
+    return findMyIncompleteRows(rows, colour, signature).length;
+}
+
 /** All three gurus have scored and agree. */
 export function allGurusHaveMatchingResults(row) {
     const normalizedAnalyses = getGuruAnalysisValues(row)
