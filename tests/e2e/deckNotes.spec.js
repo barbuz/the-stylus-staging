@@ -184,6 +184,30 @@ test.describe('Deck notes gate', () => {
         await expect(page.locator('#guru-analysis-interface')).toBeVisible();
     });
 
+    test('a double-click on Start guruing does not stack the colour picker', async ({ page }) => {
+        // An unknown signature sends the hand-off to the colour picker instead
+        // of the analysis screen; a double click must not render it twice.
+        await isolateNetwork(page);
+        await installStubs(page, {
+            spreadsheet: realPodSpreadsheet({ guruHidden: true }),
+            preferences: { guruSignature: 'nobody', recentPods: [], recentHubs: [] }
+        });
+        await page.goto('/index.html');
+        await signInAndLoad(page);
+
+        await expect(page.locator('#deck-notes-screen')).toBeVisible();
+
+        // Two clicks in one tick: both hand-offs run before the first fetch
+        // resolves, so both reach the picker.
+        await page.evaluate(() => {
+            const button = document.getElementById('deck-notes-start-btn');
+            button.click();
+            button.click();
+        });
+
+        await expect(page.locator('#color-selection-container')).toHaveCount(1);
+    });
+
     test('opening from analysis lands on the open match\'s player 1 deck', async ({ page }) => {
         await installBoot(page, realPodSpreadsheet());
         await page.goto('/index.html');

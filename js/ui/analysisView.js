@@ -441,6 +441,11 @@ export class AnalysisView {
         }
         analysisInterface.style.display = 'none';
 
+        // Two overlapping pod loads (a double-click or double Enter, or the
+        // deck-notes hand-off racing a reload) both reach here. Remove any
+        // picker already on screen first, so the screen can never stack twice.
+        removeColorSelection();
+
         const container = document.createElement('div');
         container.id = 'color-selection-container';
         container.className = 'color-selection-container full-screen';
@@ -483,10 +488,19 @@ export class AnalysisView {
 
     /** Remove the colour picker and show the analysis interface again. */
     hideColorSelection() {
-        getElement('color-selection-container')?.remove();
+        removeColorSelection();
         const analysisInterface = getElement('guru-analysis-interface');
         if (analysisInterface) {
             analysisInterface.style.display = '';
         }
     }
+}
+
+/**
+ * Remove every colour picker from the document. There should be at most one,
+ * but a duplicated render would leave more than one behind; removing all of
+ * them keeps the screen honest rather than leaving an orphan picker on screen.
+ */
+function removeColorSelection() {
+    document.querySelectorAll('#color-selection-container').forEach(container => container.remove());
 }

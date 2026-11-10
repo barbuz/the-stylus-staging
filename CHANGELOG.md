@@ -16,6 +16,10 @@ Compare this file between the two deployments to see what production is missing.
 
 - Clear My Result and Unclaim Match sit after Next again, as they did before the
   analysis-screen split moved them
+- The "Choose Your Guru Color" screen no longer appears twice when a pod load is
+  started twice in quick succession (a double-click or double Enter), or when a
+  double-click on Start guruing hands off from the deck-notes gate with an
+  unknown signature
 
 ## [2026.10] - 2026-10-23
 

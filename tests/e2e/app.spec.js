@@ -304,6 +304,22 @@ test.describe('The Stylus (no Google, no network)', () => {
         await expect(selection).toBeHidden();
         await expect(page.locator('#current-analysis-value')).toBeVisible();
     });
+
+    test('a double Enter in the pod field shows the picker exactly once', async ({ page }) => {
+        await bootApp(page, { signature: 'nobody' });
+        await signIn(page);
+
+        // Press Enter twice in quick succession: the field stays enabled, so
+        // both keypresses start a load before either fetch resolves. Both
+        // reach the colour picker, which must not stack.
+        const input = page.locator('#sheet-url');
+        await input.fill(POD_URL);
+        await input.press('Enter');
+        await input.press('Enter');
+
+        await expect(page.locator('#color-selection-container')).toHaveCount(1);
+        await expect(page.locator('.color-selection-screen')).toHaveCount(1);
+    });
 });
 
 // --- Signature ownership -----------------------------------------------------
