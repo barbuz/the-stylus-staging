@@ -10,6 +10,16 @@ a release; `## [Unreleased]` may sit above it and is ignored.
 Each release lists what changed for a guru, with the PR number that carried it.
 Compare this file between the two deployments to see what production is missing.
 
+## [Unreleased]
+
+### Fixed
+
+- Scoring a match no longer briefly flashes the match you were just on, and
+  moving quickly through matches no longer shows a previous match's cards: an
+  overlapping background refresh or a slow card load could paint its row over
+  the one you had moved to. Renders are now generation-guarded, so only the
+  newest one writes after an await
+
 ## [2026.10.1] - 2026-11-10
 
 ### Fixed

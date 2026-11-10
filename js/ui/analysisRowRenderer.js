@@ -10,6 +10,23 @@ import { logger } from '../utils/log.js';
 export class AnalysisRowRenderer {
     constructor(host) {
         this.host = host;
+        // Render generation. Rendering is async (the analysis list awaits its
+        // Discord thread link, the card slots await Scryfall), so two renders
+        // can overlap: a score's in-place refresh and a reload, or a reload and
+        // a Next. Each render claims a generation and only the newest may write
+        // after an await, or a slow older render paints its row over the newer
+        // one — the "flashing between two matches" a guru sees.
+        this._renderToken = 0;
+    }
+
+    /** Claim a new render generation. Older in-flight renders must not write. */
+    _beginRender() {
+        return ++this._renderToken;
+    }
+
+    /** Whether `token` is still the newest render generation. */
+    _isCurrent(token) {
+        return token === this._renderToken;
     }
 
     /** Sync the browser URL and document title with the current session state. */
@@ -48,6 +65,7 @@ export class AnalysisRowRenderer {
     async render() {
         const host = this.host;
         const { state } = host;
+        const token = this._beginRender();
         this.updateURL();
 
         host.view.renderSheetInfo({
@@ -72,11 +90,12 @@ export class AnalysisRowRenderer {
         this.displayDeckInfo('player1', currentRow.player1);
         this.displayDeckInfo('player2', currentRow.player2);
 
-        await this.renderRowOutputs(currentRow);
+        await this.renderRowOutputs(currentRow, token);
 
         await cards1Loaded;
         await cards2Loaded;
 
+        if (!this._isCurrent(token)) return;
         host.cards.preloadRows(state.rows, this.rowsToPreload());
     }
 
@@ -89,16 +108,23 @@ export class AnalysisRowRenderer {
     async refreshCurrentRow() {
         const { state } = this.host;
         if (state.rowIndex < 0 || state.rowIndex >= state.rows.length) return;
-        await this.renderRowOutputs(state.rows[state.rowIndex]);
+        await this.renderRowOutputs(state.rows[state.rowIndex], this._beginRender());
     }
 
-    /** Everything derived purely from the current row object. */
-    async renderRowOutputs(currentRow) {
+    /**
+     * Everything derived purely from the current row object.
+     *
+     * `token` is the render generation: the outcome write before the await is
+     * safe, but nothing after the awaited analysis list may land once a newer
+     * render has started.
+     */
+    async renderRowOutputs(currentRow, token = this._beginRender()) {
         const host = this.host;
         const { state } = host;
 
         host.view.renderOutcome(currentRow.outcomeValue);
-        await this.renderAnalysisDisplay(currentRow);
+        await this.renderAnalysisDisplay(currentRow, token);
+        if (!this._isCurrent(token)) return;
 
         const currentAnalysis = host.getCurrentColorAnalysis(currentRow);
         host.view.renderButtons({
@@ -115,10 +141,11 @@ export class AnalysisRowRenderer {
     }
 
     /** Build the analysis list, fetching its Discord thread link if any. */
-    async renderAnalysisDisplay(currentRow) {
+    async renderAnalysisDisplay(currentRow, token = this._beginRender()) {
         const host = this.host;
         const showOtherGurus = !host.isMatchAvailableForAnalysis(currentRow);
         const threadUrl = await this.getThreadUrl(currentRow);
+        if (!this._isCurrent(token)) return;
         host.view.buildAnalysisList({
             row: currentRow,
             outcomeValue: currentRow.outcomeValue || '',
