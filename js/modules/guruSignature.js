@@ -38,10 +38,15 @@ export class GuruSignature {
         // and tear down the pod the guru has open, and re-running the UI setup
         // would uncover the home input over it.
         if (this.initialized && signature === (this.signature || '')) {
+            // The one line that explains a resume: this is the path a second
+            // init must take. If a resume ever re-announces, that shows up here
+            // as the announce branch firing twice for the same value.
+            logger.debug(`🔁 initSignature: unchanged ("${signature}"), no-op`);
             return;
         }
 
         if (signature) {
+            logger.debug(`🔁 initSignature: announcing "${signature}" (was "${this.signature || ''}")`);
             this.signature = signature;
             this.displaySignature(signature);
             this.hideSignatureSection();

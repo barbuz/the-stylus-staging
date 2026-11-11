@@ -231,7 +231,7 @@ export class HubManager {
                 return this.podsCache;
             }
 
-            logger.trace(`📋 Found columns - Pod: ${podIndex}, Discrepancies: ${discrepanciesIndex}, Incompletes: ${incompletesIndex}, Sheet Link: ${sheetLinkIndex}`);
+            logger.debug(`📋 Found columns - Pod: ${podIndex}, Discrepancies: ${discrepanciesIndex}, Incompletes: ${incompletesIndex}, Sheet Link: ${sheetLinkIndex}`);
 
             // Parse data rows starting from row 3 (index 2)
             const pods = [];
@@ -266,7 +266,7 @@ export class HubManager {
                 });
             }
 
-            logger.trace(`✅ Loaded ${pods.length} pods from Totals sheet`);
+            logger.debug(`✅ Loaded ${pods.length} pods from Totals sheet`);
 
             // Cache the result
             this.podsCache = pods;
@@ -305,7 +305,7 @@ export class HubManager {
             });
 
             const title = response.result.properties?.title || 'Untitled Hub';
-            logger.trace(`✅ Hub title: ${title}`);
+            logger.debug(`✅ Hub title: ${title}`);
             return title;
 
         } catch (error) {

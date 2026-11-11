@@ -212,3 +212,35 @@ test('a deck claim logs its rows as compressed ranges, not one pair per row', as
     assert.match(line, /71-90:5/);
     clearLogBuffer();
 });
+
+test('the captured write line carries the value, not just the ranges', async () => {
+    const api = recordingAPI();
+    const writer = new AnalysisWriter(api, '#1');
+    clearLogBuffer();
+
+    await writer.claimRow({
+        spreadsheetId: SPREADSHEET_ID, sheetId: TAB_ID, row: 70, col: 4,
+        signature: 'alice', guruSheetIds: { red: TAB_ID }
+    });
+
+    const line = getLogEntries().map(e => e.message).find(m => m.includes('claim'));
+    // Where AND what: a "wrong value written" report needs both.
+    assert.match(line, /71:5/);
+    assert.match(line, /"alice"/);
+    clearLogBuffer();
+});
+
+test('a mixed-value write reports a distinct count instead of one value', async () => {
+    const api = recordingAPI();
+    const writer = new AnalysisWriter(api, '#1');
+    clearLogBuffer();
+
+    await writer.saveDeckField({
+        spreadsheetId: SPREADSHEET_ID, sheet: { sheetId: TAB_ID }, rows: [1, 2],
+        col: 3, value: 'note', expectedValue: ''
+    });
+    // saveDeckField writes the same value to every row -> a single quoted value.
+    const line = getLogEntries().map(e => e.message).find(m => m.includes('deck field'));
+    assert.match(line, /"note"/);
+    clearLogBuffer();
+});

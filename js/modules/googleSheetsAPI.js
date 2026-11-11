@@ -110,7 +110,9 @@ export class GoogleSheetsAPI {
             // Wait for custom metadata to finish loading
             const customMetadata = await customMetadataPromise;
             if (metadataSheet && Object.keys(customMetadata).length > 0) {
-                logger.trace('📋 Found metadata sheet:', customMetadata);
+                // Small, and it names the pod and hub link a report needs, so it
+                // stays on the captured log rather than moving to trace.
+                logger.debug('📋 Found metadata sheet:', customMetadata);
             }
 
             return {

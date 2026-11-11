@@ -22,10 +22,10 @@ Compare this file between the two deployments to see what production is missing.
 
 - The downloaded diagnostic log is much smaller and easier to read. The scoring
   session is now identified by a short id, so every write says which session
-  made it, and the log records each app boot and each phone lock/unlock. Whole
-  sheet dumps and other repeated noise are no longer included, so the file a
-  guru attaches to a bug report keeps the events that explain the problem
-  instead of being pushed out by detail
+  made it (and what value it wrote), and the log records each app boot and each
+  phone lock/unlock. Whole sheet dumps and other repeated noise are no longer
+  included, so the file a guru attaches to a bug report keeps the events that
+  explain the problem instead of being pushed out by detail
 
 ### Fixed
 

@@ -535,7 +535,7 @@ export class RecentPodsManager {
             const podsList = this.createHubPodsList(pods, hub);
             if (hubElement.parentNode) {
                 hubElement.parentNode.insertBefore(podsList, hubElement.nextSibling);
-                logger.trace(`✅ Loaded ${pods.length} pods for hub: ${hub.title}`);
+                logger.debug(`✅ Loaded ${pods.length} pods for hub: ${hub.title}`);
             } else {
                 logger.warn('Hub element has no parent node, cannot insert pods list');
             }

@@ -47,6 +47,20 @@ function compressRanges(updates) {
     return parts.join(',');
 }
 
+/**
+ * A short, uniform summary of the values a write sets. The ranges say *where*
+ * a write landed; this says *what* it wrote, which a "wrong value" report needs
+ * and the per-cell payload dump (now on trace) no longer carries.
+ */
+function summarizeValues(updates) {
+    const values = [...new Set(updates.map(u => String(u.value ?? '')))];
+    if (values.length === 1) {
+        const only = values[0];
+        return only.length > 40 ? `"${only.slice(0, 40)}…"` : `"${only}"`;
+    }
+    return `${values.length} distinct values`;
+}
+
 export class AnalysisWriter {
     constructor(sheetsAPI, label = '') {
         this.sheetsAPI = sheetsAPI;
@@ -57,11 +71,11 @@ export class AnalysisWriter {
 
     /**
      * One compact captured line per write. The full update objects are on trace:
-     * the ranges are what a bug report needs, and a per-cell dump of a 20-row
-     * deck claim is what crowds the buffer.
+     * the ranges and the written value are what a bug report needs, and a
+     * per-cell dump of a 20-row deck claim is what crowds the buffer.
      */
     _logWrite(action, spreadsheetId, updates) {
-        logger.debug(`✍️ ${this.label} ${action} -> ${compressRanges(updates)}`);
+        logger.debug(`✍️ ${this.label} ${action} -> ${compressRanges(updates)} = ${summarizeValues(updates)}`);
         logger.trace(`✍️ ${this.label} ${action} detail:`, { spreadsheetId, updates });
     }
 
