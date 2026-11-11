@@ -18,8 +18,7 @@ import { logger } from '../utils/log.js';
 
 /**
  * Compress a list of `row:col` cells into `row-range:col` runs, so a 20-row
- * deck claim reads as `71-90:5` instead of twenty pairs. The exact row set is
- * the evidence a double-write bug needs, so it is kept, just not spelled out.
+ * deck claim reads as `71-90:5` instead of twenty pairs.
  */
 function compressRanges(updates) {
     const sorted = [...updates].sort((a, b) => a.row - b.row || a.col - b.col);
@@ -48,9 +47,8 @@ function compressRanges(updates) {
 }
 
 /**
- * A short, uniform summary of the values a write sets. The ranges say *where*
- * a write landed; this says *what* it wrote, which a "wrong value" report needs
- * and the per-cell payload dump (now on trace) no longer carries.
+ * A short, uniform summary of the values a write sets: the single value, or a
+ * count when the cells differ.
  */
 function summarizeValues(updates) {
     const values = [...new Set(updates.map(u => String(u.value ?? '')))];
@@ -64,15 +62,12 @@ function summarizeValues(updates) {
 export class AnalysisWriter {
     constructor(sheetsAPI, label = '') {
         this.sheetsAPI = sheetsAPI;
-        // The owning controller's short id, threaded into the one captured line
-        // each write emits, so a log shows which session object made the write.
         this.label = label;
     }
 
     /**
-     * One compact captured line per write. The full update objects are on trace:
-     * the ranges and the written value are what a bug report needs, and a
-     * per-cell dump of a 20-row deck claim is what crowds the buffer.
+     * One captured line per write: the target ranges and the value written.
+     * The full update objects go to `trace`.
      */
     _logWrite(action, spreadsheetId, updates) {
         logger.debug(`✍️ ${this.label} ${action} -> ${compressRanges(updates)} = ${summarizeValues(updates)}`);

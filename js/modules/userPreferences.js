@@ -399,8 +399,6 @@ export class UserPreferences {
             schemaVersion: SCHEMA_VERSION,
             lastUpdated: new Date().toISOString()
         };
-        // A 6 KB dump on every load; keep a summary that a "recent pods went
-        // missing" report can still use, and the full object on trace.
         logger.debug(`📥 Loaded preferences from localStorage: ${preferences.recentPods?.length || 0} pods, ${preferences.recentHubs?.length || 0} hubs, signature ${preferences.guruSignature ? 'set' : 'empty'}`);
         logger.trace('📥 Loaded preferences from localStorage:', preferences);
         return preferences;

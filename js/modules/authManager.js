@@ -469,8 +469,6 @@ export class AuthManager {
     renderAuthSection() {
         const authSection = getElement('auth-section');
         const signature = this.getGuruSignature();
-        // Carries the signature being shown, so a wrong-signature-in-the-UI
-        // report has the value; low enough volume to keep on the captured log.
         logger.debug('AuthManager: Rendering auth section with guruSignature:', signature);
 
         if (this.isAuthenticated && this.user) {

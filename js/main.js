@@ -81,8 +81,8 @@ class ThreeCardBlindGuruTool {
                 return;
             }
 
-            // The buffer survives a resume, so the log is one timeline across
-            // several page loads. Mark each boot so the boundary is visible.
+            // The buffer survives a resume, so mark each boot to keep the
+            // one-timeline log readable across page loads.
             this._bootCount = (this._bootCount || 0) + 1;
             logger.debug(`——— app boot #${this._bootCount} (${navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop'}) ———`);
             this.watchPageVisibility();
@@ -175,10 +175,8 @@ class ThreeCardBlindGuruTool {
     }
 
     /**
-     * Record page hide/show so a resume is visible in the log. A guru's "I
-     * closed my phone and reopened it" report is otherwise invisible: the log
-     * just continues, and the setup that matters happens on the far side of the
-     * gap. Bound once.
+     * Log page hide/show so a resume is visible in the downloaded log. Bound
+     * once.
      */
     watchPageVisibility() {
         if (this._visibilityBound) {

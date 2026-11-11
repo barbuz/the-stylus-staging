@@ -12,14 +12,9 @@
  * `sessionStorage` (never `localStorage`) so a reload-into-failure keeps the
  * prior lines without leaking across sessions.
  *
- * `trace` is the exception: it reaches the console (gated by `?debug` like
- * `debug`) but is **never captured**. The buffer is a fixed 500 entries and a
- * session easily produces thousands of lines, so anything high-volume and
- * low-signal — a whole sheet dump, a per-card preload line — belongs on `trace`.
- * On `debug` it would evict the setup and teardown lines that explain a bug
- * long before the guru downloads the file. Use `debug` for state a bug report
- * should carry; use `trace` for detail only a developer watching the console
- * wants.
+ * `trace` reaches the console under the same `?debug` gate as `debug` but is
+ * **never captured**. Put high-volume detail here, so it cannot evict the setup
+ * and teardown lines a bug report actually needs.
  *
  * Call sites use the `logger` object (`logger.debug(...)`) rather than
  * destructured names, so a local `catch (error)` binding cannot shadow it.
@@ -93,9 +88,7 @@ restore();
 export const logger = {
     /**
      * Console-only development message, gated behind `?debug`. **Never**
-     * captured, so high-volume detail cannot crowd the downloadable log. Reach
-     * for this before `debug` whenever the line is one a bug report would not
-     * miss.
+     * captured, so high-volume detail cannot crowd the downloadable log.
      */
     trace(...args) {
         if (debugEnabled()) {

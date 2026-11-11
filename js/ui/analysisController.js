@@ -57,11 +57,9 @@ export class AnalysisController {
     constructor(sheetsAPI, uiController, guruSignature) {
         this.sheetsAPI = sheetsAPI;
         this.uiController = uiController;
-        // A short identity for this session object. The scoring screen is torn
-        // down and rebuilt whenever a pod is closed and reopened, and a bug once
-        // had two live at once writing to different rows. Tagging every write
-        // and the lifecycle lines with this id makes "who wrote that" obvious in
-        // a downloaded log instead of a timing puzzle.
+        // Short identity for this session object, so a downloaded log can tell
+        // which controller made a write; the scoring screen can have more than
+        // one live at once.
         this.id = ++AnalysisController._instanceCount;
         this.label = `#${this.id}`;
         // All session state lives on one object.
