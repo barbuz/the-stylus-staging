@@ -65,10 +65,7 @@ export class AnalysisWriter {
         this.label = label;
     }
 
-    /**
-     * One captured line per write: the target ranges and the value written.
-     * The full update objects go to `trace`.
-     */
+    /** One line per write: the target ranges and the value written. */
     _logWrite(action, spreadsheetId, updates) {
         logger.debug(`✍️ ${this.label} ${action} -> ${compressRanges(updates)} = ${summarizeValues(updates)}`);
         logger.trace(`✍️ ${this.label} ${action} detail:`, { spreadsheetId, updates });
