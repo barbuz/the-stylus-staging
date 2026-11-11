@@ -20,6 +20,11 @@ Compare this file between the two deployments to see what production is missing.
 
 ### Fixed
 
+- Reopening the app (for example after locking the phone) no longer claims
+  matches you did not touch. A resume re-ran the login flow, which treated the
+  unchanged signature as a change, tore the open pod down and reopened it as a
+  second session while the first was still listening — so one tap on Claim Deck
+  or a score ran twice, each time on a different match
 - Scoring a match no longer briefly flashes the match you were just on, and
   moving quickly through matches no longer shows a previous match's cards: an
   overlapping background refresh or a slow card load could paint its row over
