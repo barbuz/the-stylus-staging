@@ -87,6 +87,10 @@ export class AnalysisController {
     }
 
     destroy() {
+        // The view's scoring buttons are shared DOM, not owned by this
+        // controller. Unbind them or the next controller's view binds a second
+        // set of handlers onto the same elements, and one tap scores twice.
+        this.view.destroy();
         this.eventBinder.destroy();
         this.guruColorSelector?.destroy();
         this.overviewTableModal.destroy();

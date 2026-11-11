@@ -45,25 +45,52 @@ export class AnalysisView {
      */
     constructor(handlers = {}) {
         this.handlers = handlers;
+        // Bound listeners, kept so destroy() can remove them. The scoring
+        // buttons are shared DOM: a second view that binds without unbinding
+        // leaves the first controller's handlers attached, so one tap writes
+        // through both controllers.
+        this._listeners = [];
         this.bindButtons();
     }
 
     bindButtons() {
-        getElement('claim-button')?.addEventListener('click', () => this.handlers.onClaim?.());
-        getElement('unclaim-button')?.addEventListener('click', () => this.handlers.onUnclaim?.());
-        getElement('unclaim-incomplete-button')?.addEventListener('click', () => this.handlers.onUnclaimIncomplete?.());
-        getElement('clear-result-button')?.addEventListener('click', () => this.handlers.onClear?.());
+        this._addListener('claim-button', 'click', () => this.handlers.onClaim?.());
+        this._addListener('unclaim-button', 'click', () => this.handlers.onUnclaim?.());
+        this._addListener('unclaim-incomplete-button', 'click', () => this.handlers.onUnclaimIncomplete?.());
+        this._addListener('clear-result-button', 'click', () => this.handlers.onClear?.());
 
         const claimDeck = getElement('claim-deck-button');
-        claimDeck?.addEventListener('click', async () => {
-            claimDeck.disabled = true;
-            claimDeck.innerHTML = '<span class="spinner"></span> Claiming...';
-            try {
-                await this.handlers.onClaimDeck?.();
-            } finally {
-                claimDeck.disabled = false;
-            }
-        });
+        if (claimDeck) {
+            const handler = async () => {
+                claimDeck.disabled = true;
+                claimDeck.innerHTML = '<span class="spinner"></span> Claiming...';
+                try {
+                    await this.handlers.onClaimDeck?.();
+                } finally {
+                    claimDeck.disabled = false;
+                }
+            };
+            claimDeck.addEventListener('click', handler);
+            this._listeners.push({ element: claimDeck, type: 'click', handler });
+        }
+    }
+
+    /** Register a listener on an element and remember it for destroy(). */
+    _addListener(id, type, handler) {
+        const element = getElement(id);
+        if (!element) {
+            return;
+        }
+        element.addEventListener(type, handler);
+        this._listeners.push({ element, type, handler });
+    }
+
+    /** Remove every listener this view bound. */
+    destroy() {
+        for (const { element, type, handler } of this._listeners) {
+            element.removeEventListener(type, handler);
+        }
+        this._listeners = [];
     }
 
     /** Put a button into its disabled spinner state; returns the button. */

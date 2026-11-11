@@ -31,6 +31,16 @@ export class GuruSignature {
             ? await this.userPreferences.getGuruSignature()
             : getItem(this.storageKey) || '';
 
+        // The login flow re-runs on every resume (a silent token refresh
+        // re-emits USER_LOGGED_IN), and initSignature is called again each
+        // time. When the value is unchanged there is nothing to set up and no
+        // change to announce: re-announcing would look like a signature change
+        // and tear down the pod the guru has open, and re-running the UI setup
+        // would uncover the home input over it.
+        if (this.initialized && signature === (this.signature || '')) {
+            return;
+        }
+
         if (signature) {
             this.signature = signature;
             this.displaySignature(signature);

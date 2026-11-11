@@ -108,6 +108,12 @@ mostly immutable value rather than a live field.
   constructing both.
 - `initSignature()` takes no argument: the owner loads the persisted value
   itself. `main.js:onUserLoggedIn` calls it after `UserPreferences` initialises.
+  It is **idempotent**: a resume re-runs the login flow (a silent token refresh
+  re-emits `USER_LOGGED_IN`), so `initSignature` is called again with the same
+  value. When `initialized` is already true and the value is unchanged it must
+  do nothing and emit no `onSignatureSet` — re-announcing an unchanged value
+  looks like a change, tears the open pod down, and reopens it as a *second*
+  controller while the first is still listening.
 - `AnalysisController` receives a **snapshot string** at construction
   (`main.js` passes `guruSignature.getSignature()`), stored in
   `AppState.signature`. There is no `setGuruSignature`; a pod that is open cannot
@@ -116,6 +122,15 @@ mostly immutable value rather than a live field.
   is the header's `#guru-signature-display`, and the header is hidden while a pod
   is open (`#sheet-editor` fullscreen). To change it a guru leaves the pod first;
   the next `loadSheet` resolves the colour and rows against the new value.
+- **A closed controller must unbind.** The scoring and navigation buttons are
+  shared DOM, not owned by one controller. `AnalysisController.destroy()` (called
+  when a signature change closes the pod) must tear down everything that attached
+  a listener to those elements: `AnalysisView.destroy()` removes the
+  claim/unclaim/clear/claim-deck handlers and `AnalysisEventBinder.destroy()`
+  removes the win/tie/loss, navigation and `current-row-info` handlers. A
+  surviving listener means one tap drives two controllers, each on its own row,
+  so a score or Claim Deck writes a match the guru never touched. Any new
+  listener on a shared element must be registered so it can be removed again.
 - `APP_EVENTS` needs only `USER_LOGGED_IN`, `USER_LOGGED_OUT` and
   `REQUEST_GURU_SIGNATURE_CHANGE`. Do not add per-value signature events: the
   owner object makes them unnecessary.

@@ -172,3 +172,43 @@ test('changeSignature seeds the input with the current value', async () => {
         env.restore();
     }
 });
+
+test('re-initialising with the same signature does not re-announce it', async () => {
+    const env = installGlobals();
+    try {
+        const prefs = makeUserPreferences({ signature: 'alice' });
+        const owner = new GuruSignature({ userPreferences: prefs, renderAuthSection() {} });
+        const seen = [];
+        owner.onSignatureSet((value) => seen.push(value));
+
+        // A resume (silent token refresh) re-runs the login flow, which calls
+        // initSignature again. The value is unchanged, so nothing should look
+        // like a change that would tear down the open pod.
+        await owner.initSignature();
+        await owner.initSignature();
+
+        assert.deepEqual(seen, ['alice'], 'only the first, genuine set is announced');
+        assert.equal(owner.getSignature(), 'alice');
+    } finally {
+        env.restore();
+    }
+});
+
+test('re-initialising after the signature changed announces the new value', async () => {
+    const env = installGlobals();
+    try {
+        const prefs = makeUserPreferences({ signature: 'alice' });
+        const owner = new GuruSignature({ userPreferences: prefs, renderAuthSection() {} });
+        const seen = [];
+        owner.onSignatureSet((value) => seen.push(value));
+
+        await owner.initSignature();
+        prefs.stored = 'bob';
+        await owner.initSignature();
+
+        assert.deepEqual(seen, ['alice', 'bob'], 'a real change is still announced');
+        assert.equal(owner.getSignature(), 'bob');
+    } finally {
+        env.restore();
+    }
+});
