@@ -119,7 +119,7 @@ test.describe('The Stylus (no Google, no network)', () => {
         // unscored claim counts as incomplete.
         const incompleteBtn = page.locator('#unclaim-incomplete-button');
         await expect(incompleteBtn).toBeVisible();
-        await expect(incompleteBtn).toHaveText('Unclaim Incomplete (1)');
+        await expect(incompleteBtn).toHaveText('Unclaim All (1)');
 
         await incompleteBtn.click();
         await expect(page.locator('#status-message')).toContainText('Unclaimed 1 incomplete matches');
