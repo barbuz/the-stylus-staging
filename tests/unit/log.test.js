@@ -85,6 +85,36 @@ test('log: warn and error always pass through', () => {
     });
 });
 
+test('log: trace reaches the console only under ?debug', () => {
+    withGlobals({ debugFlag: undefined, search: undefined }, () => {
+        withCapturedConsole((calls) => {
+            logger.trace('quiet trace');
+            assert.equal(calls.log, 0);
+        });
+    });
+    withGlobals({ debugFlag: undefined, search: '?debug' }, () => {
+        withCapturedConsole((calls) => {
+            logger.trace('noisy trace');
+            assert.equal(calls.log, 1);
+        });
+    });
+});
+
+test('log: trace is never captured, even under ?debug', () => {
+    clearLogBuffer();
+    withGlobals({ debugFlag: true, search: undefined }, () => {
+        withCapturedConsole(() => {
+            logger.trace('this must not be buffered');
+            logger.debug('this must be buffered');
+        });
+    });
+
+    const messages = getLogEntries().map(e => e.message);
+    assert.ok(!messages.includes('this must not be buffered'));
+    assert.ok(messages.includes('this must be buffered'));
+    clearLogBuffer();
+});
+
 test('log: every call is captured regardless of the debug flag', () => {
     clearLogBuffer();
     withGlobals({ debugFlag: undefined, search: undefined }, () => {

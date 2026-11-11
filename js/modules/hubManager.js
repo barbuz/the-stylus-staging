@@ -44,7 +44,7 @@ export class HubManager {
      */
     async loadThreads() {
         try {
-            logger.debug(`📥 Loading threads from hub for pod: ${this.podCode}`);
+            logger.trace(`📥 Loading threads from hub for pod: ${this.podCode}`);
 
             // Get the spreadsheet data with hyperlinks
             // We need to use spreadsheets.get to access hyperlink formulas
@@ -125,7 +125,7 @@ export class HubManager {
      */
     async getThreads() {
         if (this.threadsCache !== null) {
-            logger.debug('📋 Returning cached threads');
+            logger.trace('📋 Returning cached threads');
             return this.threadsCache;
         }
 
@@ -159,7 +159,7 @@ export class HubManager {
      */
     async loadPods() {
         try {
-            logger.debug(`📥 Loading pods from hub Totals sheet`);
+            logger.trace(`📥 Loading pods from hub Totals sheet`);
 
             // Get the spreadsheet data with hyperlinks
             const response = await gapi.client.sheets.spreadsheets.get({
@@ -284,7 +284,7 @@ export class HubManager {
      */
     async getPods() {
         if (this.podsCache !== null) {
-            logger.debug('📋 Returning cached pods');
+            logger.trace('📋 Returning cached pods');
             return this.podsCache;
         }
 
@@ -297,7 +297,7 @@ export class HubManager {
      */
     async getHubTitle() {
         try {
-            logger.debug(`📥 Loading hub title for spreadsheet: ${this.hubSpreadsheetId}`);
+            logger.trace(`📥 Loading hub title for spreadsheet: ${this.hubSpreadsheetId}`);
 
             const response = await gapi.client.sheets.spreadsheets.get({
                 spreadsheetId: this.hubSpreadsheetId,

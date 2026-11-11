@@ -21,6 +21,7 @@ import {
     describeOutcome
 } from '../domain/analyses.js';
 import { escapeHtml, getElement } from '../utils/domUtils.js';
+import { logger } from '../utils/log.js';
 import { renderDeckInfo, updateDeckInfoValue } from './deckInfoView.js';
 import {
     renderCardSlotsLoading,
@@ -90,6 +91,7 @@ export class AnalysisView {
         for (const { element, type, handler } of this._listeners) {
             element.removeEventListener(type, handler);
         }
+        logger.debug(`AnalysisView: unbound ${this._listeners.length} listeners`);
         this._listeners = [];
     }
 

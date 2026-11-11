@@ -51,9 +51,17 @@ import { AppState } from '../app/appState.js';
 import { logger } from '../utils/log.js';
 
 export class AnalysisController {
+    /** Monotonic id source for `this.label`, shared across instances. */
+    static _instanceCount = 0;
+
     constructor(sheetsAPI, uiController, guruSignature) {
         this.sheetsAPI = sheetsAPI;
         this.uiController = uiController;
+        // Short identity for this session object, so a downloaded log can tell
+        // which controller made a write; the scoring screen can have more than
+        // one live at once.
+        this.id = ++AnalysisController._instanceCount;
+        this.label = `#${this.id}`;
         // All session state lives on one object.
         this.state = new AppState();
         this.state.setSignature(guruSignature);
@@ -66,7 +74,7 @@ export class AnalysisController {
             onUnclaimIncomplete: () => this.unclaimIncompleteRows(),
             onClear: () => this.clearCurrentUserAnalysis()
         });
-        this.writer = new AnalysisWriter(sheetsAPI);
+        this.writer = new AnalysisWriter(sheetsAPI, this.label);
         this.cards = new CardPresenter(this.scryfallAPI, this.view);
         this.guruColorSelector = null;
         this.overviewTableModal = new OverviewTableModal();
@@ -80,6 +88,7 @@ export class AnalysisController {
         this.eventBinder = new AnalysisEventBinder(this);
 
         this.bindEvents();
+        logger.debug(`AnalysisController ${this.label} created (signature: ${this.state.signature || '(none)'})`);
     }
 
     reset() {
@@ -87,6 +96,7 @@ export class AnalysisController {
     }
 
     destroy() {
+        logger.debug(`AnalysisController ${this.label} destroyed`);
         // The view's scoring buttons are shared DOM, not owned by this
         // controller. Unbind them or the next controller's view binds a second
         // set of handlers onto the same elements, and one tap scores twice.

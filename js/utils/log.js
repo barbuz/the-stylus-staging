@@ -12,6 +12,10 @@
  * `sessionStorage` (never `localStorage`) so a reload-into-failure keeps the
  * prior lines without leaking across sessions.
  *
+ * `trace` reaches the console under the same `?debug` gate as `debug` but is
+ * **never captured**. Put high-volume detail here, so it cannot evict the setup
+ * and teardown lines a bug report actually needs.
+ *
  * Call sites use the `logger` object (`logger.debug(...)`) rather than
  * destructured names, so a local `catch (error)` binding cannot shadow it.
  */
@@ -82,6 +86,16 @@ function record(level, args) {
 restore();
 
 export const logger = {
+    /**
+     * Console-only development message, gated behind `?debug`. **Never**
+     * captured, so high-volume detail cannot crowd the downloadable log.
+     */
+    trace(...args) {
+        if (debugEnabled()) {
+            console.log(...args);
+        }
+    },
+
     /** Development-only console message, gated behind `?debug`; always captured. */
     debug(...args) {
         record('DEBUG', args);

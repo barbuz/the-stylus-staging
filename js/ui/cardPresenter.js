@@ -59,6 +59,6 @@ export class CardPresenter {
         }
 
         this.scryfallAPI.preloadCards(decks, { delay: 300, silent: true });
-        logger.debug(`🔄 Started preloading cards for ${indices.length} matches (rows: ${indices.map(i => i + 1).join(', ')})`);
+        logger.trace(`🔄 Started preloading cards for ${indices.length} matches (rows: ${indices.map(i => i + 1).join(', ')})`);
     }
 }

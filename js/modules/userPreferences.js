@@ -399,7 +399,8 @@ export class UserPreferences {
             schemaVersion: SCHEMA_VERSION,
             lastUpdated: new Date().toISOString()
         };
-        logger.debug('📥 Loaded preferences from localStorage:', preferences);
+        logger.debug(`📥 Loaded preferences from localStorage: ${preferences.recentPods?.length || 0} pods, ${preferences.recentHubs?.length || 0} hubs, signature ${preferences.guruSignature ? 'set' : 'empty'}`);
+        logger.trace('📥 Loaded preferences from localStorage:', preferences);
         return preferences;
     }
 

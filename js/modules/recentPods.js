@@ -511,7 +511,7 @@ export class RecentPodsManager {
 
         // Expand: load and show pods
         try {
-            logger.debug(`🔄 Loading pods for hub: ${hub.title}`);
+            logger.trace(`🔄 Loading pods for hub: ${hub.title}`);
             hubElement.classList.add('loading');
             if (expandIcon) expandIcon.textContent = '⏳';
 

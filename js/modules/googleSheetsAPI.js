@@ -100,7 +100,8 @@ export class GoogleSheetsAPI {
             if (guruSheets.length > 0) {
                 const mergedGuruSheet = allSheetsData.find(sheet => sheet.title === 'Merged Gurus');
                 if (mergedGuruSheet) {
-                    logger.debug("Merged Guru Sheets:", mergedGuruSheet);
+                    logger.debug(`Merged Guru Sheets: ${mergedGuruSheet.values.length} rows, range ${mergedGuruSheet.range}`);
+                    logger.trace('Merged Guru Sheets:', mergedGuruSheet);
                 }
             }
 
@@ -372,7 +373,7 @@ export class GoogleSheetsAPI {
                 throw new Error('User not authenticated');
             }
 
-            logger.debug('📝 Updating sheet data:', {
+            logger.trace('📝 Updating sheet data:', {
                 spreadsheetId,
                 updates: updates.updates.map(u => ({
                     sheetId: u.sheetId,
@@ -419,7 +420,7 @@ export class GoogleSheetsAPI {
                 }
             });
 
-            logger.debug('✅ Sheet update successful:', {
+            logger.trace('✅ Sheet update successful:', {
                 updatedCells: updates.updates.length,
                 responseReplies: response.result.replies?.length || 0
             });
@@ -441,7 +442,7 @@ export class GoogleSheetsAPI {
                 throw new Error('User not authenticated');
             }
 
-            logger.debug('🔒 Performing checked update:', {
+            logger.trace('🔒 Performing checked update:', {
                 spreadsheetId,
                 updates: updates.updates.map(u => ({
                     sheetId: u.sheetId,
