@@ -304,7 +304,7 @@ export class AnalysisView {
                 if (unclaimIncompleteButton) {
                     unclaimIncompleteButton.style.display = 'block';
                     unclaimIncompleteButton.disabled = false;
-                    unclaimIncompleteButton.textContent = `Unclaim Incomplete (${incompleteCount})`;
+                    unclaimIncompleteButton.textContent = `Unclaim All (${incompleteCount})`;
                 }
                 setDisplay(clearButton, 'none');
             } else {
