@@ -399,7 +399,7 @@ export class UserPreferences {
             schemaVersion: SCHEMA_VERSION,
             lastUpdated: new Date().toISOString()
         };
-        logger.debug('📥 Loaded preferences from localStorage:', preferences);
+        logger.trace('📥 Loaded preferences from localStorage:', preferences);
         return preferences;
     }
 

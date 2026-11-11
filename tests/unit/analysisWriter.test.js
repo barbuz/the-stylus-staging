@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { AnalysisWriter } from '../../js/ui/analysisWriter.js';
+import { getLogEntries, clearLogBuffer } from '../../js/utils/log.js';
 
 /**
  * The writer must keep the spreadsheet file id (the batchUpdate target) and the
@@ -175,4 +176,39 @@ test('signGoldfishClock signs every row of a grouped entry', async () => {
     assert.equal(call.spreadsheetId, SPREADSHEET_ID);
     assert.deepEqual(call.updates.updates.map(u => u.row), [2, 3]);
     assert.ok(call.updates.updates.every(u => u.value === 'alice' && u.valueType === 'string'));
+});
+
+test('each write emits one captured line tagged with the controller label', async () => {
+    const api = recordingAPI();
+    const writer = new AnalysisWriter(api, '#7');
+    clearLogBuffer();
+
+    await writer.claimRow({
+        spreadsheetId: SPREADSHEET_ID, sheetId: TAB_ID, row: 70, col: 4,
+        signature: 'alice', guruSheetIds: { red: TAB_ID }
+    });
+
+    const messages = getLogEntries().map(e => e.message);
+    const writeLine = messages.find(m => m.includes('claim'));
+    assert.ok(writeLine, `expected a claim line, got: ${JSON.stringify(messages)}`);
+    assert.match(writeLine, /#7/);
+    assert.match(writeLine, /71:5/);
+    clearLogBuffer();
+});
+
+test('a deck claim logs its rows as compressed ranges, not one pair per row', async () => {
+    const api = recordingAPI();
+    const writer = new AnalysisWriter(api, '#3');
+    clearLogBuffer();
+
+    await writer.claimRows({
+        spreadsheetId: SPREADSHEET_ID, sheetId: TAB_ID,
+        rows: [70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89],
+        col: 4, signature: 'alice', guruSheetIds: { red: TAB_ID }
+    });
+
+    const line = getLogEntries().map(e => e.message).find(m => m.includes('claim'));
+    assert.match(line, /claim 20 rows/);
+    assert.match(line, /71-90:5/);
+    clearLogBuffer();
 });

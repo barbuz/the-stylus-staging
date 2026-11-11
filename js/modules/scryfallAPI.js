@@ -185,14 +185,14 @@ export class ScryfallAPI {
         });
 
         if (cardsToPreload.length === 0) {
-            if (!silent) logger.debug('🎯 All cards already cached or queued for preload');
+            if (!silent) logger.trace('🎯 All cards already cached or queued for preload');
             return;
         }
 
         // Add cards to preload queue
         cardsToPreload.forEach(cardName => this.preloadQueue.add(cardName.trim()));
 
-        if (!silent) logger.debug(`🔄 Starting background preload for ${cardsToPreload.length} cards`);
+        if (!silent) logger.trace(`🔄 Starting background preload for ${cardsToPreload.length} cards`);
 
         // Start preloading if not already in progress
         if (!this.isPreloading) {
@@ -228,7 +228,7 @@ export class ScryfallAPI {
                 // For preloading, load and cache the actual image
                 const loadedImage = await this.loadAndCacheImage(cardName, imageUrl);
 
-                if (!silent) logger.debug(`✅ Preloaded: ${cardName}`);
+                if (!silent) logger.trace(`✅ Preloaded: ${cardName}`);
 
             } catch (error) {
                 if (!silent) logger.warn(`⚠️ Failed to preload "${cardName}":`, error.message);
@@ -237,7 +237,7 @@ export class ScryfallAPI {
         }
 
         this.isPreloading = false;
-        if (!silent) logger.debug('🎯 Background preloading completed');
+        if (!silent) logger.trace('🎯 Background preloading completed');
     }
 
     /**

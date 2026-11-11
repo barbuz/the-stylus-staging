@@ -469,7 +469,7 @@ export class AuthManager {
     renderAuthSection() {
         const authSection = getElement('auth-section');
         const signature = this.getGuruSignature();
-        logger.debug('AuthManager: Rendering auth section with guruSignature:', signature);
+        logger.trace('AuthManager: Rendering auth section with guruSignature:', signature);
 
         if (this.isAuthenticated && this.user) {
             authSection.innerHTML = `

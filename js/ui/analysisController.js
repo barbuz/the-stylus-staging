@@ -51,9 +51,19 @@ import { AppState } from '../app/appState.js';
 import { logger } from '../utils/log.js';
 
 export class AnalysisController {
+    /** Monotonic id source for `this.label`, shared across instances. */
+    static _instanceCount = 0;
+
     constructor(sheetsAPI, uiController, guruSignature) {
         this.sheetsAPI = sheetsAPI;
         this.uiController = uiController;
+        // A short identity for this session object. The scoring screen is torn
+        // down and rebuilt whenever a pod is closed and reopened, and a bug once
+        // had two live at once writing to different rows. Tagging every write
+        // and the lifecycle lines with this id makes "who wrote that" obvious in
+        // a downloaded log instead of a timing puzzle.
+        this.id = ++AnalysisController._instanceCount;
+        this.label = `#${this.id}`;
         // All session state lives on one object.
         this.state = new AppState();
         this.state.setSignature(guruSignature);
@@ -66,7 +76,7 @@ export class AnalysisController {
             onUnclaimIncomplete: () => this.unclaimIncompleteRows(),
             onClear: () => this.clearCurrentUserAnalysis()
         });
-        this.writer = new AnalysisWriter(sheetsAPI);
+        this.writer = new AnalysisWriter(sheetsAPI, this.label);
         this.cards = new CardPresenter(this.scryfallAPI, this.view);
         this.guruColorSelector = null;
         this.overviewTableModal = new OverviewTableModal();
@@ -80,6 +90,7 @@ export class AnalysisController {
         this.eventBinder = new AnalysisEventBinder(this);
 
         this.bindEvents();
+        logger.debug(`AnalysisController ${this.label} created (signature: ${this.state.signature || '(none)'})`);
     }
 
     reset() {
@@ -87,6 +98,7 @@ export class AnalysisController {
     }
 
     destroy() {
+        logger.debug(`AnalysisController ${this.label} destroyed`);
         // The view's scoring buttons are shared DOM, not owned by this
         // controller. Unbind them or the next controller's view binds a second
         // set of handlers onto the same elements, and one tap scores twice.

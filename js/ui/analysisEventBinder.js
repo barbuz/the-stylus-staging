@@ -8,6 +8,7 @@
  */
 import { GuruColorSelector } from './guruColorSelector.js';
 import { getElement } from '../utils/domUtils.js';
+import { logger } from '../utils/log.js';
 
 export class AnalysisEventBinder {
     constructor(host) {
@@ -72,6 +73,7 @@ export class AnalysisEventBinder {
         for (const { element, handler } of this._listeners) {
             element.removeEventListener('click', handler);
         }
+        logger.debug(`AnalysisEventBinder: unbound ${this._listeners.length} listeners`);
         this._listeners = [];
 
         if (this._onDocumentClick) {

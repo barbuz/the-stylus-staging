@@ -81,6 +81,12 @@ class ThreeCardBlindGuruTool {
                 return;
             }
 
+            // The buffer survives a resume, so the log is one timeline across
+            // several page loads. Mark each boot so the boundary is visible.
+            this._bootCount = (this._bootCount || 0) + 1;
+            logger.debug(`——— app boot #${this._bootCount} (${navigator.userAgent.includes('Mobile') ? 'mobile' : 'desktop'}) ———`);
+            this.watchPageVisibility();
+
             // Show loading while initializing
             this.showLoading('Initializing application...');
 
@@ -165,6 +171,28 @@ class ThreeCardBlindGuruTool {
             if (event.target.closest('[data-log-download]')) {
                 this.downloadDiagnosticLog();
             }
+        });
+    }
+
+    /**
+     * Record page hide/show so a resume is visible in the log. A guru's "I
+     * closed my phone and reopened it" report is otherwise invisible: the log
+     * just continues, and the setup that matters happens on the far side of the
+     * gap. Bound once.
+     */
+    watchPageVisibility() {
+        if (this._visibilityBound) {
+            return;
+        }
+        this._visibilityBound = true;
+        document.addEventListener('visibilitychange', () => {
+            logger.debug(`👁️ Page ${document.visibilityState}`);
+        });
+        window.addEventListener('pageshow', (event) => {
+            logger.debug(`👁️ Page shown${event.persisted ? ' (from bfcache)' : ''}`);
+        });
+        window.addEventListener('pagehide', (event) => {
+            logger.debug(`👁️ Page hidden${event.persisted ? ' (to bfcache)' : ''}`);
         });
     }
 

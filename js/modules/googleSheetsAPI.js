@@ -100,14 +100,17 @@ export class GoogleSheetsAPI {
             if (guruSheets.length > 0) {
                 const mergedGuruSheet = allSheetsData.find(sheet => sheet.title === 'Merged Gurus');
                 if (mergedGuruSheet) {
-                    logger.debug("Merged Guru Sheets:", mergedGuruSheet);
+                    // The full sheet is large and repeats on every refresh; keep
+                    // the row count on the captured log and the dump on trace.
+                    logger.debug(`Merged Guru Sheets: ${mergedGuruSheet.values.length} rows, range ${mergedGuruSheet.range}`);
+                    logger.trace('Merged Guru Sheets:', mergedGuruSheet);
                 }
             }
 
             // Wait for custom metadata to finish loading
             const customMetadata = await customMetadataPromise;
             if (metadataSheet && Object.keys(customMetadata).length > 0) {
-                logger.debug('📋 Found metadata sheet:', customMetadata);
+                logger.trace('📋 Found metadata sheet:', customMetadata);
             }
 
             return {
@@ -372,7 +375,7 @@ export class GoogleSheetsAPI {
                 throw new Error('User not authenticated');
             }
 
-            logger.debug('📝 Updating sheet data:', {
+            logger.trace('📝 Updating sheet data:', {
                 spreadsheetId,
                 updates: updates.updates.map(u => ({
                     sheetId: u.sheetId,
@@ -419,7 +422,7 @@ export class GoogleSheetsAPI {
                 }
             });
 
-            logger.debug('✅ Sheet update successful:', {
+            logger.trace('✅ Sheet update successful:', {
                 updatedCells: updates.updates.length,
                 responseReplies: response.result.replies?.length || 0
             });
@@ -441,7 +444,7 @@ export class GoogleSheetsAPI {
                 throw new Error('User not authenticated');
             }
 
-            logger.debug('🔒 Performing checked update:', {
+            logger.trace('🔒 Performing checked update:', {
                 spreadsheetId,
                 updates: updates.updates.map(u => ({
                     sheetId: u.sheetId,

@@ -14,9 +14,55 @@
  * required: passing the tab id where the file id belongs makes the real API
  * reject the write.
  */
+import { logger } from '../utils/log.js';
+
+/**
+ * Compress a list of `row:col` cells into `row-range:col` runs, so a 20-row
+ * deck claim reads as `71-90:5` instead of twenty pairs. The exact row set is
+ * the evidence a double-write bug needs, so it is kept, just not spelled out.
+ */
+function compressRanges(updates) {
+    const sorted = [...updates].sort((a, b) => a.row - b.row || a.col - b.col);
+    const parts = [];
+    let start = null;
+    let prev = null;
+    let col = null;
+    for (const { row, col: c } of sorted) {
+        if (start === null) {
+            start = prev = row;
+            col = c;
+            continue;
+        }
+        if (row === prev + 1 && c === col) {
+            prev = row;
+            continue;
+        }
+        parts.push(start === prev ? `${start}:${col}` : `${start}-${prev}:${col}`);
+        start = prev = row;
+        col = c;
+    }
+    if (start !== null) {
+        parts.push(start === prev ? `${start}:${col}` : `${start}-${prev}:${col}`);
+    }
+    return parts.join(',');
+}
+
 export class AnalysisWriter {
-    constructor(sheetsAPI) {
+    constructor(sheetsAPI, label = '') {
         this.sheetsAPI = sheetsAPI;
+        // The owning controller's short id, threaded into the one captured line
+        // each write emits, so a log shows which session object made the write.
+        this.label = label;
+    }
+
+    /**
+     * One compact captured line per write. The full update objects are on trace:
+     * the ranges are what a bug report needs, and a per-cell dump of a 20-row
+     * deck claim is what crowds the buffer.
+     */
+    _logWrite(action, spreadsheetId, updates) {
+        logger.debug(`✍️ ${this.label} ${action} -> ${compressRanges(updates)}`);
+        logger.trace(`✍️ ${this.label} ${action} detail:`, { spreadsheetId, updates });
     }
 
     /** Write one guru's Win/Tie/Loss to a merged-guru row. */
@@ -32,6 +78,7 @@ export class AnalysisWriter {
                 guruSheetIds
             }]
         };
+        this._logWrite(`score ${value}`, spreadsheetId, updates.updates);
         await this.sheetsAPI.updateSheetData(spreadsheetId, updates);
     }
 
@@ -49,6 +96,7 @@ export class AnalysisWriter {
                 guruSheetIds
             }]
         };
+        this._logWrite('claim', spreadsheetId, updates.updates);
         return this.sheetsAPI.checkedUpdateSheetData(spreadsheetId, updates);
     }
 
@@ -66,10 +114,12 @@ export class AnalysisWriter {
                 guruSheetIds
             }))
         };
+        this._logWrite(`claim ${rows.length} rows`, spreadsheetId, updates.updates);
         return this.sheetsAPI.checkedUpdateSheetData(spreadsheetId, updates);
     }
 
     async clearCell({ spreadsheetId, sheetId, row, col, guruSheetIds }) {
+        this._logWrite('clear', spreadsheetId, [{ row: row + 1, col: col + 1 }]);
         return this.sheetsAPI.clearCell(spreadsheetId, {
             sheetId,
             row: row + 1,
@@ -81,6 +131,8 @@ export class AnalysisWriter {
 
     /** Clear the signature cell of every listed row in one request. */
     async unclaimRows({ spreadsheetId, sheetId, rows, col, guruSheetIds }) {
+        this._logWrite(`unclaim ${rows.length} rows`, spreadsheetId,
+            rows.map(row => ({ row: row + 1, col: col + 1 })));
         return this.sheetsAPI.clearCells(spreadsheetId, rows.map(row => ({
             sheetId,
             row: row + 1,
@@ -108,12 +160,15 @@ export class AnalysisWriter {
                 valueType: 'auto-detect'
             }))
         };
+        this._logWrite(`deck field ${targets.length} rows`, spreadsheetId, updates.updates);
         return this.sheetsAPI.checkedUpdateSheetData(spreadsheetId, updates);
     }
 
     /** Sign the goldfish clock with the guru signature across every row. */
     async signGoldfishClock({ spreadsheetId, sheet, row, rows, col, signature }) {
         const targets = rows || [row];
+        this._logWrite(`sign clock ${targets.length} rows`, spreadsheetId,
+            targets.map(target => ({ row: target + 1, col: col + 1 })));
         await this.sheetsAPI.updateSheetData(spreadsheetId, {
             updates: targets.map(target => ({
                 sheetId: sheet.sheetId,
