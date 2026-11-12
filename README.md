@@ -10,6 +10,13 @@ A browser-based tool for gurus to edit result sheets for 3 Card Blind MTG matche
 - Grant permissions for Google Sheets access
 - Your session will be remembered between visits
 
+Your sign-in is renewed in the background before it expires, so a long guruing
+session does not interrupt you. Your browser only allows that renewal with a
+recent tap or keypress, so if you step away for a while it renews on your next
+interaction — you are never dropped back to the home screen, and never left on a
+Google page you cannot get past. If a renewal is not possible, you are simply
+asked to sign in again.
+
 **Note:** You need a Google account to use this app, both because you need to be logged in to edit sheets
 and because the app stores its configuration on your Google appData. This means that you can change devices
 and continue guruing!

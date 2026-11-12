@@ -39,6 +39,19 @@ Compare this file between the two deployments to see what production is missing.
   overlapping background refresh or a slow card load could paint its row over
   the one you had moved to. Renders are now generation-guarded, so only the
   newest one writes after an await
+- A silent Google sign-in refresh no longer drops you back to the home screen or
+  strands you on a Google page. The refresh used to re-run the whole login flow,
+  which reset the open pod; it now renews the token in place and leaves you
+  exactly where you are. Because the browser only allows that refresh with a
+  recent tap or keypress, it waits for your next interaction instead of trying
+  (and failing, or hanging on a Google screen) while your phone is locked
+- Scoring a match on the very tap that renews your sign-in now waits for the new
+  token before writing, so the score lands on a valid session instead of being
+  sent with the expired one and failing. The same applies if you come back to
+  the app after it has been in the background past the expiry: the first tap
+  renews the sign-in, and the action that tap performs still completes. If the
+  renewal is slow, a "Renewing your sign-in..." note appears so the pause is
+  explained rather than looking like a frozen button
 
 ## [2026.10.1] - 2026-11-10
 

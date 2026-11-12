@@ -5,6 +5,14 @@ import { logger } from '../utils/log.js';
 import { getElement } from '../utils/domUtils.js';
 import { getItem, setItem, removeItem } from '../services/storage.js';
 
+// Refresh this long before the token actually expires, matching the margin the
+// expiry timer uses.
+const REFRESH_LEAD_MS = 2 * 60 * 1000;
+
+// How long a refresh may take before the guru is told it is happening. A warm
+// refresh beats this easily; anything slower is worth explaining.
+const REFRESH_NOTICE_DELAY_MS = 500;
+
 export class AuthManager {
     constructor(events, guruSignature = null) {
         // Optional event bus. When present the login / signature flow is routed
@@ -13,12 +21,23 @@ export class AuthManager {
         // The single owner of the current signature. AuthManager deliberately
         // keeps no copy: it delegates reads/writes here.
         this.guruSignature = guruSignature;
+        // Injected by main.js after both are constructed; used only to surface a
+        // "renewing your sign-in" notice during a slow refresh.
+        this.uiController = null;
         this.user = null;
         this.isAuthenticated = false;
         this.tokenClient = null;
         this.initialized = false;
         this.userPreferences = new UserPreferences();
         this.reauthTimer = null;
+        // A refresh already in flight, so the expiry timer and a write-triggered
+        // check share one token request instead of racing two popups.
+        this.refreshPromise = null;
+        // The one-shot gesture listener that lets a deferred refresh run once
+        // the browser has a user activation to attach it to, plus the
+        // visibility listener that arms it only while the page is on screen.
+        this._refreshGestureHandler = null;
+        this._visibilityHandler = null;
     }
 
     /** The current guru signature, or '' when none is set. */
@@ -171,6 +190,11 @@ export class AuthManager {
             expires_at: new Date(expiryTime).toLocaleString(),
             expires_in_minutes: Math.round(expiresIn / 60)
         });
+
+        // Watch visibility for the whole session, not just once the expiry timer
+        // fires: a tab frozen before that point would otherwise come back with
+        // no watcher and never refresh.
+        this._watchVisibility();
     }
 
     setRememberUser(remember = true) {
@@ -209,7 +233,33 @@ export class AuthManager {
         removeItem(CONFIG.STORAGE_KEYS.TOKEN_EXPIRY);
         logger.debug('🗑️ Cleared stored authentication');
 
-        // Clear any pending re-auth timer
+        this._clearReauthTimer();
+        this._disarmRefreshOnGesture();
+    }
+
+    /**
+     * Set up a timer to trigger silent re-auth before token expiry.
+     *
+     * The callback does not fire the token request itself: the token client
+     * needs a user gesture, and a request made from a bare timer (or while the
+     * phone is locked) opens Google's account screen with no gesture to attach
+     * it to, stranding the user there. Instead the timer arms a one-shot
+     * gesture listener, so the refresh runs on the guru's next tap or keypress
+     * — still before the token actually expires.
+     *
+     * @param {number} expiresIn - seconds until token expiry
+     */
+    setupReauthTimer(expiresIn) {
+        this._clearReauthTimer();
+        // Arm 2 minutes before expiry, but not less than 10 seconds from now.
+        const reauthMs = Math.max((expiresIn - 120) * 1000, 10000);
+        this.reauthTimer = setTimeout(() => {
+            logger.debug('⏰ Token expiring soon, waiting for a user gesture to refresh');
+            this._armRefreshOnGesture();
+        }, reauthMs);
+    }
+
+    _clearReauthTimer() {
         if (this.reauthTimer) {
             clearTimeout(this.reauthTimer);
             this.reauthTimer = null;
@@ -217,81 +267,240 @@ export class AuthManager {
     }
 
     /**
-     * Set up a timer to trigger silent re-auth before token expiry
-     * @param {number} expiresIn - seconds until token expiry
+     * Arm the next-gesture refresh, but only while the page is on screen.
+     *
+     * The listener must not be live while the page is hidden: a phone that is
+     * locked, or a guru who switches apps, should not fire a token request
+     * behind their back (which is the "stuck on the Google screen" failure).
+     * So the gesture listener is added on `visible` and removed on `hidden`.
+     * The visibility watcher is installed for the whole session (see
+     * `saveTokens`) and re-decides from the stored expiry on each resume, which
+     * is what lets a guru who returns after a long absence — even one that
+     * froze the tab before the expiry timer ran — still get a refresh on their
+     * first tap.
      */
-    setupReauthTimer(expiresIn) {
-        // Clear any existing timer
-        if (this.reauthTimer) {
-            clearTimeout(this.reauthTimer);
-        }
-        // Re-auth 2 minutes before expiry, but not less than 10 seconds from now
-        const reauthMs = Math.max((expiresIn - 120) * 1000, 10000);
-        this.reauthTimer = setTimeout(async () => {
-            logger.debug('⏰ Token expiring soon, attempting silent re-auth...');
-            await this.attemptAutoReauth();
-        }, reauthMs);
+    _armRefreshOnGesture() {
+        this._watchVisibility();
+        this._addRefreshGestureListener();
     }
 
-    async attemptAutoReauth() {
-        try {
-            // Only attempt auto re-auth if user opted to be remembered
-            if (!this.shouldRememberUser()) {
-                logger.debug('🔐 Auto re-auth skipped - user chose not to be remembered');
-                return false;
-            }
-
-            // Load user ID from localStorage
-            const userId = getItem(CONFIG.STORAGE_KEYS.USER_ID);
-            if (!userId) {
-                logger.debug('🔐 Auto re-auth skipped - user ID not found');
-                return false;
-            }
-
-            logger.debug('🔄 Attempting automatic re-authentication...');
-
-            // Try silent authentication with Google Identity Services
-            return new Promise((resolve) => {
-                const timeout = setTimeout(() => {
-                    logger.debug('⏰ Auto re-auth timeout after 5 seconds');
-                    resolve(false);
-                }, 5000);
-
-                try {
-                    // Create a silent token client for automatic login
-                    const silentTokenClient = google.accounts.oauth2.initTokenClient({
-                        client_id: CONFIG.GOOGLE_CLIENT_ID,
-                        scope: CONFIG.SCOPES,
-                        login_hint: userId, // Use stored user ID
-                        prompt: 'none', // No user interaction
-                        callback: (response) => {
-                            clearTimeout(timeout);
-
-                            if (response.error) {
-                                logger.debug('❌ Silent auto re-auth failed:', response.error);
-                                resolve(false);
-                            } else {
-                                logger.debug('✅ Silent auto re-auth successful');
-                                this.handleAuthSuccess(response.access_token, response.expires_in);
-                                resolve(true);
-                            }
-                        }
-                    });
-
-                    // Request token silently (no user interaction)
-                    silentTokenClient.requestAccessToken();
-
-                } catch (error) {
-                    clearTimeout(timeout);
-                    logger.debug('❌ Error during silent auth:', error);
-                    resolve(false);
+    _watchVisibility() {
+        if (this._visibilityHandler) {
+            return;
+        }
+        this._visibilityHandler = () => {
+            if (document.visibilityState === 'hidden') {
+                this._removeRefreshGestureListener();
+                logger.debug('⏰ Page hidden; refresh gesture listener removed');
+            } else {
+                // A frozen background page may not have run the expiry timer, so
+                // decide from the token itself: only arm if it is due or past.
+                if (this._tokenNeedsRefresh()) {
+                    this._addRefreshGestureListener();
+                    logger.debug('⏰ Page visible; refresh gesture listener armed');
+                } else {
+                    logger.debug('⏰ Page visible; token still fresh, nothing armed');
                 }
-            });
+            }
+        };
+        document.addEventListener('visibilitychange', this._visibilityHandler);
+    }
 
-        } catch (error) {
-            logger.error('Auto re-authentication failed:', error);
+    /** True when the stored token is within the refresh lead of its expiry. */
+    _tokenNeedsRefresh() {
+        const expiryTime = this.getStoredTokens()?.expiryTime;
+        return !expiryTime || Date.now() >= expiryTime - REFRESH_LEAD_MS;
+    }
+
+    _addRefreshGestureListener() {
+        if (this._refreshGestureHandler || this.refreshPromise) {
+            return;
+        }
+        if (document.visibilityState === 'hidden' || !this._tokenNeedsRefresh()) {
+            return;
+        }
+
+        const handler = () => {
+            this._removeRefreshGestureListener();
+            this._refreshWithGesture();
+        };
+
+        this._refreshGestureHandler = handler;
+        document.addEventListener('pointerdown', handler, { capture: true, once: true });
+        document.addEventListener('keydown', handler, { capture: true, once: true });
+        logger.debug('⏰ Token refresh armed for the next user gesture');
+    }
+
+    _removeRefreshGestureListener() {
+        if (this._refreshGestureHandler) {
+            document.removeEventListener('pointerdown', this._refreshGestureHandler, { capture: true });
+            document.removeEventListener('keydown', this._refreshGestureHandler, { capture: true });
+            this._refreshGestureHandler = null;
+        }
+    }
+
+    _disarmRefreshOnGesture() {
+        this._removeRefreshGestureListener();
+        if (this._visibilityHandler) {
+            document.removeEventListener('visibilitychange', this._visibilityHandler);
+            this._visibilityHandler = null;
+        }
+    }
+
+    /** Run a token refresh from inside a user gesture (button press, keydown). */
+    _refreshWithGesture() {
+        this._clearReauthTimer();
+        this.attemptAutoReauth({ userGesture: true }).then(success => {
+            if (success) {
+                // The token is fresh: drop the gesture listener but keep the
+                // visibility watcher, so a later freeze/resume can still refresh
+                // once this token nears its own expiry.
+                this._removeRefreshGestureListener();
+            } else if (this.isAuthenticated && this.shouldRememberUser()) {
+                // Transient failure on a session that still wants refreshing:
+                // keep watching so the next interaction retries. A deliberate
+                // "do not remember me" must not keep a listener alive.
+                this._armRefreshOnGesture();
+            } else {
+                this._disarmRefreshOnGesture();
+            }
+        });
+    }
+
+    /**
+     * Await a token refresh if one is already in flight, so a write triggered
+     * by the same gesture cannot run against the token the refresh is about to
+     * replace. Resolves immediately when nothing is in flight.
+     */
+    async ensureValidToken() {
+        if (!this.refreshPromise) {
+            return;
+        }
+        // Tell the guru why the action they just tapped has not happened yet.
+        // Delayed, so a warm refresh (well under this) does not flash a notice;
+        // the action's own message replaces it when the write proceeds.
+        const notice = setTimeout(() => {
+            this.uiController?.showStatus('Renewing your sign-in...', 'loading');
+        }, REFRESH_NOTICE_DELAY_MS);
+        try {
+            await this.refreshPromise;
+        } finally {
+            clearTimeout(notice);
+        }
+    }
+
+    /**
+     * True while a token refresh is in flight. Callers use this to explain a
+     * pause that is really the sign-in renewing, rather than reporting the
+     * action they were asked to perform as if it were already underway.
+     */
+    isRefreshing() {
+        return !!this.refreshPromise;
+    }
+
+    /**
+     * Obtain a fresh access token without re-running the login flow.
+     *
+     * A token refresh is not a login: it must not re-render the shell, reset
+     * the open pod or re-emit USER_LOGGED_IN. Doing so is what kicked a guru
+     * back to the home screen mid-session when their token refreshed.
+     *
+     * @param {object} [options]
+     * @param {boolean} [options.userGesture] - true when called from a gesture
+     * @returns {Promise<boolean>} whether a new token was obtained
+     */
+    async attemptAutoReauth({ userGesture = false } = {}) {
+        // One refresh at a time: a second caller joins the in-flight request.
+        if (this.refreshPromise) {
+            return this.refreshPromise;
+        }
+
+        // A token request needs a user gesture. Without one, defer rather than
+        // opening a Google screen the user cannot act on (the mobile "stuck at
+        // the Google screen"). The expiry timer is what arms the gesture
+        // listener; a bare call must not, or it would also arm one behind the
+        // login screen and fire a second popup on the sign-in click.
+        if (!userGesture) {
+            logger.debug('🔐 Auto re-auth deferred - a token request needs a user gesture');
             return false;
         }
+
+        // Only attempt auto re-auth if the user opted to be remembered.
+        if (!this.shouldRememberUser()) {
+            logger.debug('🔐 Auto re-auth skipped - user chose not to be remembered');
+            return false;
+        }
+
+        const userId = getItem(CONFIG.STORAGE_KEYS.USER_ID);
+        if (!userId) {
+            logger.debug('🔐 Auto re-auth skipped - user ID not found');
+            return false;
+        }
+
+        this.refreshPromise = this._requestRefreshToken(userId)
+            .finally(() => { this.refreshPromise = null; });
+        return this.refreshPromise;
+    }
+
+    _requestRefreshToken(userId) {
+        logger.debug('🔄 Attempting automatic re-authentication...');
+
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                logger.debug('⏰ Auto re-auth timeout after 5 seconds');
+                resolve(false);
+            }, 5000);
+
+            try {
+                const silentTokenClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CONFIG.GOOGLE_CLIENT_ID,
+                    scope: CONFIG.SCOPES,
+                    login_hint: userId,
+                    prompt: 'none',
+                    callback: (response) => {
+                        clearTimeout(timeout);
+
+                        if (response.error) {
+                            logger.debug('❌ Silent auto re-auth failed:', response.error);
+                            resolve(false);
+                            return;
+                        }
+
+                        logger.debug('✅ Silent auto re-auth successful');
+                        this.applyRefreshedToken(response.access_token, response.expires_in);
+                        resolve(true);
+                    },
+                    // Without this, a popup that fails to open (a blocked popup
+                    // on mobile) never calls back and the 5s timeout is the only
+                    // thing that resolves the promise.
+                    error_callback: (err) => {
+                        clearTimeout(timeout);
+                        logger.debug('❌ Silent auto re-auth error:', err?.type || err);
+                        resolve(false);
+                    }
+                });
+
+                silentTokenClient.requestAccessToken();
+            } catch (error) {
+                clearTimeout(timeout);
+                logger.debug('❌ Error during silent auth:', error);
+                resolve(false);
+            }
+        });
+    }
+
+    /**
+     * Adopt a refreshed token in place. Deliberately does NOT render, reset the
+     * session or emit USER_LOGGED_IN: a refresh keeps the guru exactly where
+     * they are.
+     */
+    applyRefreshedToken(accessToken, expiresIn = 3600) {
+        gapi.client.setToken({ access_token: accessToken });
+        this.user = { ...(this.user || {}), accessToken };
+        this.isAuthenticated = true;
+        this.saveTokens(accessToken, expiresIn);
+        this.setupReauthTimer(expiresIn);
+        logger.debug('🔁 Token refreshed in place (session preserved)');
     }
 
     async checkAuthStatus() {
@@ -309,19 +518,11 @@ export class AuthManager {
                 const isExpired = storedTokens.expiryTime && Date.now() >= storedTokens.expiryTime;
 
                 if (isExpired) {
-                    logger.debug('🕒 Access token expired, attempting automatic re-authentication...');
-
-                    // Try automatic re-authentication
-                    const reauthSuccess = await this.attemptAutoReauth();
-                    if (reauthSuccess) {
-                        this.isAuthenticated = true;
-                        logger.debug('✅ Automatic re-authentication successful');
-                        return true;
-                    }
-
-                    logger.debug('❌ Automatic re-authentication failed, clearing stored auth');
+                    // A refresh needs a user gesture, and there is none on page
+                    // load. Drop the stale token and show the login screen; the
+                    // guru's next tap signs them back in.
+                    logger.debug('🕒 Access token expired; refresh needs a gesture, showing login');
                     this.clearStoredAuth();
-
                     return false;
                 } else {
                     // Set up automatic silent re-auth timer
@@ -355,31 +556,16 @@ export class AuthManager {
 
                     return true;
                 } catch (error) {
-                    logger.debug('❌ Error validating stored token, attempting silent re-auth...', error);
-
-                    // Try automatic re-authentication when there's an error
-                    const reauthSuccess = await this.attemptAutoReauth();
-                    if (reauthSuccess) {
-                        logger.debug('✅ Silent re-authentication successful after token validation error');
-                        return true;
-                    }
-
-                    logger.debug('❌ Silent re-authentication failed, clearing stored auth');
+                    // A refresh needs a user gesture, and there is none on page
+                    // load, so a broken stored token cannot be recovered here.
+                    logger.debug('❌ Error validating stored token; dropping it and showing login', error);
                     this.clearStoredAuth();
-
-                    // Show login screen when silent re-auth fails
                     return false;
                 }
             }
 
-            // Final attempt: try silent authentication if no valid tokens found
             if (!this.isAuthenticated) {
-                logger.debug('🔄 No valid tokens found, attempting silent authentication...');
-                const reauthSuccess = await this.attemptAutoReauth();
-                if (reauthSuccess) {
-                    logger.debug('✅ Silent authentication successful as fallback');
-                    return true;
-                }
+                logger.debug('🔄 No valid tokens found; showing login (sign-in needs a user gesture)');
             }
 
             this.isAuthenticated = false;
