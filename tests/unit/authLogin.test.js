@@ -211,7 +211,7 @@ test('an installed app points the guru at the browser when sign-in does not comp
 
         env.gis.respond = (opts) => opts.error_callback({ type: 'unknown' });
         await manager.login();
-        assert.match(statusCalls[0][0], /browser \(not the installed app\)/i);
+        assert.match(statusCalls[0][0], /browser and sign in there/i);
     } finally {
         env.restore();
     }

@@ -514,6 +514,80 @@ export class AuthManager {
     }
 
     /**
+     * Attempt a silent sign-in at load for a remembered guru.
+     *
+     * This is the auto-login an installed app depends on. `prompt: 'none'`
+     * reuses the guru's existing Google session with no interaction, so the
+     * installed app does not have to open the interactive sign-in popup — which
+     * is the flow that is unreliable in a standalone window.
+     *
+     * The page load itself supplies the user gesture (opening the app is a
+     * navigation), so this is safe to run unattended; the mid-session refresh is
+     * a different matter and stays gesture-gated.
+     *
+     * @returns {Promise<boolean>} whether a silent sign-in completed
+     */
+    async _attemptSilentLogin() {
+        if (!this.shouldRememberUser()) {
+            logger.debug('🔐 Silent sign-in skipped - user chose not to be remembered');
+            return false;
+        }
+
+        const userId = getItem(CONFIG.STORAGE_KEYS.USER_ID);
+        if (!userId) {
+            logger.debug('🔐 Silent sign-in skipped - user ID not found');
+            return false;
+        }
+
+        logger.debug('🔄 Attempting silent sign-in for a remembered user...');
+
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                logger.debug('⏰ Silent sign-in timed out');
+                resolve(false);
+            }, 5000);
+
+            try {
+                const silentClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CONFIG.GOOGLE_CLIENT_ID,
+                    scope: CONFIG.SCOPES,
+                    login_hint: userId,
+                    prompt: 'none',
+                    callback: async (response) => {
+                        clearTimeout(timeout);
+                        if (response.error) {
+                            logger.debug('❌ Silent sign-in failed:', response.error);
+                            resolve(false);
+                            return;
+                        }
+                        logger.debug('✅ Silent sign-in successful');
+                        try {
+                            await this.handleAuthSuccess(response.access_token, response.expires_in);
+                            resolve(true);
+                        } catch (error) {
+                            // A silent sign-in that cannot finish the session must
+                            // not hang the load; fall back to the login screen.
+                            logger.warn('Silent sign-in could not complete the session:', error);
+                            resolve(false);
+                        }
+                    },
+                    error_callback: (err) => {
+                        clearTimeout(timeout);
+                        logger.debug('❌ Silent sign-in error:', err?.type || err);
+                        resolve(false);
+                    }
+                });
+
+                silentClient.requestAccessToken();
+            } catch (error) {
+                clearTimeout(timeout);
+                logger.debug('❌ Error during silent sign-in:', error);
+                resolve(false);
+            }
+        });
+    }
+
+    /**
      * Adopt a refreshed token in place. Deliberately does NOT render, reset the
      * session or emit USER_LOGGED_IN: a refresh keeps the guru exactly where
      * they are.
@@ -542,11 +616,17 @@ export class AuthManager {
                 const isExpired = storedTokens.expiryTime && Date.now() >= storedTokens.expiryTime;
 
                 if (isExpired) {
-                    // A refresh needs a user gesture, and there is none on page
-                    // load. Drop the stale token and show the login screen; the
-                    // guru's next tap signs them back in.
-                    logger.debug('🕒 Access token expired; refresh needs a gesture, showing login');
+                    // The stored token is stale. Drop it and try a silent
+                    // sign-in: a remembered guru (and especially an installed
+                    // app) should come back signed in without the interactive
+                    // popup, which a standalone window cannot complete.
+                    logger.debug('🕒 Access token expired; attempting silent sign-in...');
                     this.clearStoredAuth();
+                    const silentSuccess = await this._attemptSilentLogin();
+                    if (silentSuccess) {
+                        logger.debug('✅ Silent sign-in successful after expiry');
+                        return true;
+                    }
                     return false;
                 } else {
                     // Set up automatic silent re-auth timer
@@ -580,16 +660,29 @@ export class AuthManager {
 
                     return true;
                 } catch (error) {
-                    // A refresh needs a user gesture, and there is none on page
-                    // load, so a broken stored token cannot be recovered here.
-                    logger.debug('❌ Error validating stored token; dropping it and showing login', error);
+                    // A broken stored token cannot be validated. Drop it and try
+                    // a silent sign-in before giving up on the session.
+                    logger.debug('❌ Error validating stored token; attempting silent sign-in...', error);
                     this.clearStoredAuth();
+                    const silentSuccess = await this._attemptSilentLogin();
+                    if (silentSuccess) {
+                        logger.debug('✅ Silent sign-in successful after validation error');
+                        return true;
+                    }
                     return false;
                 }
             }
 
             if (!this.isAuthenticated) {
-                logger.debug('🔄 No valid tokens found; showing login (sign-in needs a user gesture)');
+                // No stored token: try a silent sign-in for a remembered guru.
+                // This is what lets the installed app come back to a signed-in
+                // session instead of the interactive popup it cannot complete.
+                logger.debug('🔄 No valid tokens found; attempting silent sign-in...');
+                const silentSuccess = await this._attemptSilentLogin();
+                if (silentSuccess) {
+                    logger.debug('✅ Silent sign-in successful as fallback');
+                    return true;
+                }
             }
 
             this.isAuthenticated = false;
@@ -666,11 +759,10 @@ export class AuthManager {
         if (reason === 'popup_closed') {
             return 'Sign-in was cancelled. Tap "Sign in with Google" to try again.';
         }
-        // The installed-app case: the popup opened but cannot hand the token
-        // back, because a standalone window has no opener for Google to return
-        // to. Signing in from the normal browser is the reliable route.
+        // In an installed app the interactive popup is unreliable, so point the
+        // guru at the route that works: the browser session the app reuses.
         if (this._isStandaloneApp()) {
-            return 'Sign-in did not complete. Open The Stylus in your browser (not the installed app) and sign in there; the installed app will then use that session.';
+            return 'Sign-in did not complete. Open The Stylus in your browser and sign in there; the installed app will then use that session.';
         }
         return 'Sign-in did not complete. Please tap "Sign in with Google" to try again.';
     }
@@ -797,14 +889,6 @@ export class AuthManager {
     showLoginScreen() {
         getElement('login-section').style.display = 'block';
         getElement('app-content').style.display = 'none';
-
-        // An installed app cannot complete Google sign-in (no opener for the
-        // popup to return the token to), so tell the guru up front rather than
-        // letting them hit the dead end.
-        const installedHint = getElement('installed-app-hint');
-        if (installedHint) {
-            installedHint.style.display = this._isStandaloneApp() ? 'block' : 'none';
-        }
 
         const loginBtn = getElement('login-btn');
         // Remove existing listeners to prevent duplicates

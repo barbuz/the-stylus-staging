@@ -389,7 +389,7 @@ test('a refresh requested by the gesture is not duplicated by a second caller', 
     }
 });
 
-test('an expired stored token at load does not open an unattended refresh', async () => {
+test('an expired stored token at load silently signs the guru back in', async () => {
     const env = installEnv();
     try {
         const emitted = [];
@@ -400,13 +400,80 @@ test('an expired stored token at load does not open an unattended refresh', asyn
         localStorage.setItem('user_id', 'alice@example.com');
         localStorage.setItem('access_token', 'expired-token');
         localStorage.setItem('token_expiry', String(Date.now() - 1000));
+        // Isolate the silent sign-in decision from the DOM/Drive-bound success path.
+        manager.handleAuthSuccess = async (token) => { manager.user = { accessToken: token }; };
+        env.gis.respond = (opts) => opts.callback({ access_token: 'fresh-token', expires_in: 3600 });
+
+        const restored = await manager.checkAuthStatus();
+
+        assert.equal(restored, true, 'the session is restored');
+        assert.equal(env.gis.requests, 1, 'a silent sign-in is attempted at load');
+        assert.equal(env.gis.opts.prompt, 'none', 'it is silent, not interactive');
+        assert.equal(manager.user.accessToken, 'fresh-token');
+    } finally {
+        env.restore();
+    }
+});
+
+test('with no stored token a remembered guru is signed in silently at load', async () => {
+    const env = installEnv();
+    try {
+        const emitted = [];
+        const events = { emit: (event) => emitted.push(event) };
+        const manager = new AuthManager(events, null);
+        manager.initialized = true;
+        // The reported case: a remembered guru whose token storage is empty.
+        localStorage.setItem('remember_user', 'true');
+        localStorage.setItem('user_id', 'alice@example.com');
+        manager.handleAuthSuccess = async (token) => { manager.user = { accessToken: token }; };
+        env.gis.respond = (opts) => opts.callback({ access_token: 'fresh-token', expires_in: 3600 });
+
+        const restored = await manager.checkAuthStatus();
+
+        assert.equal(restored, true);
+        assert.equal(env.gis.requests, 1, 'silent sign-in is the auto-login path');
+        assert.equal(env.gis.opts.prompt, 'none');
+    } finally {
+        env.restore();
+    }
+});
+
+test('a guru who did not ask to be remembered gets no silent sign-in', async () => {
+    const env = installEnv();
+    try {
+        const emitted = [];
+        const events = { emit: (event) => emitted.push(event) };
+        const manager = new AuthManager(events, null);
+        manager.initialized = true;
+        manager.showLoginScreen = () => {};
+        localStorage.setItem('remember_user', 'false');
+        localStorage.setItem('user_id', 'alice@example.com');
 
         const restored = await manager.checkAuthStatus();
 
         assert.equal(restored, false);
-        assert.equal(env.gis.requests, 0, 'no popup on page load');
-        assert.equal(localStorage.getItem('access_token'), null, 'the stale token is dropped');
-        assert.deepEqual(emitted, [], 'a failed restore is not a login');
+        assert.equal(env.gis.requests, 0, 'no silent sign-in without consent to remember');
+    } finally {
+        env.restore();
+    }
+});
+
+test('a silent sign-in that fails leaves the guru on the login screen', async () => {
+    const env = installEnv();
+    try {
+        const emitted = [];
+        const events = { emit: (event) => emitted.push(event) };
+        const manager = new AuthManager(events, null);
+        manager.initialized = true;
+        manager.showLoginScreen = () => {};
+        localStorage.setItem('remember_user', 'true');
+        localStorage.setItem('user_id', 'alice@example.com');
+        env.gis.respond = (opts) => opts.error_callback({ type: 'popup_failed_to_open' });
+
+        const restored = await manager.checkAuthStatus();
+
+        assert.equal(restored, false);
+        assert.equal(env.gis.requests, 1, 'one silent attempt was made');
     } finally {
         env.restore();
     }
