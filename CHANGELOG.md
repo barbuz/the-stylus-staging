@@ -29,6 +29,13 @@ Compare this file between the two deployments to see what production is missing.
 
 ### Fixed
 
+- Signing in from the installed app no longer leaves you stuck on "Signing in..."
+  with the spinner turning forever. The Google sign-in popup can fail without
+  ever reporting back — most reliably when the app is opened as an installed
+  PWA, where the popup has no page to hand the token back to — and the app was
+  not listening for that case. It now releases the button and tells you what
+  happened, and points you at signing in from the browser when the installed app
+  cannot complete it
 - Reopening the app (for example after locking the phone) no longer claims
   matches you did not touch. A resume re-ran the login flow, which treated the
   unchanged signature as a change, tore the open pod down and reopened it as a

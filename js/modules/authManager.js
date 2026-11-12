@@ -13,6 +13,13 @@ const REFRESH_LEAD_MS = 2 * 60 * 1000;
 // refresh beats this easily; anything slower is worth explaining.
 const REFRESH_NOTICE_DELAY_MS = 500;
 
+// Backstop for a sign-in popup that never reports back. A popup the user closes
+// or that fails to open is reported immediately by `error_callback`; this only
+// covers the silent case (e.g. a standalone app, where the popup has no opener
+// to return the token through, so the user can sit on a blank page). Without
+// it the button would stay on "Signing in..." forever.
+const LOGIN_TIMEOUT_MS = 60000;
+
 export class AuthManager {
     constructor(events, guruSignature = null) {
         // Optional event bus. When present the login / signature flow is routed
@@ -38,6 +45,10 @@ export class AuthManager {
         // visibility listener that arms it only while the page is on screen.
         this._refreshGestureHandler = null;
         this._visibilityHandler = null;
+        // The backstop timer for a sign-in popup that never reports back, and
+        // whether the sign-in button is currently showing its loading state.
+        this.loginTimer = null;
+        this._loginPending = false;
     }
 
     /** The current guru signature, or '' when none is set. */
@@ -72,6 +83,7 @@ export class AuthManager {
                 callback: (response) => {
                     if (response.error) {
                         logger.error('OAuth error:', response.error);
+                        this._handleLoginFailure(response.error);
                         return;
                     }
                     const idToken = response.id_token;
@@ -79,6 +91,14 @@ export class AuthManager {
                     // ID tokens. The diagnostic buffer must stay secret-free.
                     logger.debug('✅ OAuth token received');
                     this.handleAuthSuccess(response.access_token, response.expires_in);
+                },
+                // Some non-OAuth failures never reach `callback`: the popup was
+                // blocked or closed, or (in an installed / standalone app) it
+                // opened but could not hand the token back. Without this the
+                // button would sit on "Signing in..." with nothing in the log.
+                error_callback: (err) => {
+                    logger.warn('OAuth popup error:', err?.type || err);
+                    this._handleLoginFailure(err?.type);
                 }
             });
 
@@ -93,6 +113,10 @@ export class AuthManager {
 
 
     async handleAuthSuccess(accessToken, expiresIn = 3600) {
+        // The popup reported back, so the backstop is no longer needed and a
+        // late error callback must not override this success.
+        this._loginPending = false;
+        this._clearLoginTimer();
         setItem(CONFIG.STORAGE_KEYS.LAST_LOGIN, Date.now().toString());
         try {
             // Set access token for gapi client
@@ -595,13 +619,85 @@ export class AuthManager {
             // Show loading state on login button
             this.setLoginButtonLoading(true);
 
+            // Mark the attempt pending and arm the backstop *before* the
+            // request: a blocked popup reports through `error_callback`
+            // synchronously, and must not be dropped as "not pending".
+            this._armLoginTimer();
+
             // Request access token using Google Identity Services
             this.tokenClient.requestAccessToken();
 
         } catch (error) {
             logger.error('Error during login:', error);
+            this._loginPending = false;
+            this._clearLoginTimer();
             this.setLoginButtonLoading(false);
             return false;
+        }
+    }
+
+    /**
+     * Release the sign-in button and explain why sign-in did not complete.
+     *
+     * Called from the token client's `error_callback` (popup blocked or closed)
+     * and from the backstop timer. Deliberately does not surface a raw OAuth
+     * code: the guru only needs to know the sign-in did not go through and how
+     * to retry.
+     */
+    _handleLoginFailure(reason) {
+        this._clearLoginTimer();
+        // A popup that already reported back should not be double-handled.
+        if (!this._loginPending) {
+            return;
+        }
+        this._loginPending = false;
+        this.setLoginButtonLoading(false);
+
+        const message = this._signInFailureMessage(reason);
+        logger.warn(`Login did not complete (${reason || 'unknown'}): ${message}`);
+        this.uiController?.showStatus(message, 'error');
+    }
+
+    /** Human-readable reason for a sign-in that did not complete. */
+    _signInFailureMessage(reason) {
+        if (reason === 'popup_failed_to_open') {
+            return 'Your browser blocked the Google sign-in popup. Allow popups for this app and try again.';
+        }
+        if (reason === 'popup_closed') {
+            return 'Sign-in was cancelled. Tap "Sign in with Google" to try again.';
+        }
+        // The installed-app case: the popup opened but cannot hand the token
+        // back, because a standalone window has no opener for Google to return
+        // to. Signing in from the normal browser is the reliable route.
+        if (this._isStandaloneApp()) {
+            return 'Sign-in did not complete. Open The Stylus in your browser (not the installed app) and sign in there; the installed app will then use that session.';
+        }
+        return 'Sign-in did not complete. Please tap "Sign in with Google" to try again.';
+    }
+
+    /** True when the app is running as an installed / standalone window. */
+    _isStandaloneApp() {
+        try {
+            return window.matchMedia?.('(display-mode: standalone)')?.matches === true
+                || window.navigator?.standalone === true;
+        } catch {
+            return false;
+        }
+    }
+
+    _armLoginTimer() {
+        this._loginPending = true;
+        this._clearLoginTimer();
+        this.loginTimer = setTimeout(() => {
+            this.loginTimer = null;
+            this._handleLoginFailure('timeout');
+        }, LOGIN_TIMEOUT_MS);
+    }
+
+    _clearLoginTimer() {
+        if (this.loginTimer) {
+            clearTimeout(this.loginTimer);
+            this.loginTimer = null;
         }
     }
 
@@ -701,6 +797,14 @@ export class AuthManager {
     showLoginScreen() {
         getElement('login-section').style.display = 'block';
         getElement('app-content').style.display = 'none';
+
+        // An installed app cannot complete Google sign-in (no opener for the
+        // popup to return the token to), so tell the guru up front rather than
+        // letting them hit the dead end.
+        const installedHint = getElement('installed-app-hint');
+        if (installedHint) {
+            installedHint.style.display = this._isStandaloneApp() ? 'block' : 'none';
+        }
 
         const loginBtn = getElement('login-btn');
         // Remove existing listeners to prevent duplicates

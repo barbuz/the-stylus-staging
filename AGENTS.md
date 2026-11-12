@@ -155,6 +155,20 @@ mostly immutable value rather than a live field.
     `guruSignature`). The delay matters — the notice must not flash for a warm
     refresh, and the action's own "Saving..." message replaces it once the write
     proceeds.
+- **A sign-in that never reports back must not strand the button.** The GIS
+  token client can fail without ever calling `callback`: the popup is blocked or
+  closed (reported through `error_callback`), or — most reliably when the app is
+  launched as an **installed / standalone PWA** — the popup opens but cannot
+  hand the token back, because a standalone window has no opener for Google to
+  return it to. The login token client therefore passes an `error_callback` and
+  `login()` arms a `LOGIN_TIMEOUT_MS` backstop; both route to
+  `_handleLoginFailure`, which releases the button and shows a reason. The
+  refresh token client deliberately does **not** get the same treatment — a
+  refresh is silent by design and `ensureValidToken()` already covers a stall.
+  `_isStandaloneApp()` is what lets the failure message tell a guru to sign in
+  from the browser instead. Never let a failed sign-in leave the button on
+  "Signing in..." or fail without a captured `warn` line saying which reason it
+  was.
 - `AnalysisController` receives a **snapshot string** at construction
   (`main.js` passes `guruSignature.getSignature()`), stored in
   `AppState.signature`. There is no `setGuruSignature`; a pod that is open cannot
@@ -485,12 +499,13 @@ When you add, remove, or rename a file under `js/`, `styles/`, `images/`, or `fa
 
 ### Bumping the version
 
-`APP_VERSION` at the top of `sw.js` (format `vYYYYMMDD`) is a **service-worker
-cache token, not a release name**, and `main.js` parses it for the footer.
-`README.md` covers when to bump it. The constraint that matters here: do not
-read a release out of this string, and do not try to keep it in step with the
-tag — a refactor with no user-visible effect legitimately leaves the same value
-on more than one commit.
+`APP_VERSION` at the top of `sw.js` (format `vYYYYMMDD`, with a trailing letter
+such as `vYYYYMMDDb` when more than one bump lands on the same day) is a
+**service-worker cache token, not a release name**, and `main.js` parses it for
+the footer. `README.md` covers when to bump it. The constraint that matters
+here: do not read a release out of this string, and do not try to keep it in
+step with the tag — a refactor with no user-visible effect legitimately leaves
+the same value on more than one commit.
 
 ### Release identity and tagging
 

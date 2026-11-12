@@ -25,7 +25,13 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
             preferences: seededPreferences,
             tokenRequests: 0,
             deferToken: false,
-            pendingToken: null
+            pendingToken: null,
+            // When set, the next token request reports this non-OAuth failure
+            // through the token client's error_callback instead of resolving.
+            tokenError: null,
+            // When true, a token request does nothing at all — the popup opens
+            // but never reports back (the installed-app hang).
+            tokenSilent: false
         };
 
         // Disable the service worker entirely: its controllerchange handler
@@ -193,6 +199,12 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
                 state.pendingToken = null;
                 if (respond) respond();
             },
+            // Make the next token request report a non-OAuth failure, so a test
+            // can prove the login screen recovers from a blocked/closed popup.
+            failNextToken: (type = 'popup_closed') => { state.tokenError = type; },
+            // Make token requests do nothing, so a test can prove the backstop
+            // releases the button when the popup never reports back.
+            silenceToken: () => { state.tokenSilent = true; },
             reset() { state.requests = []; state.batchUpdates = []; }
         };
 
@@ -236,6 +248,18 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
                     initTokenClient: (opts) => ({
                         requestAccessToken() {
                             state.tokenRequests++;
+                            if (state.tokenSilent) {
+                                // The popup opened but never reports back.
+                                return;
+                            }
+                            if (state.tokenError) {
+                                const type = state.tokenError;
+                                state.tokenError = null;
+                                if (typeof opts.error_callback === 'function') {
+                                    opts.error_callback({ type });
+                                }
+                                return;
+                            }
                             const respond = () => {
                                 if (opts && typeof opts.callback === 'function') {
                                     opts.callback({ access_token: 'test-access-token', expires_in: 3600 });

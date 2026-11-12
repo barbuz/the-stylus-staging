@@ -17,6 +17,11 @@ interaction — you are never dropped back to the home screen, and never left on
 Google page you cannot get past. If a renewal is not possible, you are simply
 asked to sign in again.
 
+**Installed app:** if you have installed The Stylus to your home screen, sign in
+from the normal browser first. A standalone app has no page for the Google
+sign-in popup to hand the token back to, so signing in there may not complete;
+once you are signed in from the browser, the installed app uses that session.
+
 **Note:** You need a Google account to use this app, both because you need to be logged in to edit sheets
 and because the app stores its configuration on your Google appData. This means that you can change devices
 and continue guruing!
