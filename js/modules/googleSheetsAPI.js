@@ -47,11 +47,23 @@ export class GoogleSheetsAPI {
         this.authManager = authManager;
     }
 
+    /**
+     * Ensure the session is authenticated before an API call.
+     *
+     * Awaits any in-flight token refresh, so a call made from the same gesture
+     * that triggered the refresh (a score tap) cannot race it and run against
+     * the token the refresh is replacing.
+     */
+    async _requireAuth() {
+        await this.authManager.ensureValidToken?.();
+        if (!this.authManager.isLoggedIn()) {
+            throw new Error('User not authenticated');
+        }
+    }
+
     async getSheetData(spreadsheetId) {
         try {
-            if (!this.authManager.isLoggedIn()) {
-                throw new Error('User not authenticated');
-            }
+            await this._requireAuth();
 
             // Get metadata first to find all sheets
             const metadata = await this.getSheetMetadata(spreadsheetId);
@@ -369,9 +381,7 @@ export class GoogleSheetsAPI {
 
     async updateSheetData(spreadsheetId, updates) {
         try {
-            if (!this.authManager.isLoggedIn()) {
-                throw new Error('User not authenticated');
-            }
+            await this._requireAuth();
 
             logger.trace('📝 Updating sheet data:', {
                 spreadsheetId,
@@ -438,9 +448,7 @@ export class GoogleSheetsAPI {
 
     async checkedUpdateSheetData(spreadsheetId, updates) {
         try {
-            if (!this.authManager.isLoggedIn()) {
-                throw new Error('User not authenticated');
-            }
+            await this._requireAuth();
 
             logger.trace('🔒 Performing checked update:', {
                 spreadsheetId,
@@ -577,9 +585,7 @@ export class GoogleSheetsAPI {
 
     async getSheetMetadata(spreadsheetId) {
         try {
-            if (!this.authManager.isLoggedIn()) {
-                throw new Error('User not authenticated');
-            }
+            await this._requireAuth();
 
             const response = await gapi.client.sheets.spreadsheets.get({
                 spreadsheetId,
@@ -603,9 +609,7 @@ export class GoogleSheetsAPI {
 
     async batchUpdate(spreadsheetId, requests) {
         try {
-            if (!this.authManager.isLoggedIn()) {
-                throw new Error('User not authenticated');
-            }
+            await this._requireAuth();
 
             const response = await gapi.client.sheets.spreadsheets.batchUpdate({
                 spreadsheetId,
@@ -629,9 +633,7 @@ export class GoogleSheetsAPI {
      * Returns a promise that resolves when the operation is complete.
     */
     async unhideGuruSheets(spreadsheetId) {
-        if (!this.authManager.isLoggedIn()) {
-            throw new Error('User not authenticated');
-        }
+        await this._requireAuth();
         // Get all sheet metadata
         const metadata = await this.getSheetMetadata(spreadsheetId);
         // Only match exact Guru sheet names (case-insensitive)
@@ -676,9 +678,7 @@ export class GoogleSheetsAPI {
      */
     async clearCell(spreadsheetId, update) {
         try {
-            if (!this.authManager.isLoggedIn()) {
-                throw new Error('User not authenticated');
-            }
+            await this._requireAuth();
 
             if (!update || typeof update !== 'object') {
                 throw new Error('clearCell requires an update object');
@@ -728,9 +728,7 @@ export class GoogleSheetsAPI {
      */
     async clearCells(spreadsheetId, updates) {
         try {
-            if (!this.authManager.isLoggedIn()) {
-                throw new Error('User not authenticated');
-            }
+            await this._requireAuth();
 
             if (!Array.isArray(updates) || updates.length === 0) {
                 throw new Error('clearCells requires at least one update');

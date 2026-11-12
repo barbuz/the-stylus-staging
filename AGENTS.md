@@ -108,12 +108,53 @@ mostly immutable value rather than a live field.
   constructing both.
 - `initSignature()` takes no argument: the owner loads the persisted value
   itself. `main.js:onUserLoggedIn` calls it after `UserPreferences` initialises.
-  It is **idempotent**: a resume re-runs the login flow (a silent token refresh
-  re-emits `USER_LOGGED_IN`), so `initSignature` is called again with the same
-  value. When `initialized` is already true and the value is unchanged it must
-  do nothing and emit no `onSignatureSet` — re-announcing an unchanged value
-  looks like a change, tears the open pod down, and reopens it as a *second*
-  controller while the first is still listening.
+  It is **idempotent**: `USER_LOGGED_IN` can still arrive more than once for one
+  session (a genuine re-login, a restored session), so `initSignature` may be
+  called again with the same value. When `initialized` is already true and the
+  value is unchanged it must do nothing and emit no `onSignatureSet` —
+  re-announcing an unchanged value looks like a change, tears the open pod down,
+  and reopens it as a *second* controller while the first is still listening.
+  This guard is the last line of defence, not the first: the token refresh below
+  must not re-emit `USER_LOGGED_IN` at all.
+- **A token refresh is not a login.** The access token expires after an hour, so
+  `AuthManager` renews it in the background. That path (`attemptAutoReauth` →
+  `applyRefreshedToken`) must set the token, persist it and re-arm the expiry
+  timer **only** — it must never render the shell, reset the open pod, or emit
+  `USER_LOGGED_IN`. Routing a refresh through `handleAuthSuccess` re-runs the
+  whole login flow and is what returned a guru to the home input mid-session.
+  - The token request needs a **user gesture**, so the expiry timer does not
+    fire it directly: `setupReauthTimer` arms a one-shot `pointerdown`/`keydown`
+    listener (`_armRefreshOnGesture`) and the refresh runs on the guru's next
+    interaction. Firing it from a bare timer opens a Google screen with no
+    gesture to attach it to, which is what strands a phone user there.
+  - The armed listener is **visibility-scoped, not time-limited**. A
+    `visibilitychange` handler removes the gesture listener while the page is
+    hidden and re-adds it when the page returns, so a phone left locked or a
+    guru who switches apps never fires a request in the background — and, just
+    as importantly, a guru who comes back *after the token expired* still has
+    the refresh armed for their first tap. Do not replace this with a
+    "listener expires after N minutes" timeout: that drops the listener while
+    the page is hidden, which is exactly the long-absence case it needs to
+    cover. The watcher is installed for the whole session by `saveTokens` (a tab
+    frozen *before* the expiry timer fires would otherwise resume with no
+    watcher) and re-decides from the stored expiry on each resume, so a resume
+    after a successful refresh arms nothing. Only `clearStoredAuth` tears it
+    down.
+  - `attemptAutoReauth` refuses to request a token without `{ userGesture: true }`
+    and coalesces concurrent callers onto one `refreshPromise`. `checkAuthStatus`
+    must not fire an unattended refresh either: an already-expired stored token
+    at load is dropped and the login screen shown, and the guru's next tap signs
+    them in.
+  - `GoogleSheetsAPI._requireAuth()` awaits `ensureValidToken()` before its
+    `isLoggedIn()` guard, so a write made from the same gesture that triggered a
+    refresh cannot race it. Keep new authenticated API entry points behind
+    `_requireAuth()`. `ensureValidToken()` also tells the guru *why* their action
+    has not landed yet: if the refresh is still running after
+    `REFRESH_NOTICE_DELAY_MS` it shows "Renewing your sign-in..." on the shared
+    status line (the `uiController` is injected by `main.js`, like
+    `guruSignature`). The delay matters — the notice must not flash for a warm
+    refresh, and the action's own "Saving..." message replaces it once the write
+    proceeds.
 - `AnalysisController` receives a **snapshot string** at construction
   (`main.js` passes `guruSignature.getSignature()`), stored in
   `AppState.signature`. There is no `setGuruSignature`; a pod that is open cannot
@@ -345,6 +386,10 @@ Notes:
   handler reloads the page mid-test.
 - Keep fixtures shaped like the real API payloads (ragged rows, header row at
   range index 0) so parsing paths stay honest.
+- The stub's token client resolves synchronously by default, which hides any
+  race between a refresh and a write. `deferTokenResponse()` /
+  `resolveToken()` hold the response open so a test can prove a write waited for
+  it (see `authRefresh.spec.js`, which scores a match on the refreshing tap).
 - The stub records `spreadsheetId` but does not validate it, so a write that
   names the wrong spreadsheet still lands in the modelled cells. Assert on the
   batchUpdate `spreadsheetId` (as `app.spec.js` does) when touching a write

@@ -30,6 +30,8 @@ class ThreeCardBlindGuruTool {
         this.authManager.guruSignature = this.guruSignature;
         this.sheetsAPI = new GoogleSheetsAPI(this.authManager);
         this.uiController = new UIController(this.guruSignature);
+        // Let the auth layer explain a slow refresh on the shared status line.
+        this.authManager.uiController = this.uiController;
         this.analysisInterface = null; // Initialized after auth
         this.recentPodsManager = new RecentPodsManager();
 

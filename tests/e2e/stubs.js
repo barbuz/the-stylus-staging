@@ -22,7 +22,10 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
             spreadsheet: seededSpreadsheet,
             requests: [],
             batchUpdates: [],
-            preferences: seededPreferences
+            preferences: seededPreferences,
+            tokenRequests: 0,
+            deferToken: false,
+            pendingToken: null
         };
 
         // Disable the service worker entirely: its controllerchange handler
@@ -180,6 +183,16 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
             getRequests: () => state.requests.slice(),
             getBatchUpdates: () => state.batchUpdates.slice(),
             getPreferences: () => state.preferences,
+            getTokenRequests: () => state.tokenRequests,
+            // Hold the next token response until `resolveToken` is called, so a
+            // test can prove what waits on an in-flight refresh.
+            deferTokenResponse: () => { state.deferToken = true; },
+            resolveToken: () => {
+                state.deferToken = false;
+                const respond = state.pendingToken;
+                state.pendingToken = null;
+                if (respond) respond();
+            },
             reset() { state.requests = []; state.batchUpdates = []; }
         };
 
@@ -217,11 +230,24 @@ export async function installStubs(page, { spreadsheet, preferences = null } = {
             accounts: {
                 oauth2: {
                     // Resolving immediately with a token mirrors a user who has
-                    // already consented; no real popup is ever opened.
+                    // already consented; no real popup is ever opened. Requests
+                    // are counted so a test can prove a refresh did (or did not)
+                    // happen without one.
                     initTokenClient: (opts) => ({
                         requestAccessToken() {
-                            if (opts && typeof opts.callback === 'function') {
-                                opts.callback({ access_token: 'test-access-token', expires_in: 3600 });
+                            state.tokenRequests++;
+                            const respond = () => {
+                                if (opts && typeof opts.callback === 'function') {
+                                    opts.callback({ access_token: 'test-access-token', expires_in: 3600 });
+                                }
+                            };
+                            // A test can hold the token response open to observe
+                            // what waits on the refresh (e.g. a write made by the
+                            // same tap that triggered it).
+                            if (state.deferToken) {
+                                state.pendingToken = respond;
+                            } else {
+                                respond();
                             }
                         }
                     }),
