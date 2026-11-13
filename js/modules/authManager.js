@@ -13,6 +13,13 @@ const REFRESH_LEAD_MS = 2 * 60 * 1000;
 // refresh beats this easily; anything slower is worth explaining.
 const REFRESH_NOTICE_DELAY_MS = 500;
 
+// Backstop for a sign-in popup that never reports back. A popup the user closes
+// or that fails to open is reported immediately by `error_callback`; this only
+// covers the silent case (e.g. a standalone app, where the popup has no opener
+// to return the token through, so the user can sit on a blank page). Without
+// it the button would stay on "Signing in..." forever.
+const LOGIN_TIMEOUT_MS = 60000;
+
 export class AuthManager {
     constructor(events, guruSignature = null) {
         // Optional event bus. When present the login / signature flow is routed
@@ -38,6 +45,10 @@ export class AuthManager {
         // visibility listener that arms it only while the page is on screen.
         this._refreshGestureHandler = null;
         this._visibilityHandler = null;
+        // The backstop timer for a sign-in popup that never reports back, and
+        // whether the sign-in button is currently showing its loading state.
+        this.loginTimer = null;
+        this._loginPending = false;
     }
 
     /** The current guru signature, or '' when none is set. */
@@ -72,6 +83,7 @@ export class AuthManager {
                 callback: (response) => {
                     if (response.error) {
                         logger.error('OAuth error:', response.error);
+                        this._handleLoginFailure(response.error);
                         return;
                     }
                     const idToken = response.id_token;
@@ -79,6 +91,14 @@ export class AuthManager {
                     // ID tokens. The diagnostic buffer must stay secret-free.
                     logger.debug('✅ OAuth token received');
                     this.handleAuthSuccess(response.access_token, response.expires_in);
+                },
+                // Some non-OAuth failures never reach `callback`: the popup was
+                // blocked or closed, or (in an installed / standalone app) it
+                // opened but could not hand the token back. Without this the
+                // button would sit on "Signing in..." with nothing in the log.
+                error_callback: (err) => {
+                    logger.warn('OAuth popup error:', err?.type || err);
+                    this._handleLoginFailure(err?.type);
                 }
             });
 
@@ -93,6 +113,10 @@ export class AuthManager {
 
 
     async handleAuthSuccess(accessToken, expiresIn = 3600) {
+        // The popup reported back, so the backstop is no longer needed and a
+        // late error callback must not override this success.
+        this._loginPending = false;
+        this._clearLoginTimer();
         setItem(CONFIG.STORAGE_KEYS.LAST_LOGIN, Date.now().toString());
         try {
             // Set access token for gapi client
@@ -490,6 +514,80 @@ export class AuthManager {
     }
 
     /**
+     * Attempt a silent sign-in at load for a remembered guru.
+     *
+     * This is the auto-login an installed app depends on. `prompt: 'none'`
+     * reuses the guru's existing Google session with no interaction, so the
+     * installed app does not have to open the interactive sign-in popup — which
+     * is the flow that is unreliable in a standalone window.
+     *
+     * The page load itself supplies the user gesture (opening the app is a
+     * navigation), so this is safe to run unattended; the mid-session refresh is
+     * a different matter and stays gesture-gated.
+     *
+     * @returns {Promise<boolean>} whether a silent sign-in completed
+     */
+    async _attemptSilentLogin() {
+        if (!this.shouldRememberUser()) {
+            logger.debug('🔐 Silent sign-in skipped - user chose not to be remembered');
+            return false;
+        }
+
+        const userId = getItem(CONFIG.STORAGE_KEYS.USER_ID);
+        if (!userId) {
+            logger.debug('🔐 Silent sign-in skipped - user ID not found');
+            return false;
+        }
+
+        logger.debug('🔄 Attempting silent sign-in for a remembered user...');
+
+        return new Promise((resolve) => {
+            const timeout = setTimeout(() => {
+                logger.debug('⏰ Silent sign-in timed out');
+                resolve(false);
+            }, 5000);
+
+            try {
+                const silentClient = google.accounts.oauth2.initTokenClient({
+                    client_id: CONFIG.GOOGLE_CLIENT_ID,
+                    scope: CONFIG.SCOPES,
+                    login_hint: userId,
+                    prompt: 'none',
+                    callback: async (response) => {
+                        clearTimeout(timeout);
+                        if (response.error) {
+                            logger.debug('❌ Silent sign-in failed:', response.error);
+                            resolve(false);
+                            return;
+                        }
+                        logger.debug('✅ Silent sign-in successful');
+                        try {
+                            await this.handleAuthSuccess(response.access_token, response.expires_in);
+                            resolve(true);
+                        } catch (error) {
+                            // A silent sign-in that cannot finish the session must
+                            // not hang the load; fall back to the login screen.
+                            logger.warn('Silent sign-in could not complete the session:', error);
+                            resolve(false);
+                        }
+                    },
+                    error_callback: (err) => {
+                        clearTimeout(timeout);
+                        logger.debug('❌ Silent sign-in error:', err?.type || err);
+                        resolve(false);
+                    }
+                });
+
+                silentClient.requestAccessToken();
+            } catch (error) {
+                clearTimeout(timeout);
+                logger.debug('❌ Error during silent sign-in:', error);
+                resolve(false);
+            }
+        });
+    }
+
+    /**
      * Adopt a refreshed token in place. Deliberately does NOT render, reset the
      * session or emit USER_LOGGED_IN: a refresh keeps the guru exactly where
      * they are.
@@ -518,11 +616,17 @@ export class AuthManager {
                 const isExpired = storedTokens.expiryTime && Date.now() >= storedTokens.expiryTime;
 
                 if (isExpired) {
-                    // A refresh needs a user gesture, and there is none on page
-                    // load. Drop the stale token and show the login screen; the
-                    // guru's next tap signs them back in.
-                    logger.debug('🕒 Access token expired; refresh needs a gesture, showing login');
+                    // The stored token is stale. Drop it and try a silent
+                    // sign-in: a remembered guru (and especially an installed
+                    // app) should come back signed in without the interactive
+                    // popup, which a standalone window cannot complete.
+                    logger.debug('🕒 Access token expired; attempting silent sign-in...');
                     this.clearStoredAuth();
+                    const silentSuccess = await this._attemptSilentLogin();
+                    if (silentSuccess) {
+                        logger.debug('✅ Silent sign-in successful after expiry');
+                        return true;
+                    }
                     return false;
                 } else {
                     // Set up automatic silent re-auth timer
@@ -556,16 +660,29 @@ export class AuthManager {
 
                     return true;
                 } catch (error) {
-                    // A refresh needs a user gesture, and there is none on page
-                    // load, so a broken stored token cannot be recovered here.
-                    logger.debug('❌ Error validating stored token; dropping it and showing login', error);
+                    // A broken stored token cannot be validated. Drop it and try
+                    // a silent sign-in before giving up on the session.
+                    logger.debug('❌ Error validating stored token; attempting silent sign-in...', error);
                     this.clearStoredAuth();
+                    const silentSuccess = await this._attemptSilentLogin();
+                    if (silentSuccess) {
+                        logger.debug('✅ Silent sign-in successful after validation error');
+                        return true;
+                    }
                     return false;
                 }
             }
 
             if (!this.isAuthenticated) {
-                logger.debug('🔄 No valid tokens found; showing login (sign-in needs a user gesture)');
+                // No stored token: try a silent sign-in for a remembered guru.
+                // This is what lets the installed app come back to a signed-in
+                // session instead of the interactive popup it cannot complete.
+                logger.debug('🔄 No valid tokens found; attempting silent sign-in...');
+                const silentSuccess = await this._attemptSilentLogin();
+                if (silentSuccess) {
+                    logger.debug('✅ Silent sign-in successful as fallback');
+                    return true;
+                }
             }
 
             this.isAuthenticated = false;
@@ -595,13 +712,84 @@ export class AuthManager {
             // Show loading state on login button
             this.setLoginButtonLoading(true);
 
+            // Mark the attempt pending and arm the backstop *before* the
+            // request: a blocked popup reports through `error_callback`
+            // synchronously, and must not be dropped as "not pending".
+            this._armLoginTimer();
+
             // Request access token using Google Identity Services
             this.tokenClient.requestAccessToken();
 
         } catch (error) {
             logger.error('Error during login:', error);
+            this._loginPending = false;
+            this._clearLoginTimer();
             this.setLoginButtonLoading(false);
             return false;
+        }
+    }
+
+    /**
+     * Release the sign-in button and explain why sign-in did not complete.
+     *
+     * Called from the token client's `error_callback` (popup blocked or closed)
+     * and from the backstop timer. Deliberately does not surface a raw OAuth
+     * code: the guru only needs to know the sign-in did not go through and how
+     * to retry.
+     */
+    _handleLoginFailure(reason) {
+        this._clearLoginTimer();
+        // A popup that already reported back should not be double-handled.
+        if (!this._loginPending) {
+            return;
+        }
+        this._loginPending = false;
+        this.setLoginButtonLoading(false);
+
+        const message = this._signInFailureMessage(reason);
+        logger.warn(`Login did not complete (${reason || 'unknown'}): ${message}`);
+        this.uiController?.showStatus(message, 'error');
+    }
+
+    /** Human-readable reason for a sign-in that did not complete. */
+    _signInFailureMessage(reason) {
+        if (reason === 'popup_failed_to_open') {
+            return 'Your browser blocked the Google sign-in popup. Allow popups for this app and try again.';
+        }
+        if (reason === 'popup_closed') {
+            return 'Sign-in was cancelled. Tap "Sign in with Google" to try again.';
+        }
+        // In an installed app the interactive popup is unreliable, so point the
+        // guru at the route that works: the browser session the app reuses.
+        if (this._isStandaloneApp()) {
+            return 'Sign-in did not complete. Open The Stylus in your browser and sign in there; the installed app will then use that session.';
+        }
+        return 'Sign-in did not complete. Please tap "Sign in with Google" to try again.';
+    }
+
+    /** True when the app is running as an installed / standalone window. */
+    _isStandaloneApp() {
+        try {
+            return window.matchMedia?.('(display-mode: standalone)')?.matches === true
+                || window.navigator?.standalone === true;
+        } catch {
+            return false;
+        }
+    }
+
+    _armLoginTimer() {
+        this._loginPending = true;
+        this._clearLoginTimer();
+        this.loginTimer = setTimeout(() => {
+            this.loginTimer = null;
+            this._handleLoginFailure('timeout');
+        }, LOGIN_TIMEOUT_MS);
+    }
+
+    _clearLoginTimer() {
+        if (this.loginTimer) {
+            clearTimeout(this.loginTimer);
+            this.loginTimer = null;
         }
     }
 

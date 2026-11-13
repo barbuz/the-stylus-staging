@@ -141,20 +141,38 @@ mostly immutable value rather than a live field.
     after a successful refresh arms nothing. Only `clearStoredAuth` tears it
     down.
   - `attemptAutoReauth` refuses to request a token without `{ userGesture: true }`
-    and coalesces concurrent callers onto one `refreshPromise`. `checkAuthStatus`
-    must not fire an unattended refresh either: an already-expired stored token
-    at load is dropped and the login screen shown, and the guru's next tap signs
-    them in.
-  - `GoogleSheetsAPI._requireAuth()` awaits `ensureValidToken()` before its
-    `isLoggedIn()` guard, so a write made from the same gesture that triggered a
-    refresh cannot race it. Keep new authenticated API entry points behind
-    `_requireAuth()`. `ensureValidToken()` also tells the guru *why* their action
-    has not landed yet: if the refresh is still running after
-    `REFRESH_NOTICE_DELAY_MS` it shows "Renewing your sign-in..." on the shared
-    status line (the `uiController` is injected by `main.js`, like
-    `guruSignature`). The delay matters — the notice must not flash for a warm
-    refresh, and the action's own "Saving..." message replaces it once the write
-    proceeds.
+    and coalesces concurrent callers onto one `refreshPromise`. This gate is for
+    the **mid-session** refresh only, where a bare timer would open a Google
+    screen the guru cannot act on. It is **not** the load-time path: the two are
+    deliberately separate, and conflating them is what broke installed-app
+    sign-in.
+- **Coming back at load is a silent sign-in, not a gesture-gated refresh.**
+  `checkAuthStatus` must sign a remembered guru back in on page load with a
+  silent token request (`_attemptSilentLogin`, `prompt: 'none'`). Opening the app
+  *is* the gesture, so this is safe unattended and is the auto-login the installed
+  app depends on: a standalone window cannot complete the interactive sign-in
+  popup, so it must never be the only route to a session. Keep the three load
+  branches — stored-but-expired, no stored token, and stored-token validation
+  failure — all falling back to `_attemptSilentLogin()` before showing the login
+  screen. A guru who did not tick "Remember me" gets no silent request.
+  - This is distinct from the refresh rule below. `attemptAutoReauth` is the
+    *renewal* of a session already open; `_attemptSilentLogin` is the *restore*
+    of a session at start-up. A refresh keeps the guru in place; a silent
+    sign-in completes the normal login flow through `handleAuthSuccess`.
+- **A sign-in that never reports back must not strand the button.** The GIS
+  token client can fail without ever calling `callback`: the popup is blocked or
+  closed, or it opens and never hands the token back. The login token client
+  therefore passes an `error_callback` and `login()` arms a `LOGIN_TIMEOUT_MS`
+  backstop; both route to `_handleLoginFailure`, which releases the button and
+  shows a reason. The refresh token client deliberately does **not** get the same
+  treatment — a refresh is silent by design and `ensureValidToken()` already
+  covers a stall. `_isStandaloneApp()` is what lets the failure message point an
+  installed-app guru at the browser. Never let a failed sign-in leave the button
+  on "Signing in..." or fail without a captured `warn` line saying which reason
+  it was. Do not reinstate a proactive "sign-in only works in the browser" hint
+  on the login screen: it was added on a mistaken reading of the bug (a
+  standalone window *does* have an opener, and the popup behaves identically
+  there), and a remembered guru signs in from the installed app perfectly well.
 - `AnalysisController` receives a **snapshot string** at construction
   (`main.js` passes `guruSignature.getSignature()`), stored in
   `AppState.signature`. There is no `setGuruSignature`; a pod that is open cannot
@@ -485,12 +503,13 @@ When you add, remove, or rename a file under `js/`, `styles/`, `images/`, or `fa
 
 ### Bumping the version
 
-`APP_VERSION` at the top of `sw.js` (format `vYYYYMMDD`) is a **service-worker
-cache token, not a release name**, and `main.js` parses it for the footer.
-`README.md` covers when to bump it. The constraint that matters here: do not
-read a release out of this string, and do not try to keep it in step with the
-tag — a refactor with no user-visible effect legitimately leaves the same value
-on more than one commit.
+`APP_VERSION` at the top of `sw.js` (format `vYYYYMMDD`, with a trailing letter
+such as `vYYYYMMDDb` when more than one bump lands on the same day) is a
+**service-worker cache token, not a release name**, and `main.js` parses it for
+the footer. `README.md` covers when to bump it. The constraint that matters
+here: do not read a release out of this string, and do not try to keep it in
+step with the tag — a refactor with no user-visible effect legitimately leaves
+the same value on more than one commit.
 
 ### Release identity and tagging
 
