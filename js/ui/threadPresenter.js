@@ -37,7 +37,7 @@ export class ThreadPresenter {
 
         const correctionString = buildCorrectionString(row, currentAnalysis);
         const threadText = `P1 - ${this.formatDeck(row.player1)}\nP2 - ${this.formatDeck(row.player2)}\n` +
-            `[See match on The Stylus](${matchLink}) :Stylus:${correctionString}\n`;
+            `[See match on the stylus](${matchLink}) :Stylus:${correctionString}\n`;
 
         this.threadModal.open({
             titleText: `${podName} ${matchNumber}`,
