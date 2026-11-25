@@ -15,7 +15,7 @@ export const CONFIG = {
     ].join(' '),
 
     // Application settings
-    APP_NAME: 'The Stylus',
+    APP_NAME: 'the stylus',
 
     // Local storage keys
     STORAGE_KEYS: {
@@ -41,13 +41,13 @@ export const CONFIG = {
 // Google appData preferences file.
 export const DEPLOYMENTS = {
     production: {
-        label: 'Production',
-        appName: 'The Stylus',
+        label: 'production',
+        appName: 'the stylus',
         path: '/the-stylus/'
     },
     preview: {
-        label: 'Preview',
-        appName: 'The Stylus - Preview',
+        label: 'preview',
+        appName: 'the stylus - preview',
         path: '/the-stylus-staging/'
     }
 };

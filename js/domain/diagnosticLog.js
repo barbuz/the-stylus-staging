@@ -106,7 +106,7 @@ export function formatDiagnosticLog(entries = [], meta = {}) {
         : `${meta.version}`;
 
     const header = [
-        'The Stylus — diagnostic log',
+        'the stylus — diagnostic log',
         `Generated: ${generatedAt}`,
         `Version: ${version}`,
         `URL: ${redactEmails(meta.url || '')}`,

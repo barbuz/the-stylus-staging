@@ -309,11 +309,11 @@ export class AnalysisView {
             if (claimButton) {
                 claimButton.style.display = 'block';
                 claimButton.disabled = false;
-                claimButton.textContent = 'Claim Match';
+                claimButton.textContent = 'Claim match';
             }
             if (claimDeckButton) {
                 claimDeckButton.style.display = 'inline-block';
-                claimDeckButton.textContent = `Claim Deck (${deckStats.unclaimedMatches}/${deckStats.totalMatches})`;
+                claimDeckButton.textContent = `Claim deck (${deckStats.unclaimedMatches}/${deckStats.totalMatches})`;
             }
         } else if (owned) {
             scoringButtons.forEach(btn => { btn.style.display = ''; });
@@ -328,12 +328,12 @@ export class AnalysisView {
                 if (unclaimButton) {
                     unclaimButton.style.display = 'block';
                     unclaimButton.disabled = false;
-                    unclaimButton.textContent = 'Unclaim Match';
+                    unclaimButton.textContent = 'Unclaim match';
                 }
                 if (unclaimIncompleteButton) {
                     unclaimIncompleteButton.style.display = 'block';
                     unclaimIncompleteButton.disabled = false;
-                    unclaimIncompleteButton.textContent = `Unclaim All (${incompleteCount})`;
+                    unclaimIncompleteButton.textContent = `Unclaim all (${incompleteCount})`;
                 }
                 setDisplay(clearButton, 'none');
             } else {
