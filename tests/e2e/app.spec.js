@@ -119,7 +119,7 @@ test.describe('The Stylus (no Google, no network)', () => {
         // unscored claim counts as incomplete.
         const incompleteBtn = page.locator('#unclaim-incomplete-button');
         await expect(incompleteBtn).toBeVisible();
-        await expect(incompleteBtn).toHaveText('Unclaim All (1)');
+        await expect(incompleteBtn).toHaveText('Unclaim all (1)');
 
         await incompleteBtn.click();
         await expect(page.locator('#status-message')).toContainText('Unclaimed 1 incomplete matches');
@@ -453,7 +453,7 @@ test.describe('Diagnostic log download', () => {
 
         const path = await download.path();
         const text = fs.readFileSync(path, 'utf8');
-        expect(text).toContain('The Stylus — diagnostic log');
+        expect(text).toContain('the stylus — diagnostic log');
     });
 
     test('the footer Log button downloads a file containing a log line', async ({ page }) => {
@@ -468,7 +468,7 @@ test.describe('Diagnostic log download', () => {
 
         const path = await download.path();
         const text = fs.readFileSync(path, 'utf8');
-        expect(text).toContain('The Stylus — diagnostic log');
+        expect(text).toContain('the stylus — diagnostic log');
         expect(text).toContain('Version: v');
         expect(text).toMatch(/\[\d{4}-\d{2}-\d{2}T[\d:.]+Z\] (DEBUG|WARN|ERROR)/);
     });
@@ -484,7 +484,7 @@ test.describe('Diagnostic log download', () => {
 
         const path = await download.path();
         const text = fs.readFileSync(path, 'utf8');
-        expect(text).toContain('The Stylus — diagnostic log');
+        expect(text).toContain('the stylus — diagnostic log');
     });
 
     test('an uncaught error is captured in the downloaded log', async ({ page }) => {

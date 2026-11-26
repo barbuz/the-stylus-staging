@@ -10,12 +10,23 @@ body {
     line-height: 1.6;
     color: #333;
     background-color: #f5f7fa;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 0px 20px;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    width: 100%;
+}
+
+main {
+    flex: 1 0 auto;
 }
 
 /* Header */
@@ -63,7 +74,7 @@ header {
 
 .header-title p {
     color: #7f8c8d;
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     text-align: left;
 }
 
@@ -2621,16 +2632,62 @@ section h2, .login-section h2 {
 /* Footer */
 .app-footer {
     margin-top: 40px;
-    padding: 20px;
+    padding: 24px 20px 20px;
+    border-top: 1px solid #e9ecef;
     text-align: center;
     color: #666;
     font-size: 0.875rem;
+}
+
+.footer-credit {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 6px 10px;
+    margin-bottom: 12px;
+    font-size: 0.8rem;
+}
+
+.footer-credit a {
+    color: #7f8c8d;
+    text-decoration: none;
+}
+
+.footer-credit a:hover {
+    color: #3498db;
+}
+
+.footer-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.footer-mark {
+    height: 1.05em;
+    width: auto;
+    display: block;
+}
+
+.footer-brand strong {
+    color: #2c3e50;
+    font-weight: 700;
+}
+
+.footer-brand:hover strong {
+    color: inherit;
+}
+
+.footer-sep {
+    color: #adb5bd;
 }
 
 .footer-content {
     display: flex;
     justify-content: center;
     align-items: center;
+    flex-wrap: wrap;
     gap: 10px;
 }
 

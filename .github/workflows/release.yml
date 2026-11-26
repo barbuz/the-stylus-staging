@@ -89,5 +89,5 @@ jobs:
         run: |
           gh release create "$TAG" \
             --target "$GITHUB_SHA" \
-            --title "The Stylus $TAG" \
+            --title "the stylus $TAG" \
             --notes-file release-notes.md

@@ -762,7 +762,7 @@ export class AuthManager {
         // In an installed app the interactive popup is unreliable, so point the
         // guru at the route that works: the browser session the app reuses.
         if (this._isStandaloneApp()) {
-            return 'Sign-in did not complete. Open The Stylus in your browser and sign in there; the installed app will then use that session.';
+            return 'Sign-in did not complete. Open the stylus in your browser and sign in there; the installed app will then use that session.';
         }
         return 'Sign-in did not complete. Please tap "Sign in with Google" to try again.';
     }

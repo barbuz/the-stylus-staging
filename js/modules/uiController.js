@@ -88,7 +88,7 @@ export class UIController {
         window.history.replaceState({}, '', newUrl);
 
         // Reset document title
-        document.title = 'The Stylus';
+        document.title = 'the stylus';
     }
 
     hideHomeScreen() {

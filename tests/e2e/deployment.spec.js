@@ -90,14 +90,14 @@ test.describe('Deployment preference routing', () => {
     test('preview shows its own name and offers a switch to production', async ({ page }) => {
         await bootDeployment(page, '/the-stylus-staging/index.html');
 
-        await expect(page).toHaveTitle('The Stylus - Preview');
-        await expect(page.locator('.header-title h1')).toHaveText('The Stylus - Preview');
+        await expect(page).toHaveTitle('the stylus - preview');
+        await expect(page.locator('.header-title h1')).toHaveText('the stylus - preview');
 
         await page.getByRole('button', { name: /sign in with google/i }).click();
         await expect(page.locator('#app-content')).toBeVisible();
 
-        await expect(page.locator('.deployment-switch-note')).toHaveText('You are using Preview.');
-        await expect(page.locator('.deployment-switch-btn')).toHaveText('Switch to Production');
+        await expect(page.locator('.deployment-switch-note')).toHaveText('You are using preview.');
+        await expect(page.locator('.deployment-switch-btn')).toHaveText('Switch to production');
     });
 
     test('production offers a working switch into preview', async ({ page }) => {
@@ -107,11 +107,11 @@ test.describe('Deployment preference routing', () => {
         await expect(page.locator('#app-content')).toBeVisible();
 
         const button = page.locator('.deployment-switch-btn');
-        await expect(button).toHaveText('Switch to Preview');
+        await expect(button).toHaveText('Switch to preview');
         await button.click();
 
         await expect(page).toHaveURL(/\/the-stylus-staging\/(index\.html)?$/);
-        await expect(page).toHaveTitle('The Stylus - Preview');
+        await expect(page).toHaveTitle('the stylus - preview');
     });
 
     test('merely opening a deployment does not change the stored preference', async ({ page }) => {
@@ -129,7 +129,7 @@ test.describe('Deployment preference routing', () => {
         await bootDeployment(page, `/the-stylus-staging/index.html?pod=${POD_ID}`);
 
         await page.getByRole('button', { name: /sign in with google/i }).click();
-        await expect(page.locator('.deployment-switch-btn')).toHaveText('Switch to Production');
+        await expect(page.locator('.deployment-switch-btn')).toHaveText('Switch to production');
         await page.locator('.deployment-switch-btn').click();
 
         await expect(page).toHaveURL(new RegExp(`/the-stylus/\\?pod=${POD_ID}$`));

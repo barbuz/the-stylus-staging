@@ -1,7 +1,7 @@
 {
-  "name": "The Stylus - 3CB Guru Tool",
-  "short_name": "The Stylus",
-  "description": "Visual tool for gurus to edit 3 Card Blind MTG pod sheets",
+  "name": "the stylus",
+  "short_name": "the stylus",
+  "description": "edit 3 Card Blind pod sheets",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
