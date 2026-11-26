@@ -73,6 +73,13 @@
     --info-soft: #d1ecf1;
     --info-border: #bee5eb;
 
+    /* Floating status messages need an opaque background: they sit over card
+       art, so the translucent soft tokens leave the text hard to read. */
+    --status-success-bg: #eaf7ee;
+    --status-danger-bg: #fdecee;
+    --status-info-bg: #e8f4f8;
+    --status-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+
     --secondary: #95a5a6;
     --secondary-hover: #7f8c8d;
     --secondary-ink: #ffffff;
@@ -154,6 +161,11 @@ html[data-theme='dark'] {
     --info-text: #8ecdf4;
     --info-soft: rgba(61, 123, 255, 0.16);
     --info-border: rgba(61, 123, 255, 0.4);
+
+    --status-success-bg: #12261b;
+    --status-danger-bg: #2c1418;
+    --status-info-bg: #0f2038;
+    --status-shadow: 0 6px 22px rgba(0, 0, 0, 0.55);
 
     --secondary: #333d55;
     --secondary-hover: #414d6b;
@@ -663,7 +675,7 @@ section h2, .login-section h2 {
     margin-left: 20px;
     margin-bottom: 8px;
     padding: 8px 12px;
-    background: var(--danger-soft);
+    background: var(--status-danger-bg);
     color: var(--danger-text);
     border: 1px solid var(--danger-border);
     border-radius: 4px;
@@ -811,7 +823,7 @@ section h2, .login-section h2 {
 }
 
 .guru-info {
-    background-color: var(--success-soft);
+    background-color: var(--status-success-bg);
     border: 1px solid var(--success-border);
     border-radius: 6px;
     padding: 15px;
@@ -831,8 +843,8 @@ section h2, .login-section h2 {
 
 /* Status message, located in the top center */
 .status-message {
-    padding: 10px;
-    border-radius: 4px;
+    padding: 10px 16px;
+    border-radius: 6px;
     margin-top: 10px;
     display: none;
     position: fixed;
@@ -840,31 +852,35 @@ section h2, .login-section h2 {
     left: 50%;
     transform: translateX(-50%);
     z-index: 9999;
+    box-shadow: var(--status-shadow);
+    font-weight: 600;
+    max-width: calc(100vw - 32px);
+    text-align: center;
 }
 
 .status-message.success {
-    background-color: var(--success-soft);
+    background-color: var(--status-success-bg);
     color: var(--success-text);
     border: 1px solid var(--success-border);
     display: block;
 }
 
 .status-message.error {
-    background-color: var(--danger-soft);
+    background-color: var(--status-danger-bg);
     color: var(--danger-text);
     border: 1px solid var(--danger-border);
     display: block;
 }
 
 .status-message.loading {
-    background-color: var(--info-soft);
+    background-color: var(--status-info-bg);
     color: var(--info-text);
     border: 1px solid var(--info-border);
     display: block;
 }
 
 .status-message.info {
-    background-color: var(--info-soft);
+    background-color: var(--status-info-bg);
     color: var(--info-text);
     border: 1px solid var(--info-border);
     display: block;

@@ -515,6 +515,56 @@ pin down, each of which a synthetic fixture had wrong or absent:
 - Decklists are pipe-separated and rendered as separate card lines; the pipes
   are not shown to the user.
 
+### Previewing changes with a local mock
+
+When the user asks for a preview that bypasses Google login, build a temporary
+mock outside the repository. Never put a login bypass in app code, `sw.js` or
+`index.html` that ships: the only safe place for it is the throwaway copy.
+
+The recipe that worked:
+
+1. Copy the shipped static files to `/tmp/stylus-mock` — `index.html`, `sw.js`,
+   `site.webmanifest`, `js/`, `styles/`, `images/`, `favicons/`.
+2. In the copy's `index.html`, remove the two Google CDN `<script>` tags
+   (`https://apis.google.com/js/api.js` and
+   `https://accounts.google.com/gsi/client`) and add
+   `<script src="mock-login.js"></script>` in `<head>`. It must run before the
+   app's module script.
+3. `mock-login.js` is a browser-side version of the in-page worker in
+   `tests/e2e/stubs.js` (`installStubs`'s `addInitScript` body). If a previous
+   copy exists at `/tmp/stylus-mock/mock-login.js`, reuse it; otherwise rebuild
+   from that file. It must define:
+   - `window.gapi` with `load`, `client.init`, `setToken`, and the modelled
+     `sheets` (`spreadsheets.get`, `values.get` / `batchGet` / `batchUpdate` /
+     `clear` / `batchClear`) and `drive.files` / `request` clients.
+   - `window.google.accounts.oauth2.initTokenClient` returning a client whose
+     `requestAccessToken` calls `callback` immediately with a mock
+     `access_token` and a long `expires_in`.
+   - A `fetch` override for `openidconnect.googleapis.com/v1/userinfo`
+     returning a mock email.
+   - `delete Navigator.prototype.serviceWorker`, so the real worker cannot
+     serve a stale shell or reload the page mid-preview.
+4. Seed a restored session before the app modules run:
+   `access_token`, a future `token_expiry`, `remember_user=true`, `user_id`,
+   `guru_signature` (use `alice` so the sample pod opens on the current guru's
+   matches), and `recent_pods`. The Drive preference file must also return
+   `{ guruSignature: 'alice', recentPods: [{ spreadsheetId: 'mock-pod-1',
+   title: 'Test Pod', url, ... }], recentHubs: [], schemaVersion: 1 }`.
+5. Model a sample pod with four guru rows, a `Deck Notes` sheet and no metadata
+   sheet. Use real card names (`Black Lotus | Channel | Fireball`, etc.) so
+   Scryfall serves real card art. Leave one row unscored for the current guru,
+   one unclaimed row, and one row with disagreeing analyses so the discrepancy
+   path is visible.
+6. Serve the copy on a work-host port:
+   `cd /tmp/stylus-mock && python3 -m http.server 12000 --bind 0.0.0.0`.
+   The preview is the work-1 host; `/?pod=mock-pod-1` goes straight to analysis
+   and `/` is the signed-in home with an **Open Test Pod** link.
+7. Add a small mock banner only in the copy so a tester knows the data is fake.
+
+Check light and night on the home header, analysis controls, deck notes and the
+thread modal. The mock directory and `mock-login.js` are not committed, not
+referenced by `index.html` / `sw.js`, and must stay outside the repository.
+
 ### CI billing
 
 This repository is public, so standard GitHub-hosted runners are free and
