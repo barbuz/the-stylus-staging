@@ -4,7 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, height=device-height">
     <meta name="description" content="Edit 3 Card Blind pod sheets in your browser">
-    <meta name="theme-color" content="#3498db">
+    <meta name="theme-color" content="#f5f7fa">
+    <script>
+        // Resolve day/night before first paint, so a dark-mode guru never sees a
+        // light flash. The key mirrors CONFIG.STORAGE_KEYS.THEME in js/config.js.
+        (function () {
+            var stored = null;
+            try { stored = localStorage.getItem('stylus_theme'); } catch (e) { /* storage blocked */ }
+            var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var dark = stored === 'dark' || (stored !== 'light' && prefersDark);
+            var theme = dark ? 'dark' : 'light';
+            document.documentElement.dataset.theme = theme;
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', theme === 'dark' ? '#0a0e17' : '#f5f7fa');
+        })();
+    </script>
     
     <!-- iOS specific meta tags -->
     <meta name="mobile-web-app-capable" content="yes">
@@ -43,6 +57,7 @@
                 <div class="header-auth" id="auth-section">
                     <!-- Authentication content will be loaded here -->
                 </div>
+                <span class="theme-toggle-slot" data-theme-toggle-slot></span>
             </div>
         </header>
 
@@ -220,6 +235,7 @@
                                     <button id="deck-notes-btn" class="secondary-btn">Deck notes</button>
                                     <button id="refresh-btn" class="secondary-btn">Refresh</button>
                                     <button id="exit-analysis-btn" class="secondary-btn">Exit</button>
+                                    <span class="theme-toggle-slot" data-theme-toggle-slot></span>
                                     <button type="button" class="log-download-btn" data-log-download title="Download diagnostic log" aria-label="Download diagnostic log">
                                         <svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg> Log
                                     </button>

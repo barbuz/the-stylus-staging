@@ -10,6 +10,15 @@ a release; `## [Unreleased]` may sit above it and is ignored.
 Each release lists what changed for a guru, with the PR number that carried it.
 Compare this file between the two deployments to see what production is missing.
 
+## [Unreleased]
+
+### Added
+
+- A **Day / Night** switch, available in the header and in the analysis and
+  deck-notes controls. The app follows your device's light/dark preference by
+  default and remembers an explicit choice. Night is a cool blue-black face;
+  day keeps the existing light layout with the same blue family
+
 ## [2026.11] - 2026-11-15
 
 Monthly promotion to production. It carries the session-lifecycle fixes (silent

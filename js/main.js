@@ -3,6 +3,7 @@ import { UIController } from './modules/uiController.js';
 import { AuthManager } from './modules/authManager.js';
 import { GuruSignature } from './modules/guruSignature.js';
 import { AnalysisController } from './ui/analysisController.js';
+import { ThemeToggle } from './ui/themeToggle.js';
 import { RecentPodsManager } from './modules/recentPods.js';
 import { CONFIG, DEPLOYMENTS } from './config.js';
 import { EventBus, APP_EVENTS } from './app/events.js';
@@ -529,6 +530,11 @@ class ThreeCardBlindGuruTool {
 // Initialize the application when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     applyDeploymentBranding();
+
+    // Independent of auth and of any open screen: the inline script already
+    // painted the resolved theme, so this only mounts the switches and keeps
+    // the choice in step.
+    new ThemeToggle().init();
 
     const app = new ThreeCardBlindGuruTool();
     app.setupGlobalErrorCapture();

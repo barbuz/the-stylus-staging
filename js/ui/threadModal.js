@@ -17,17 +17,19 @@ function setupCopyButton(button, textToCopy, defaultTitle, textarea) {
         }
         navigator.clipboard.writeText(textToCopy).then(() => {
             button.textContent = '✓';
-            button.style.color = '#28a745';
+            button.classList.remove('copy-failed');
+            button.classList.add('copy-success');
             button.title = 'Copied!';
             setTimeout(() => {
                 button.textContent = '📋';
-                button.style.color = '#5865F2';
+                button.classList.remove('copy-success', 'copy-failed');
                 button.title = defaultTitle;
             }, 2000);
         }).catch(err => {
             logger.error('Failed to copy:', err);
             button.textContent = '✗';
-            button.style.color = '#dc3545';
+            button.classList.remove('copy-success');
+            button.classList.add('copy-failed');
             button.title = 'Failed to copy';
         });
     });
@@ -58,19 +60,19 @@ export class ThreadModal {
             <div class="thread-modal-header">
                 <h3>${escapeHtml(titleText)}</h3>
                 <button class="copy-btn-icon copy-title-btn" title="Copy title to Clipboard">📋</button>
-                <button class="close-thread-modal" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #666;">&times;</button>
+                <button class="close-thread-modal">&times;</button>
             </div>
             <div class="thread-modal-content">
-                <p style="margin-bottom: 10px; color: #666; display: flex; align-items: center; justify-content: space-between;">
-                    <span>Copy this text to create a <a href="https://discord.com/channels/1051702336113889330/1145460704724398181" target="_blank" style="display: inline-flex; align-items: center; gap: 4px;"><img src="images/Discord-Symbol-Blurple.svg" alt="Discord" style="width: 16px; height: 16px; vertical-align: middle;" />Guru Match Help post</a> for this match:</span>
+                <p class="thread-modal-note">
+                    <span>Copy this text to create a <a href="https://discord.com/channels/1051702336113889330/1145460704724398181" target="_blank" class="thread-modal-discord-link"><img src="images/Discord-Symbol-Blurple.svg" alt="Discord" class="thread-modal-discord-icon" />Guru Match Help post</a> for this match:</span>
                     <button class="copy-btn-icon copy-thread-btn" title="Copy to Clipboard">📋</button>
                 </p>
-                <textarea readonly class="thread-text-area" rows="${textareaRows}" style="width: 100%; font-family: monospace; padding: 12px; border: 1px solid #ddd; border-radius: 4px; resize: none;">${escapeHtml(threadText)}</textarea>
-                <p style="margin-top: 16px; margin-bottom: 10px; color: #666; display: flex; align-items: center; justify-content: space-between;">
+                <textarea readonly class="thread-text-area" rows="${textareaRows}">${escapeHtml(threadText)}</textarea>
+                <p class="thread-modal-note thread-modal-note-spaced">
                     <span>Then run this command in the thread:</span>
                     <button class="copy-btn-icon copy-writeup-btn" title="Copy command to Clipboard">📋</button>
                 </p>
-                <div style="font-family: monospace; padding: 12px; border: 1px solid #ddd; border-radius: 4px; background-color: #f5f5f5;">${escapeHtml(writeupCommand)}</div>
+                <div class="writeup-command">${escapeHtml(writeupCommand)}</div>
             </div>
         `;
 

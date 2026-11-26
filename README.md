@@ -84,6 +84,18 @@ you can change devices and keep guruing.
 - attach that file to your bug report; access tokens and email addresses are
   removed automatically, but the file may still contain match data
 
+## Day and night mode
+
+The stylus has a day (light) and night (dark) face. It starts on whichever your
+device prefers, and a **Day / Night** switch in the header lets you choose. The
+same switch appears in the analysis and deck-notes controls, because the header
+is hidden while a pod is open. Night is a cool blue-black face; day keeps the
+existing light look with the same blue family.
+
+Your choice is remembered for next time. The first time you switch, it becomes
+an explicit choice and no longer follows your device; leave it alone and the app
+keeps matching your device as that changes.
+
 ## Browser requirements
 
 - a modern browser with ES modules and localStorage
