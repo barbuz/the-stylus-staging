@@ -19,11 +19,6 @@ Compare this file between the two deployments to see what production is missing.
   default and remembers an explicit choice. Night is a cool blue-black face;
   day keeps the existing light layout with the same blue family
 
-### Fixed
-
-- Status messages now use an opaque background in night mode, so information,
-  success and error notices stay readable over card art
-
 ## [2026.11] - 2026-11-15
 
 Monthly promotion to production. It carries the session-lifecycle fixes (silent
