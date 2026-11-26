@@ -33,6 +33,9 @@ export const CONFIG = {
         // Which deployment this browser should open deep links in. Absent or
         // unknown means "leave me on whichever deployment the link points at".
         PREFERRED_DEPLOYMENT: 'preferred_deployment',
+        // Explicit day/night choice. Absent means follow the OS preference.
+        // The key is duplicated by the pre-paint script in index.html.
+        THEME: 'stylus_theme',
     }
 };
 

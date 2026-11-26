@@ -18,6 +18,7 @@ import {
     renderCardSlots,
     renderCardSlotsError
 } from './cardSlotsView.js';
+import { mountThemeToggles } from './themeToggle.js';
 
 export class DeckNotesView {
     /**
@@ -89,6 +90,7 @@ export class DeckNotesView {
                             </div>
                         </div>
                         <div class="editor-controls">
+                            <span class="theme-toggle-slot" data-theme-toggle-slot></span>
                             <button id="deck-notes-exit-btn" class="secondary-btn">Exit</button>
                         </div>
                     </div>
@@ -98,6 +100,7 @@ export class DeckNotesView {
 
         sheetEditor.insertBefore(screen, sheetEditor.firstChild);
         this.screen = screen;
+        mountThemeToggles(screen);
         this.bindButtons();
 
         const analysisInterface = getElement('guru-analysis-interface');

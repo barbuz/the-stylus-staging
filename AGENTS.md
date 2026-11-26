@@ -256,6 +256,53 @@ at a time before guruing can start. It is a gate and a view at once:
   - A deck whose goldfish signature matches `state.signature` gets the same
     `current-guru-row` highlight as the match table.
 
+## Day and night theme
+
+The app has a light (day) and dark (night) face. It is a **theming layer over the
+existing design**, not a redesign: the layout, type and controls are unchanged;
+only the palette follows the theme. The night face is the barbuz cool blue-black;
+the day face is the app's existing neutral-light palette, so the two are not a
+straight brightness swap. **Blue is the one colour that crosses both** — day uses
+the darker tone, night the brighter one.
+
+- **One source of truth:** the token blocks at the top of `styles/main.css`
+  (`:root` for day, `html[data-theme='dark']` for night). Every colour in that
+  file must be a `var(--token)`. A raw hex value below the token blocks is a
+  bug: the night face cannot follow it. Add a token rather than a one-off colour.
+- **No flash:** the inline script in `index.html` sets `data-theme` and the
+  browser-chrome `theme-color` before first paint. It reads the same
+  `stylus_theme` key that `CONFIG.STORAGE_KEYS.THEME` exposes, so changing one
+  means changing the other. The script cannot import modules, which is why the
+  key is duplicated there.
+- **A stored choice wins; otherwise follow the OS.** `js/domain/theme.js` is the
+  pure resolver (`resolveTheme`, `nextTheme`). An explicit toggle persists
+  `light`/`dark`; no stored value means `prefers-color-scheme`. The toggle also
+  listens for OS changes while no choice is stored.
+- **The switch:** `js/ui/themeToggle.js` owns the delegation and persistence.
+  Buttons use `[data-theme-toggle]`; a screen marks a slot with
+  `<span data-theme-toggle-slot></span>` and calls `mountThemeToggles(root)` if
+  it builds its DOM later (`deckNotesView` does this). A single delegated click
+  handler serves every switch, so a new screen must not bind its own. The
+  thumb/label state is CSS-driven from `html[data-theme]`; only `aria-checked`
+  is synced in JS.
+- **Every screen with its own chrome needs a switch**, because the header is
+  hidden while a pod is open: the analysis `editor-controls` and the deck-notes
+  `editor-controls` both carry a slot. Do not put one in the footer; the footer
+  deployment switch is tester-only.
+- **Inline styles in JS are part of the theme too.** Use classes from
+  `main.css` (as `threadModal.js` does) instead of `style="color: …"`, or the
+  element will keep a day colour on the night face.
+- **Dark-only assets:** an asset drawn for the light face (e.g. the black
+  Discord glyph) gets an `html[data-theme='dark']` filter/override rather than a
+  second file, unless it is genuinely two-colour artwork.
+- **Contrast:** day and night each clear WCAG AA for body text and controls. The
+  night accent (`#3D7BFF`) is bright, so filled controls use `--accent-ink`
+  (near-black) rather than white; day uses the darker `--accent` with white.
+  Keep that pair together when adding a filled control.
+- **`color-scheme`** is set per face, so native inputs, scrollbars and form
+  controls follow; still set `background`/`color` explicitly on any new input,
+  as browser defaults vary.
+
 ## Characterization (intentional current quirks)
 
 `tests/unit/characterization.test.js` pins these. Each is labelled CONTRACT
@@ -292,7 +339,8 @@ the-stylus/
 │   │   ├── guruColor.js        # colour registry: fields, sheet names, merged-column layout
 │   │   ├── inverseCheck.js     # inverse-error detection helpers
 │   │   ├── matchRows.js        # row model build + find first incomplete/discrepancy/mirror, deck stats
-│   │   └── recentEntries.js    # recent-pod/hub record shape + legacy sheetId fallback
+│   │   ├── recentEntries.js    # recent-pod/hub record shape + legacy sheetId fallback
+│   │   └── theme.js            # pure day/night resolution + browser-chrome colours
 │   ├── modules/                # ES6 class-based feature modules
 │   │   ├── authManager.js
 │   │   ├── deckNotesEditor.js         # Deck Notes gate controller: grouping, index, poll, hand-off
@@ -321,6 +369,7 @@ the-stylus/
 │   │   ├── matchStatus.js             # Pure match-status descriptors/markup
 │   │   ├── overviewTableModal.js      # Generic jump-to-row table modal (matches/decks)
 │   │   ├── matchTablePresenter.js     # Row/status options for the match table
+│   │   ├── themeToggle.js             # Day/night switch: mount, delegated click, persistence
 │   │   ├── threadModal.js             # Create-thread modal, open/close/destroy
 │   │   └── threadPresenter.js         # Builds the Discord thread text for a row
 │   ├── services/               # Small infrastructure helpers
@@ -331,7 +380,7 @@ the-stylus/
 │       ├── log.js              # logger + bounded diagnostic buffer (debug gated by ?debug)
 │       ├── podUtils.js         # pod name <-> code conversion
 │       └── urlUtils.js         # Sheet URL validation/parsing/sanitising
-├── styles/main.css             # All application styles
+├── styles/main.css             # All application styles + day/night token blocks
 ├── sw.js                       # Service worker: APP_VERSION, precache list, Scryfall cache
 ├── site.webmanifest            # PWA manifest
 ├── favicons/ images/           # Static assets
